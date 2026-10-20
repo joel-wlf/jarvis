@@ -99,8 +99,8 @@ shred -u "$PROJECT/.env"
 ln -s "$MNT/secrets/.env" "$PROJECT/.env"
 if [ -d "$HOME/jarvis-backups" ] && [ ! -L "$HOME/jarvis-backups" ]; then
   cp -a "$HOME/jarvis-backups/." "$MNT/backups/"
-  find "$HOME/jarvis-backups" -type f -exec shred -u {} +
-  rm -rf "$HOME/jarvis-backups"
+  sudo find "$HOME/jarvis-backups" -type f -exec shred -u {} +
+  sudo rm -rf "$HOME/jarvis-backups"
 fi
 ln -sfn "$MNT/backups" "$HOME/jarvis-backups"
 

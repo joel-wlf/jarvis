@@ -150,3 +150,30 @@ Der `organizer` bündelt nicht nur Nachrichten je Chat zu Threads, sondern verkn
 ## Vorbereitet für später
 
 `messages.embedding` und `memories.embedding` (`vector(1024)`) sind angelegt, aber leer. Der spätere Kontext-Service kann Embeddings berechnen, einen HNSW-Index ergänzen und `memories` / `suggested_actions` füllen – ohne Umbau der bestehenden Container.
+
+## Diebstahlschutz (verschlüsselte Daten auf dem Pi)
+
+Wer den Pi samt SD-Karte stiehlt, soll weder Nachrichten lesen noch dein WhatsApp-Konto übernehmen können.
+
+**Was verschlüsselt ist:** Ein LUKS2-Container (`/srv/vault.img`, eingehängt unter `/srv/vault`) enthält das komplette Docker-Datenverzeichnis (Postgres mit allen Nachrichten, die WhatsApp-Sitzung, Container-Logs), die `.env` (API-Schlüssel, Token, Passwörter) und die Backups. `~/jarvis/.env` und `~/jarvis-backups` sind Verweise dorthin. Verschlüsselt wird mit Adiantum (schnell auf dem Pi 4 ohne AES-Hardware), das Passwort wird mit Argon2id abgeleitet.
+
+**Einrichtung (einmalig, auf dem Pi):** `scripts/vault-setup.sh`. Das Skript fragt interaktiv nach dem Passwort, legt den Container an, verschiebt die Daten, prüft die Nachrichtenzahl und überschreibt erst dann die alten Klartext-Dateien. Es schaltet außerdem den Zram-Writeback und die Swap-Datei ab, die Klartext aus dem Arbeitsspeicher auf die SD-Karte schreiben könnten. Bricht es in Schritt 7 ab, setzt `scripts/vault-finish.sh` fort.
+
+**Nach jedem Neustart oder Stromausfall:** Docker startet nur, wenn der Container eingehängt ist (systemd-Bedingung). Entsperren vom Rechner aus:
+
+```bash
+ssh -t <benutzer>@<pi-adresse> jarvis-unlock
+```
+
+Das Passwort kann niemand zurücksetzen. Im Passwort-Manager aufbewahren.
+
+**Grenzen:**
+- Die alten Klartext-Daten wurden überschreibend gelöscht. Auf SD-Karten bleiben durch Wear-Leveling trotzdem unter Umständen Reste in unbenutzten Blöcken. Wer das ausschließen will, spielt die Karte neu auf und stellt aus dem Backup wieder her.
+- Läuft der Pi und ist entsperrt, schützt die Verschlüsselung nicht (Zugriff per SSH, Cold-Boot-Angriffe). SSH nur mit Schlüssel, `PasswordAuthentication no`.
+- Der Cloudflare-Tunnel-Token liegt in `/etc/cloudflared/token` unverschlüsselt.
+
+**Notfallplan bei Diebstahl:**
+1. WhatsApp: Verknüpfte Geräte, Gerät "Jarvis" entfernen (beendet die Sitzung sofort).
+2. Cloudflare Zero Trust: Tunnel löschen oder Token neu erzeugen.
+3. OpenAI: API-Schlüssel widerrufen.
+4. Neuen `MCP_TOKEN` setzen und den Connector in Claude neu einrichten.
