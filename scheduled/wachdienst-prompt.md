@@ -7,15 +7,15 @@ Den aktuellen Prompt findest du in `~/.claude/scheduled-tasks/jarvis-wachdienst/
 
 - **Jarvis (Server):** `get_dashboard` berechnet alle Kandidaten (Erinnerungen, Termine in 3 Tagen, unbeantwortete Fragen in Einzelchats, offene Umfragen, fällige Vorschläge, Gesundheit) und filtert Zurückgestelltes und Unwichtiges heraus. `to_notify` nennt, was jetzt gemeldet werden soll.
 - **Wachdienst (Claude):** prüft die Kandidaten im Chat-Kontext, entscheidet, ob wirklich etwas zu melden ist, sendet höchstens eine gebündelte Push-Nachricht und ruft danach `watch_mark_notified` auf.
-- **Jarvis Zentrale (Seite):** https://claude.ai/artifact/1qzZRFGBNBBg9NkaCuajpr zeigt dieselben Karten mit Schnellaktionen (Später 1 Std, 3 Std, Morgen; Unwichtig; Chat stumm; Erledigt; Antwort im eigenen Stil vorschlagen und senden).
+- **Jarvis Zentrale (optional):** eine Claude-Artifact-Seite mit denselben Karten und Schnellaktionen (Später, Unwichtig, Chat stumm, Erledigt, Antwort im eigenen Stil vorschlagen). Nicht Teil des Repos.
 
 ## Zustand (alles in Postgres)
 
-- `reminders`: Erinnerungen von Joel (`create_reminder`, `list_reminders`, `update_reminder`).
+- `reminders`: Erinnerungen des Nutzers (`create_reminder`, `list_reminders`, `update_reminder`).
 - `watch_state`: pro Meldeschlüssel zuletzt gemeldet, zurückgestellt bis, unwichtig (`watch_feedback`, `watch_state`, `watch_mark_notified`).
 - Schlüssel: `event:<topic>:<vortag|kurz|info>`, `frage:<chat_jid>:<epoche>`, `umfrage:<id>`, `aktion:<id>`, `reminder:<id>`, `health`.
 - Ein Schlüssel ohne Zusatz gilt als Präfix: `frage:<chat_jid>` blendet alle Fragen aus diesem Chat aus, `umfrage:` alle Umfragen.
 
 ## Schreibstil
 
-`get_writing_style(chat)` liefert Kennzahlen und echte Beispiele aus Joels eigenen Nachrichten (pro Chat, bei wenig Material ergänzt durch ähnliche Personen). Die Jarvis-Anweisungen verlangen, das vor jedem Entwurf oder Senden zu nutzen.
+`get_writing_style(chat)` liefert Kennzahlen und echte Beispiele aus des Nutzers eigenen Nachrichten (pro Chat, bei wenig Material ergänzt durch ähnliche Personen). Die Jarvis-Anweisungen verlangen, das vor jedem Entwurf oder Senden zu nutzen.

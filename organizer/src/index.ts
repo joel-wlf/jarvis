@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { ApiError, DAILY_BUDGET, MODEL, OPENAI_KEY, REDACT, TZ, budgetLeft, complete, dayFmt, dayOnly, isAuthError, log, parseDate, fixWhen, sanitizeYear, pool, redact, retryable, sleep, memoryBlock } from './lib.js'
 import { linkNext, sweep } from './topics.js'
 import { profileNext } from './people.js'
+import { OWNER, OWNER_GEN } from './config.js'
 
 // ---------------------------------------------------------------- Konfiguration (Stufe 1: Threads je Chat)
 const ENABLED = process.env.ORGANIZER_ENABLED === 'true'
@@ -19,13 +20,13 @@ const Event = z.object({
   what: z.string(),
   when: z.string().nullable().describe('lokale Zeit ohne Zeitzone, z.B. 2026-10-25T12:30:00, oder nur YYYY-MM-DD, oder null wenn unklar'),
   where: z.string().nullable(),
-  for_me: z.boolean().describe('true, wenn der Termin Joel ("Ich") betrifft'),
+  for_me: z.boolean().describe(`true, wenn der Termin ${OWNER} ("Ich") betrifft`),
 })
 const Todo = z.object({
   what: z.string(),
   who: z.string().nullable(),
   due: z.string().nullable().describe('ISO-8601 oder null'),
-  for_me: z.boolean().describe('true, wenn die Aufgabe an Joel ("Ich") oder die ganze Gruppe gerichtet ist'),
+  for_me: z.boolean().describe(`true, wenn die Aufgabe an ${OWNER} ("Ich") oder die ganze Gruppe gerichtet ist`),
 })
 const Output = z.object({
   threads: z.array(
@@ -42,7 +43,7 @@ const Output = z.object({
   ),
 })
 
-const SYSTEM = `Du sortierst WhatsApp-Nachrichten eines Chats zu Themen ("Threads") für Joel. Joel schreibt als "Ich".
+const SYSTEM = `Du sortierst WhatsApp-Nachrichten eines Chats zu Themen ("Threads") für ${OWNER}. ${OWNER} schreibt als "Ich".
 
 Aufgabe: Gruppiere die nummerierten Nachrichten nach Thema. In Gruppenchats laufen oft mehrere Themen verschränkt, viele kurze Nachrichten von verschiedenen Personen gehören zum selben Thema. Eine Nachricht gehört zu genau einem Thema.
 - Gehört eine Nachricht zu einem schon bekannten Thema (T…-Liste), gib dessen Nummer in existing_thread an und liefere Titel und Zusammenfassung mit dem aktualisierten Stand. Sonst existing_thread = null.
@@ -234,7 +235,7 @@ async function store(chat: string, msgs: Msg[], idx: Map<number, Msg>, known: Kn
          WHERE t.id = $1`,
         [threadId],
       )
-      // Vorschläge für Joel
+      // Vorschläge für den Nutzer
       const actions: { title: string; detail: string | null; due: Date | null }[] = [
         ...t.events.filter((e) => e.for_me).map((e) => ({ title: `Termin: ${e.what}`, detail: [e.where && `Ort: ${e.where}`, t.title].filter(Boolean).join(' · '), due: sanitizeYear(parseDate(e.when), from, to) })),
         ...t.todos.filter((x) => x.for_me).map((x) => ({ title: `Aufgabe: ${x.what}`, detail: t.title, due: sanitizeYear(parseDate(x.due), from, to) })),

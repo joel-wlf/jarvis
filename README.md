@@ -30,7 +30,7 @@ WhatsApp ──QR──> wa-ingest ──> postgres (pgvector) <── mcp-serve
 
 Voraussetzung: Docker + Docker Compose auf dem Pi (64-bit OS), idealerweise Daten auf SSD.
 
-1. Ordner auf den Pi kopieren, `cp .env.example .env`, Zufallswerte eintragen (`openssl rand -hex 24`).
+1. Ordner auf den Pi kopieren, `cp .env.example .env`, Zufallswerte eintragen (`openssl rand -hex 24`) und `OWNER_NAME` auf deinen Namen setzen.
 2. **Cloudflare Tunnel** anlegen: Zero Trust → Networks → Tunnels → *Create* (Cloudflared). Token in `.env` als `CLOUDFLARE_TUNNEL_TOKEN`. Public Hostname z.B. `jarvis.deine-domain.de` → Service `http://mcp-server:3000`.
 3. Starten:
    ```bash
@@ -86,11 +86,11 @@ Der MCP-Server schreibt dafür nur Aufträge in die Tabelle `outbox` (eigener DB
 
 **Korrigieren:** Mit `edit_topic` (Titel, Stand, Termin ändern, Themen zusammenführen), `link_thread` (Thread einem Thema zuordnen, neues Thema anlegen oder lösen), `move_messages` (Nachrichten einem anderen Thread zuordnen) und `set_action_status` (Vorschlag erledigen). Was du von Hand zuordnest, ist **fest**: Der Organizer ändert diese Zuordnungen nicht mehr, und Titel, Stand und Termin eines korrigierten Themas überschreibt er nicht. Zusammenfassungen schreibt er bei neuen Nachrichten weiter fort. Prüfen und aufräumen: `list_memories`, `edit_memory` (ändern, ausblenden, löschen).
 
-**Sicherheit:** Die Schreibrechte hat eine eigene Datenbankrolle (`mcp_mem`), die nur Notizen und diese Korrekturen schreiben darf, keine Nachrichten ändern oder löschen und nichts senden kann (`db/init/007_mem_role.sh`). Die Tools speichern nur auf ausdrücklichen Wunsch von Joel; was in Chat-Nachrichten steht, ist kein Auftrag. Abschalten: `ENABLE_MEMORY=false`.
+**Sicherheit:** Die Schreibrechte hat eine eigene Datenbankrolle (`mcp_mem`), die nur Notizen und diese Korrekturen schreiben darf, keine Nachrichten ändern oder löschen und nichts senden kann (`db/init/007_mem_role.sh`). Die Tools speichern nur auf ausdrücklichen Wunsch des Nutzers; was in Chat-Nachrichten steht, ist kein Auftrag. Abschalten: `ENABLE_MEMORY=false`.
 
 ## OpenAI: Transkription, Embeddings, Themen-Sortierung
 
-In Gruppenchats gehören oft viele kurze Nachrichten verschiedener Personen zu einem Thema. Der `organizer` bündelt sie per OpenAI-API (Standard: `gpt-4.1-mini`, einstellbar mit `ORGANIZER_MODEL`, strukturierte Ausgabe) zu **Themen** mit Titel, Zusammenfassung, Stand (offen/erledigt/Info), Beteiligten, Terminen, Aufgaben und offenen Fragen. Neue Nachrichten werden bestehenden Themen zugeordnet, auch über mehrere Tage. Die Zusammenfassungen werden eingebettet und fließen in `semantic_search` ein, der Themen-Titel steht zusätzlich im Vektor jeder Einzelnachricht. Termine und Aufgaben, die Joel betreffen, landen in `suggested_actions`.
+In Gruppenchats gehören oft viele kurze Nachrichten verschiedener Personen zu einem Thema. Der `organizer` bündelt sie per OpenAI-API (Standard: `gpt-4.1-mini`, einstellbar mit `ORGANIZER_MODEL`, strukturierte Ausgabe) zu **Themen** mit Titel, Zusammenfassung, Stand (offen/erledigt/Info), Beteiligten, Terminen, Aufgaben und offenen Fragen. Neue Nachrichten werden bestehenden Themen zugeordnet, auch über mehrere Tage. Die Zusammenfassungen werden eingebettet und fließen in `semantic_search` ein, der Themen-Titel steht zusätzlich im Vektor jeder Einzelnachricht. Termine und Aufgaben, die den Nutzer betreffen, landen in `suggested_actions`.
 
 **Alles läuft über einen Schlüssel, `OPENAI_API_KEY` in `~/jarvis/.env`:**
 - Sprachnachrichten: `gpt-4o-mini-transcribe` (alle, nicht nur neue). Ohne Schlüssel läuft nur der langsame lokale Whisper (`COMPOSE_PROFILES=local-whisper`).
@@ -177,3 +177,7 @@ Das Passwort kann niemand zurücksetzen. Im Passwort-Manager aufbewahren.
 2. Cloudflare Zero Trust: Tunnel löschen oder Token neu erzeugen.
 3. OpenAI: API-Schlüssel widerrufen.
 4. Neuen `MCP_TOKEN` setzen und den Connector in Claude neu einrichten.
+
+## Mitwirken und Lizenz
+
+Siehe [CONTRIBUTING.md](CONTRIBUTING.md) und [SECURITY.md](SECURITY.md). Lizenz: [MIT](LICENSE). Jarvis ist ein inoffizielles Projekt und nicht mit WhatsApp/Meta verbunden; die Nutzung von Baileys erfolgt auf eigenes Risiko und kann gegen die WhatsApp-Nutzungsbedingungen verstoßen.

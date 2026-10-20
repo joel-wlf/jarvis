@@ -1,4 +1,4 @@
--- Erinnerungen von Joel und Rückmeldungen an den Wachdienst (Scheduled Task).
+-- Erinnerungen des Nutzers und Rückmeldungen an den Wachdienst (Scheduled Task).
 -- Idempotent; auf bestehenden Datenbanken manuell anwenden.
 CREATE TABLE IF NOT EXISTS reminders (
   id          serial PRIMARY KEY,

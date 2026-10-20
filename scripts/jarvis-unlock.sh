@@ -7,7 +7,7 @@ set -euo pipefail
 IMG=/srv/vault.img
 MAPPER=jarvisvault
 MNT=/srv/vault
-USER_NAME="${SUDO_USER:-joel}"
+USER_NAME="${SUDO_USER:?kein Benutzer ermittelbar, bitte mit sudo aufrufen}"
 
 if mountpoint -q "$MNT"; then
   echo "Schon entsperrt."

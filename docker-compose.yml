@@ -132,6 +132,7 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     environment:
+      OWNER_NAME: ${OWNER_NAME:-}
       DATABASE_URL: postgres://mcp_ro:${MCP_RO_PASSWORD}@postgres:5432/jarvis
       # nur INSERT/SELECT auf die outbox (gleiches Passwort wie mcp_ro, siehe db/init/002_roles.sh)
       ACTIONS_DATABASE_URL: postgres://mcp_act:${MCP_RO_PASSWORD}@postgres:5432/jarvis
@@ -186,7 +187,8 @@ services:
       PEOPLE_ACTIVITY_DELTA: ${PEOPLE_ACTIVITY_DELTA:-15}
       PEOPLE_MAX_PER_DAY: ${PEOPLE_MAX_PER_DAY:-60}
       PEOPLE_SCRUB: ${PEOPLE_SCRUB:-false}
-      OWN_NAMES: ${OWN_NAMES:-Joel}
+      OWNER_NAME: ${OWNER_NAME:-}
+      OWN_NAMES: ${OWN_NAMES:-}
       ORGANIZER_EXCLUDE_NAMES: ${ORGANIZER_EXCLUDE_NAMES:-}
       ORGANIZER_REDACT: ${ORGANIZER_REDACT:-true}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}

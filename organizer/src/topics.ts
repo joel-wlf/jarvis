@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { TZ, sanitizeYear, complete, dayFmt, dayOnly, isAuthError, log, parseDate, pool, redact, retryable, sleep, MODEL, memoryBlock } from './lib.js'
+import { OWNER, OWNER_GEN } from './config.js'
 
 // Stufe 2: Threads (je Chat) zu chatübergreifenden "Themen" verknüpfen, Stand pflegen, Veraltetes erkennen.
 
@@ -28,7 +29,7 @@ const LinkOut = z.object({
     .describe('null nur bei decision = none'),
 })
 
-const SYSTEM = `Du pflegst für Joel ("Ich") eine Liste von Themen, die über mehrere WhatsApp-Chats hinweg laufen können. Ein "Thema" ist etwas Verfolgbares: eine Veranstaltung/Verabredung, ein Vorhaben, eine Entscheidung, eine Aufgabe, ein Vorgang. Beispiel: In der Gruppe "Jubaew" läuft die Anmeldung zum Spieleabend, und Joel fragt Marco im Einzelchat, ob er kommt: das ist EIN Thema "Spieleabend".
+const SYSTEM = `Du pflegst für ${OWNER} ("Ich") eine Liste von Themen, die über mehrere WhatsApp-Chats hinweg laufen können. Ein "Thema" ist etwas Verfolgbares: eine Veranstaltung/Verabredung, ein Vorhaben, eine Entscheidung, eine Aufgabe, ein Vorgang. Beispiel: In der Gruppe "Jubaew" läuft die Anmeldung zum Spieleabend, und ${OWNER} fragt Marco im Einzelchat, ob er kommt: das ist EIN Thema "Spieleabend".
 
 Du bekommst einen Thread (Teil eines Chats) und Kandidaten-Themen (K…).
 - decision "attach": Der Thread gehört eindeutig zum selben Gegenstand wie ein Kandidat (gleiche Veranstaltung/Vorhaben/Vorgang). Gib topic_id an und liefere das aktualisierte Thema: Titel, Gesamtstand über ALLE Chats (was läuft wo, wer hat was gesagt), Status, Termin, Personenstatus.
@@ -123,7 +124,7 @@ export async function linkNext(): Promise<boolean> {
       ? [...cand.values()]
           .map((c) => {
             const people = (c.facts?.people ?? []).map((p) => `${p.name}=${p.state}${p.note ? ` (${p.note})` : ''}`).join(', ')
-            return `K${c.id} [${c.locked ? 'von Joel korrigiert, ' : ''}${c.status}${c.event_at ? `, Termin ${dayOnly.format(c.event_at)}` : ''}, Chats: ${(chatNames.get(String(c.id)) ?? []).join(' + ')}] ${c.title}: ${c.summary ?? ''}${people ? ` | Personen: ${people}` : ''}`
+            return `K${c.id} [${c.locked ? `von ${OWNER} korrigiert, ` : ''}${c.status}${c.event_at ? `, Termin ${dayOnly.format(c.event_at)}` : ''}, Chats: ${(chatNames.get(String(c.id)) ?? []).join(' + ')}] ${c.title}: ${c.summary ?? ''}${people ? ` | Personen: ${people}` : ''}`
           })
           .join('\n')
       : '(keine)'

@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS contact_profiles (
   stats         jsonb,                               -- gemessene Kennzahlen (Nachrichten, Anteil, Länge, Emojis ...)
   confidence    real,
   source        text NOT NULL DEFAULT 'auto',        -- auto | user
-  locked        boolean NOT NULL DEFAULT false,      -- von Joel gesetzt: die automatische Einschätzung überschreibt nichts mehr
+  locked        boolean NOT NULL DEFAULT false,      -- vom Nutzer gesetzt: die automatische Einschätzung überschreibt nichts mehr
   profiled_at   timestamptz,
   profiled_msgs integer,                             -- Nachrichtenzahl zum Zeitpunkt der Einschätzung
   updated_at    timestamptz NOT NULL DEFAULT now()

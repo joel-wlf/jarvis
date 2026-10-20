@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { likeEscape, pool } from './db.js'
+import { OWNER, OWNER_GEN } from './config.js'
 
 const text = (t: string, isError = false) => ({ content: [{ type: 'text' as const, text: t }], ...(isError ? { isError: true } : {}) })
 
@@ -80,8 +81,8 @@ export function registerStyleTools(server: McpServer) {
     'get_writing_style',
     {
       description:
-        'Joels Schreibstil gegenüber einer Person oder in einem Chat: Zahlen (Länge, Emojis, Groß-/Kleinschreibung, Satzzeichen), echte Beispiel-Nachrichten von ihm und das Verhältnis (Beziehung, Anrede). ' +
-        'IMMER vor dem Entwerfen oder Senden einer Nachricht aufrufen und im Stil von Joel schreiben (Länge, Ton, Emojis, Anrede wie in den Beispielen), nicht im Stil eines Assistenten. ' +
+        `${OWNER_GEN} Schreibstil gegenüber einer Person oder in einem Chat: Zahlen (Länge, Emojis, Groß-/Kleinschreibung, Satzzeichen), echte Beispiel-Nachrichten von ihm und das Verhältnis (Beziehung, Anrede). ` +
+        `IMMER vor dem Entwerfen oder Senden einer Nachricht aufrufen und im Stil von ${OWNER} schreiben (Länge, Ton, Emojis, Anrede wie in den Beispielen), nicht im Stil eines Assistenten. ` +
         'Bei wenigen eigenen Nachrichten kommen Beispiele aus Chats mit ähnlichen Personen dazu.',
       inputSchema: {
         chat: z.string().describe('Person oder Chat (Name-Teilstring oder JID)'),
@@ -96,7 +97,7 @@ export function registerStyleTools(server: McpServer) {
       )
       if (!c.rows.length) return text(`Kein Chat zu "${chat}" gefunden.`, true)
       const target = c.rows[0]
-      const lines: string[] = [`Schreibstil von Joel in: ${target.name}${target.is_group ? ' (Gruppe)' : ''}`]
+      const lines: string[] = [`Schreibstil von ${OWNER} in: ${target.name}${target.is_group ? ' (Gruppe)' : ''}`]
       if (c.rows.length > 1 && c.rows[1].name.toLowerCase().includes(chat.toLowerCase()))
         lines.push(`(Weitere Treffer: ${c.rows.slice(1).map((x) => x.name).join(', ')}. Falls der falsche gemeint ist, genauer angeben.)`)
 
@@ -116,7 +117,7 @@ export function registerStyleTools(server: McpServer) {
         lines.push('\nBeispiele (neueste zuerst):')
         for (const m of pickExamples(own, 10)) lines.push(quote(m))
       } else {
-        lines.push('\nJoel hat hier noch keine Textnachrichten geschrieben.')
+        lines.push(`\n${OWNER} hat hier noch keine Textnachrichten geschrieben.`)
       }
 
       if (own.length < 25) {
@@ -147,7 +148,7 @@ export function registerStyleTools(server: McpServer) {
       )
       if (theirs.rows.length >= 5) lines.push(`\nZum Vergleich: ${target.is_group ? 'Andere' : 'Die Person'} schreibt typisch ${median(theirs.rows.map((x) => x.body.length))} Zeichen pro Nachricht.`)
 
-      lines.push('\nSo verwenden: Länge, Anrede, Emojis und Satzzeichen an den Beispielen ausrichten. Nichts Förmlicheres oder Längeres schreiben als Joel hier üblicherweise. Keine Floskeln und keine Gedankenstriche, die er nie nutzt.')
+      lines.push(`\nSo verwenden: Länge, Anrede, Emojis und Satzzeichen an den Beispielen ausrichten. Nichts Förmlicheres oder Längeres schreiben als ${OWNER} hier üblicherweise. Keine Floskeln und keine Gedankenstriche, die er nie nutzt.`)
       return text(lines.join('\n'))
     },
   )
