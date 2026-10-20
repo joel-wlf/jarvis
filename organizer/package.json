@@ -1,0 +1,16 @@
+{
+  "name": "organizer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "tsc", "start": "node dist/index.js" },
+  "dependencies": {
+    "pg": "^8.13.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.6.0"
+  }
+}

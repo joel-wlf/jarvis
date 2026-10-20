@@ -1,0 +1,10 @@
+.env
+node_modules/
+dist/
+outgoing/*
+!outgoing/.gitkeep
+*.tgz
+*.dump
+*.img
+.DS_Store
+backups/
