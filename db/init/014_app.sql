@@ -29,10 +29,11 @@ CREATE TABLE IF NOT EXISTS pairing_codes (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- OAuth 2.1 dynamic client registration (RFC 7591). `metadata` is the full client information document.
+-- OAuth 2.1 dynamic client registration (RFC 7591). `metadata` is the full client information document as returned at
+-- registration, including client_secret for confidential clients: the MCP SDK compares it directly. The secret only
+-- authenticates the client; access still needs the owner password on the authorize page and PKCE.
 CREATE TABLE IF NOT EXISTS oauth_clients (
   client_id     text PRIMARY KEY,
-  secret_hash   text,                                -- NULL for public clients (PKCE only)
   metadata      jsonb NOT NULL,
   created_at    timestamptz NOT NULL DEFAULT now(),
   revoked_at    timestamptz
