@@ -1,13 +1,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import pg from 'pg'
 import { z } from 'zod'
-import { embedQuery, findContacts, fmtTs, likeEscape, pool } from './db.js'
+import { embedQuery, findContacts, fmtTs, likeEscape, pool, memDb as memPool } from './db.js'
 import { OWNER, OWNER_GEN } from './config.js'
 
 const ENABLED = process.env.ENABLE_MEMORY !== 'false'
 
-// Eigener DB-Benutzer: darf nur Gedächtnis und manuelle Korrekturen schreiben (siehe db/init/007_mem_role.sh)
-const memPool = new pg.Pool({ connectionString: process.env.MEM_DATABASE_URL, max: 3 })
 
 const text = (t: string, isError = false) => ({ content: [{ type: 'text' as const, text: t }], ...(isError ? { isError: true } : {}) })
 const KINDS = ['fact', 'correction', 'rule', 'person', 'preference', 'link', 'note'] as const

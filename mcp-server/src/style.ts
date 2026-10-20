@@ -76,6 +76,71 @@ function pickExamples(msgs: Own[], k: number): Own[] {
   return out
 }
 
+/** Writing style of the owner in a chat (numbers, examples, relationship), as text for a model prompt. null if no chat matches. */
+export async function writingStyle(chat: string): Promise<string | null> {
+  const like = `%${likeEscape(chat)}%`
+  const c = await pool.query<{ jid: string; name: string; is_group: boolean; message_count: number }>(
+    `SELECT jid, name, is_group, message_count FROM v_chats WHERE jid = $1 OR name ILIKE $2
+     ORDER BY (lower(name) = lower($1)) DESC, message_count DESC LIMIT 4`,
+    [chat, like],
+  )
+  if (!c.rows.length) return null
+  const target = c.rows[0]
+  const lines: string[] = [`Schreibstil von ${OWNER} in: ${target.name}${target.is_group ? ' (Gruppe)' : ''}`]
+  if (c.rows.length > 1 && c.rows[1].name.toLowerCase().includes(chat.toLowerCase()))
+    lines.push(`(Weitere Treffer: ${c.rows.slice(1).map((x) => x.name).join(', ')}. Falls der falsche gemeint ist, genauer angeben.)`)
+
+  const prof = await pool
+    .query<{ relationship: string | null; closeness: number | null; formality: string | null; tone: string | null; note: string | null }>(
+      `SELECT relationship, closeness, formality, tone, note FROM contact_profiles WHERE jid = $1`,
+      [target.jid],
+    )
+    .catch(() => ({ rows: [] as never[] }))
+  const p = prof.rows[0]
+  if (p) lines.push(`Verhältnis: ${p.relationship ?? '?'}${p.closeness ? `, Nähe ${p.closeness}/5` : ''}${p.formality ? `, Anrede/Formalität: ${p.formality}` : ''}${p.tone ? `, Ton: ${p.tone}` : ''}${p.note ? `. Hinweis: ${p.note}` : ''}`)
+
+  const own = await ownMessages(target.jid, 300)
+  if (own.length) {
+    lines.push(`\nZahlen (aus ${own.length} eigenen Nachrichten hier):`)
+    for (const s of styleStats(own)) lines.push(`- ${s}`)
+    lines.push('\nBeispiele (neueste zuerst):')
+    for (const m of pickExamples(own, 10)) lines.push(quote(m))
+  } else {
+    lines.push(`\n${OWNER} hat hier noch keine Textnachrichten geschrieben.`)
+  }
+
+  if (own.length < 25) {
+    const sim = await pool.query<{ jid: string; name: string }>(
+      `SELECT p.jid, coalesce(c.name, p.real_name, p.jid) AS name
+       FROM contact_profiles p JOIN v_chats c ON c.jid = p.jid AND NOT c.is_group
+       WHERE p.jid <> $1 AND p.relationship IS NOT DISTINCT FROM $2 AND ($3::int IS NULL OR abs(coalesce(p.closeness, $3) - $3) <= 1)
+       ORDER BY c.message_count DESC LIMIT 6`,
+      [target.jid, p?.relationship ?? null, p?.closeness ?? null],
+    )
+    if (sim.rows.length) {
+      const pool2: Own[] = []
+      for (const s of sim.rows) pool2.push(...(await ownMessages(s.jid, 60)).slice(0, 12))
+      pool2.sort((a, b) => b.ts.getTime() - a.ts.getTime())
+      if (pool2.length) {
+        lines.push(`\nZahlen bei ähnlichen Personen (${sim.rows.map((x) => x.name).join(', ')}):`)
+        for (const s of styleStats(pool2)) lines.push(`- ${s}`)
+        lines.push('Beispiele dort:')
+        for (const m of pickExamples(pool2, 8)) lines.push(quote(m))
+      }
+    }
+  }
+
+  const theirs = await pool.query<{ body: string }>(
+    `SELECT body FROM v_messages WHERE chat_jid = $1 AND NOT from_me AND type = 'text' AND deleted_at IS NULL AND length(body) BETWEEN 2 AND 400
+     ORDER BY ts DESC LIMIT 60`,
+    [target.jid],
+  )
+  if (theirs.rows.length >= 5) lines.push(`\nZum Vergleich: ${target.is_group ? 'Andere' : 'Die Person'} schreibt typisch ${median(theirs.rows.map((x) => x.body.length))} Zeichen pro Nachricht.`)
+
+  lines.push(`\nSo verwenden: Länge, Anrede, Emojis und Satzzeichen an den Beispielen ausrichten. Nichts Förmlicheres oder Längeres schreiben als ${OWNER} hier üblicherweise. Keine Floskeln und keine Gedankenstriche, die er nie nutzt.`)
+  return lines.join('\n')
+}
+
 export function registerStyleTools(server: McpServer) {
   server.registerTool(
     'get_writing_style',
@@ -89,67 +154,8 @@ export function registerStyleTools(server: McpServer) {
       },
     },
     async ({ chat }) => {
-      const like = `%${likeEscape(chat)}%`
-      const c = await pool.query<{ jid: string; name: string; is_group: boolean; message_count: number }>(
-        `SELECT jid, name, is_group, message_count FROM v_chats WHERE jid = $1 OR name ILIKE $2
-         ORDER BY (lower(name) = lower($1)) DESC, message_count DESC LIMIT 4`,
-        [chat, like],
-      )
-      if (!c.rows.length) return text(`Kein Chat zu "${chat}" gefunden.`, true)
-      const target = c.rows[0]
-      const lines: string[] = [`Schreibstil von ${OWNER} in: ${target.name}${target.is_group ? ' (Gruppe)' : ''}`]
-      if (c.rows.length > 1 && c.rows[1].name.toLowerCase().includes(chat.toLowerCase()))
-        lines.push(`(Weitere Treffer: ${c.rows.slice(1).map((x) => x.name).join(', ')}. Falls der falsche gemeint ist, genauer angeben.)`)
-
-      const prof = await pool
-        .query<{ relationship: string | null; closeness: number | null; formality: string | null; tone: string | null; note: string | null }>(
-          `SELECT relationship, closeness, formality, tone, note FROM contact_profiles WHERE jid = $1`,
-          [target.jid],
-        )
-        .catch(() => ({ rows: [] as never[] }))
-      const p = prof.rows[0]
-      if (p) lines.push(`Verhältnis: ${p.relationship ?? '?'}${p.closeness ? `, Nähe ${p.closeness}/5` : ''}${p.formality ? `, Anrede/Formalität: ${p.formality}` : ''}${p.tone ? `, Ton: ${p.tone}` : ''}${p.note ? `. Hinweis: ${p.note}` : ''}`)
-
-      const own = await ownMessages(target.jid, 300)
-      if (own.length) {
-        lines.push(`\nZahlen (aus ${own.length} eigenen Nachrichten hier):`)
-        for (const s of styleStats(own)) lines.push(`- ${s}`)
-        lines.push('\nBeispiele (neueste zuerst):')
-        for (const m of pickExamples(own, 10)) lines.push(quote(m))
-      } else {
-        lines.push(`\n${OWNER} hat hier noch keine Textnachrichten geschrieben.`)
-      }
-
-      if (own.length < 25) {
-        const sim = await pool.query<{ jid: string; name: string }>(
-          `SELECT p.jid, coalesce(c.name, p.real_name, p.jid) AS name
-           FROM contact_profiles p JOIN v_chats c ON c.jid = p.jid AND NOT c.is_group
-           WHERE p.jid <> $1 AND p.relationship IS NOT DISTINCT FROM $2 AND ($3::int IS NULL OR abs(coalesce(p.closeness, $3) - $3) <= 1)
-           ORDER BY c.message_count DESC LIMIT 6`,
-          [target.jid, p?.relationship ?? null, p?.closeness ?? null],
-        )
-        if (sim.rows.length) {
-          const pool2: Own[] = []
-          for (const s of sim.rows) pool2.push(...(await ownMessages(s.jid, 60)).slice(0, 12))
-          pool2.sort((a, b) => b.ts.getTime() - a.ts.getTime())
-          if (pool2.length) {
-            lines.push(`\nZahlen bei ähnlichen Personen (${sim.rows.map((x) => x.name).join(', ')}):`)
-            for (const s of styleStats(pool2)) lines.push(`- ${s}`)
-            lines.push('Beispiele dort:')
-            for (const m of pickExamples(pool2, 8)) lines.push(quote(m))
-          }
-        }
-      }
-
-      const theirs = await pool.query<{ body: string }>(
-        `SELECT body FROM v_messages WHERE chat_jid = $1 AND NOT from_me AND type = 'text' AND deleted_at IS NULL AND length(body) BETWEEN 2 AND 400
-         ORDER BY ts DESC LIMIT 60`,
-        [target.jid],
-      )
-      if (theirs.rows.length >= 5) lines.push(`\nZum Vergleich: ${target.is_group ? 'Andere' : 'Die Person'} schreibt typisch ${median(theirs.rows.map((x) => x.body.length))} Zeichen pro Nachricht.`)
-
-      lines.push(`\nSo verwenden: Länge, Anrede, Emojis und Satzzeichen an den Beispielen ausrichten. Nichts Förmlicheres oder Längeres schreiben als ${OWNER} hier üblicherweise. Keine Floskeln und keine Gedankenstriche, die er nie nutzt.`)
-      return text(lines.join('\n'))
+      const out = await writingStyle(chat)
+      return out ? text(out) : text(`Kein Chat zu "${chat}" gefunden.`, true)
     },
   )
 }

@@ -1,6 +1,38 @@
 import pg from 'pg'
 
-export const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5 })
+// Database access by role. Each role is a pg.Pool by default; tests swap in another backend with useDatabases().
+//  ro  (mcp_ro):  read-only, every search and read query
+//  mem (mcp_mem): memory, corrections, reminders, watch state, app auth and cards
+//  act (mcp_act): outbox only (send, vote, react ...)
+export interface DbClient {
+  query<R extends pg.QueryResultRow = any>(text: string, params?: unknown[]): Promise<pg.QueryResult<R>>
+  release(): void
+}
+export interface Db {
+  query<R extends pg.QueryResultRow = any>(text: string, params?: unknown[]): Promise<pg.QueryResult<R>>
+  connect(): Promise<DbClient>
+}
+export type DbRole = 'ro' | 'mem' | 'act'
+
+const backends: Record<DbRole, Db> = {
+  ro: new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5 }),
+  mem: new pg.Pool({ connectionString: process.env.MEM_DATABASE_URL, max: 3 }),
+  act: new pg.Pool({ connectionString: process.env.ACTIONS_DATABASE_URL, max: 3 }),
+}
+
+const byRole = (role: DbRole): Db => ({
+  query: (text, params) => backends[role].query(text, params),
+  connect: () => backends[role].connect(),
+})
+
+export const pool = byRole('ro')
+export const memDb = byRole('mem')
+export const actDb = byRole('act')
+
+/** Replace the database backends (tests). */
+export function useDatabases(d: Partial<Record<DbRole, Db>>) {
+  Object.assign(backends, d)
+}
 
 const dateFmt = new Intl.DateTimeFormat('de-DE', {
   timeZone: 'Europe/Berlin',
