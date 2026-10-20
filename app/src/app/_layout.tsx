@@ -52,6 +52,7 @@ function Routes() {
       <Stack.Protected guard={!!session} redirectTo="/connect">
         <Stack.Screen name="(main)" />
         <Stack.Screen name="ask" options={{ animation: 'fade_from_bottom' }} />
+        <Stack.Screen name="setup" options={{ animation: 'fade' }} />
       </Stack.Protected>
       <Stack.Protected guard={!session} redirectTo="/">
         <Stack.Screen name="connect" />

@@ -31,7 +31,8 @@ const FIELDS: SettingsField[] = [
 export function createMockAdmin(): AdminApi {
   const values: Record<string, string> = { OWNER_NAME: 'Alex', OWN_NAMES: 'Lexi', MCP_PUBLIC_HOST: 'jarvis.example.com', REDACT_NUMBERS: 'true', ORGANIZER_EXCLUDE_NAMES: '', ORGANIZER_ENABLED: 'true', ORGANIZER_INTERVAL_MIN: '15', REQUIRE_CONFIRM: 'true', ACTIONS_PER_HOUR: '20' }
   const secrets: Record<string, { set: boolean; hint?: string }> = { CLOUDFLARE_TUNNEL_TOKEN: { set: true, hint: '…a91f' }, OPENAI_API_KEY: { set: true, hint: '…7Qx2' } }
-  const state: AdminState = { configured: true, loggedIn: false, envExists: true, initialized: true, envProblem: null, fake: true, job: null }
+  // initialized: false so the setup wizard can be walked through in mock mode.
+  const state: AdminState = { configured: true, loggedIn: false, envExists: true, initialized: false, envProblem: null, fake: true, job: null }
   const jobs = new Map<string, Job>()
   let n = 0
 
