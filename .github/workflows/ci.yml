@@ -21,7 +21,7 @@ jobs:
           cache-dependency-path: ${{ matrix.service }}/package-lock.json
       - run: npm ci
       - run: npm run build
-      - if: matrix.service == 'admin'
+      - if: matrix.service == 'admin' || matrix.service == 'mcp-server'
         run: npm test
   compose:
     runs-on: ubuntu-latest

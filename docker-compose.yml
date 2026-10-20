@@ -128,7 +128,11 @@ services:
     networks: [internal]
 
   mcp-server:
-    build: ./mcp-server
+    # Built from the repository root so the shared contract (packages/contract) is in the build context;
+    # mcp-server/Dockerfile.dockerignore keeps everything else out.
+    build:
+      context: .
+      dockerfile: mcp-server/Dockerfile
     restart: unless-stopped
     logging: *logging
     <<: *hardened
@@ -154,6 +158,17 @@ services:
       REQUIRE_CONFIRM: ${REQUIRE_CONFIRM:-false}
       SEARCH_MAX_TOPIC_DIST: ${SEARCH_MAX_TOPIC_DIST:-0.52}
       MCP_TOKEN: ${MCP_TOKEN:-}
+      # true = the static MCP_TOKEN keeps working next to OAuth (old connector URLs /t/<token>/mcp)
+      MCP_LEGACY_TOKEN: ${MCP_LEGACY_TOKEN:-true}
+      # Public address of the API through the Cloudflare tunnel: OAuth issuer, pairing QR code
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
+      # Shared secret for the internal admin API on :3001 (docker network only, not published)
+      ADMIN_INTERNAL_SECRET: ${ADMIN_INTERNAL_SECRET:-}
+      INTERNAL_PORT: "3001"
+      # Reply suggestions and "Ask Jarvis" in the app
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      APP_MODEL: ${APP_MODEL:-gpt-4.1-mini}
       PORT: "3000"
       TZ: Europe/Berlin
     healthcheck:
