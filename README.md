@@ -25,23 +25,47 @@ WhatsApp ──QR──> wa-ingest ──> postgres (pgvector) <── mcp-serve
 | `whisper` | whisper.cpp (CPU) für die Transkription von Sprachnachrichten. Das Audio wird nicht gespeichert. |
 | `mcp-server` | MCP (Streamable HTTP) mit Read-only-DB-Zugang und Suchtools. |
 | `cloudflared` | Cloudflare Tunnel, macht den MCP-Server von außen erreichbar. |
+| `admin` | Weboberfläche für Einrichtung, Einstellungen, Status, Logs und Wartung (Port 8080, nur Heimnetz). |
 
 ## Einrichtung auf dem Pi
 
 Voraussetzung: Docker + Docker Compose auf dem Pi (64-bit OS), idealerweise Daten auf SSD.
 
-1. Ordner auf den Pi kopieren, `cp .env.example .env`, Zufallswerte eintragen (`openssl rand -hex 24`) und `OWNER_NAME` auf deinen Namen setzen.
-2. **Cloudflare Tunnel** anlegen: Zero Trust → Networks → Tunnels → *Create* (Cloudflared). Token in `.env` als `CLOUDFLARE_TUNNEL_TOKEN`. Public Hostname z.B. `jarvis.deine-domain.de` → Service `http://mcp-server:3000`.
-3. Starten:
-   ```bash
-   docker compose up -d --build
-   ```
+### Mit der Weboberfläche (empfohlen)
+
+```bash
+git clone https://github.com/joel-wlf/jarvis.git ~/jarvis && cd ~/jarvis
+docker compose up -d admin
+docker compose logs admin        # zeigt den Einrichtungscode
+```
+
+Dann im Browser `http://<adresse-des-pi>:8080` öffnen, den Einrichtungscode eingeben und ein Admin-Passwort festlegen. Der Assistent fragt Name, OpenAI-Schlüssel (optional, mit Live-Test), Datenschutz-Ausschlüsse, Funktionen und Cloudflare-Tunnel ab, erzeugt alle Passwörter und den MCP-Token selbst, baut und startet die Dienste und zeigt danach den **WhatsApp-QR-Code direkt im Browser** (oder einen Kopplungscode per Telefonnummer). Am Ende steht die Connector-URL zum Kopieren bereit.
+
+Danach ist die Oberfläche die Zentrale für alles Weitere:
+
+| Bereich | Was geht |
+|---|---|
+| Übersicht | Zustand aller Dienste, WhatsApp-Verbindung, Archiv-Kennzahlen, freier Speicher, Warnungen, Connector-URL |
+| Einstellungen | Alle Einstellungen aus `.env` in Gruppen, mit Suche, Experten-Modus, Prüfung während der Eingabe, Vorschau der Unterschiede und betroffenen Dienste |
+| WhatsApp | QR-Code/Kopplungscode live, neu verknüpfen (das Archiv bleibt erhalten) |
+| Logs | Logs je Dienst, live, mit geschwärzten Geheimnissen |
+| Wartung | Dienste neu starten, nach `git pull` neu bauen, Kostenschätzung der Themen-Sortierung, MCP-Token und Datenbank-Passwörter wechseln, Admin-Passwort ändern, Protokolle früherer Vorgänge |
+| Versionen | Jede frühere `.env` (die letzten 30), Unterschiede ansehen und wiederherstellen |
+
+**So schützt die Oberfläche vor Fehlern:** Jede Änderung wird erst geprüft (Format, Grenzen, Abhängigkeiten wie „Themen-Sortierung braucht einen Schlüssel"), dann von Docker Compose gegengeprüft, bevor irgendetwas geschrieben wird. Die alte `.env` wird gesichert, die neue atomar geschrieben (ein Stromausfall hinterlässt nie eine halbe Datei). Danach startet Compose nur die betroffenen Dienste neu, und die Oberfläche wartet, bis alle stabil laufen und sich an der Datenbank anmelden können. Klappt das nicht, stellt sie den vorherigen Stand automatisch wieder her. Docker-Profile (`tunnel`, `organizer`, `local-whisper`) setzt sie passend zu den Schaltern; Datenbank-Passwörter lassen sich nur über „Wechseln" ändern, das die Datenbank mit umstellt. Es läuft immer nur ein Vorgang gleichzeitig; schließt du den Browser, läuft er weiter.
+
+**Sicherheit der Oberfläche:** Sie steuert Docker über den Docker-Socket und hat damit Root-Rechte auf dem Pi. Deshalb: nur im Heimnetz erreichbar (nie über den Cloudflare-Tunnel veröffentlichen), Erstzugang nur mit dem Einrichtungscode aus dem Log, danach Passwort (scrypt), Sperre nach 10 Fehlversuchen, Geheimnisse gehen nie im Klartext an den Browser (Anzeigen nur mit erneuter Passwort-Eingabe). Nur auf dem Pi selbst: unter Einstellungen → Oberfläche „Erreichbar über" auf `127.0.0.1` setzen und per `ssh -L 8080:localhost:8080 <pi>` zugreifen. Passwort vergessen: `docker compose exec admin node dist/src/cli.js reset-password`. Wer die Oberfläche nicht braucht: `docker compose stop admin`.
+
+Mit verschlüsseltem Tresor (siehe unten) zeigt `.env` auf `/srv/vault/secrets/.env`; dafür muss `JARVIS_SECRETS_DIR=/srv/vault/secrets` in `.env` stehen (das Tresor-Skript trägt es ein, die Oberfläche nennt sonst den genauen Befehl).
+
+### Von Hand
+
+1. `cp .env.example .env`, Pflichtwerte eintragen (Zufallswerte mit `openssl rand -hex 24`) und `OWNER_NAME` setzen. Alle Einstellungen sind in `.env.example` beschrieben.
+2. **Cloudflare Tunnel** anlegen: Zero Trust → Networks → Tunnels → *Create* (Cloudflared). Token in `.env` als `CLOUDFLARE_TUNNEL_TOKEN`, dazu `COMPOSE_PROFILES=tunnel`. Public Hostname z.B. `jarvis.deine-domain.de` → Service `http://mcp-server:3000`.
+3. Starten: `docker compose up -d --build`
 4. **WhatsApp verknüpfen**: `docker compose logs -f wa-ingest` → QR-Code erscheint im Log. Am Handy: WhatsApp → Einstellungen → Verknüpfte Geräte → Gerät hinzufügen → scannen.
    Danach schickt das Handy den Verlauf in Batches (Log: „History-Batch importiert"). Das kann einige Minuten dauern; das Handy sollte dabei online und die App geöffnet sein.
-5. Prüfen:
-   ```bash
-   docker compose exec postgres psql -U jarvis -c "select count(*) from messages"
-   ```
+5. Prüfen: `docker compose exec postgres psql -U jarvis -c "select count(*) from messages"`
 
 ## MCP in Claude eintragen
 

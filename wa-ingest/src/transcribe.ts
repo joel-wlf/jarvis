@@ -35,7 +35,8 @@ let running = false
 /** Wird bei jeder (Wieder-)Verbindung aufgerufen; die Schleife läuft nur einmal. */
 export function setTranscriberSocket(s: WASocket | null) {
   sock = s
-  if (s && !running && (PROVIDER === 'openai' ? !!OPENAI_KEY : !!WHISPER_URL)) {
+  // PROVIDER "off": Sprachnachrichten nicht transkribieren (z.B. ohne Schlüssel und ohne lokalen Whisper)
+  if (s && !running && PROVIDER !== 'off' && (PROVIDER === 'openai' ? !!OPENAI_KEY : !!WHISPER_URL)) {
     running = true
     loop().catch((e) => {
       running = false

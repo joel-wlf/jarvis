@@ -95,6 +95,8 @@ sudo mkdir -p "$MNT/secrets" "$MNT/backups"
 sudo chown "$ME:$ME" "$MNT/secrets" "$MNT/backups"
 cp -p "$PROJECT/.env" "$MNT/secrets/.env"
 chmod 600 "$MNT/secrets/.env"
+# Admin-Oberfläche: Ordner der echten .env mounten, damit sie den Verweis auflösen kann
+grep -q '^JARVIS_SECRETS_DIR=' "$MNT/secrets/.env" || printf 'JARVIS_SECRETS_DIR=%s\n' "$MNT/secrets" >> "$MNT/secrets/.env"
 shred -u "$PROJECT/.env"
 ln -s "$MNT/secrets/.env" "$PROJECT/.env"
 if [ -d "$HOME/jarvis-backups" ] && [ ! -L "$HOME/jarvis-backups" ]; then

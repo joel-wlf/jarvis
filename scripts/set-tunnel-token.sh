@@ -11,9 +11,12 @@ if [ -z "$T" ] || ! printf '%s' "$T" | base64 -d 2>/dev/null | grep -q '"t"'; th
   echo "Abbruch: Das sieht nicht wie ein Cloudflare-Tunnel-Token aus (er beginnt mit eyJ…). Nichts wurde gespeichert."
   exit 1
 fi
-set_env() { grep -v "^$1=" .env > .env.tmp || true; printf '%s=%s\n' "$1" "$2" >> .env.tmp; mv .env.tmp .env; chmod 600 .env; }
+touch .env
+# Verweis (Tresor) auflösen, damit .env nicht durch eine Klartext-Datei ersetzt wird
+ENV_FILE="$(readlink -f .env)"
+set_env() { grep -v "^$1=" "$ENV_FILE" > "$ENV_FILE.tmp" || true; printf '%s=%s\n' "$1" "$2" >> "$ENV_FILE.tmp"; chmod 600 "$ENV_FILE.tmp"; mv "$ENV_FILE.tmp" "$ENV_FILE"; }
 set_env CLOUDFLARE_TUNNEL_TOKEN "$T"
-cur="$(grep '^COMPOSE_PROFILES=' .env | cut -d= -f2- || true)"
+cur="$(grep '^COMPOSE_PROFILES=' "$ENV_FILE" | cut -d= -f2- || true)"
 case ",$cur," in *,tunnel,*) ;; *) set_env COMPOSE_PROFILES "${cur:+$cur,}tunnel" ;; esac
 echo "Token gespeichert. Starte den Tunnel ..."
 docker compose up -d cloudflared 2>&1 | grep -E "Started|Created|Recreate|rror" || true

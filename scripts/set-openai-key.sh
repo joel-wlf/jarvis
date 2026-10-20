@@ -16,8 +16,10 @@ if [ "$code" != "200" ]; then
   exit 1
 fi
 touch .env && chmod 600 .env
-grep -v '^OPENAI_API_KEY=' .env > .env.tmp || true
-printf 'OPENAI_API_KEY=%s\n' "$K" >> .env.tmp
-mv .env.tmp .env && chmod 600 .env
+# Verweis (Tresor) auflösen, damit .env nicht durch eine Klartext-Datei ersetzt wird
+ENV_FILE="$(readlink -f .env)"
+grep -v '^OPENAI_API_KEY=' "$ENV_FILE" > "$ENV_FILE.tmp" || true
+printf 'OPENAI_API_KEY=%s\n' "$K" >> "$ENV_FILE.tmp"
+chmod 600 "$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"
 echo "Schlüssel geprüft und gespeichert. Starte Dienste neu ..."
 docker compose up -d embedder wa-ingest

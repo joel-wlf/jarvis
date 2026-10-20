@@ -1,4 +1,6 @@
 import { Boom } from '@hapi/boom'
+import fs from 'node:fs'
+import path from 'node:path'
 import makeWASocket, {
   Browsers,
   DisconnectReason,
@@ -34,6 +36,20 @@ const log = pino({ level: process.env.LOG_LEVEL ?? 'info' })
 let groupTimer: NodeJS.Timeout | undefined
 let beatTimer: NodeJS.Timeout | undefined
 
+// Verknüpfungsstatus für die Admin-Oberfläche (QR/Kopplungscode im Browser). Atomar geschrieben, Fehler sind egal.
+const STATUS_FILE = process.env.WA_STATUS_FILE ?? '/data/status/link.json'
+type LinkState = { state: 'starting' | 'qr' | 'pairing' | 'open' | 'closed' | 'logged_out'; qr?: string; pairingCode?: string; user?: string; error?: string }
+function writeLinkStatus(s: LinkState) {
+  try {
+    fs.mkdirSync(path.dirname(STATUS_FILE), { recursive: true })
+    const tmp = `${STATUS_FILE}.${process.pid}.tmp`
+    fs.writeFileSync(tmp, JSON.stringify({ ...s, at: new Date().toISOString() }), { mode: 0o600 })
+    fs.renameSync(tmp, STATUS_FILE)
+  } catch {
+    // Ordner nicht gemountet (z.B. lokale Entwicklung): ignorieren
+  }
+}
+
 /** Verbindungsstatus für den MCP-Server: "open" + Herzschlag alle 15 s. Ohne frischen Herzschlag gilt WhatsApp als nicht erreichbar. */
 async function setWaStatus(open: boolean) {
   clearInterval(beatTimer)
@@ -64,6 +80,7 @@ async function syncGroups(sock: ReturnType<typeof makeWASocket>) {
 }
 
 async function start() {
+  writeLinkStatus({ state: 'starting' })
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
   const { version } = await fetchLatestBaileysVersion()
   const baileysLog = pino({ level: process.env.BAILEYS_LOG_LEVEL ?? 'warn' })
@@ -94,14 +111,17 @@ async function start() {
           pairingRequested = true
           try {
             const code = await sock.requestPairingCode(PAIRING_PHONE)
+            writeLinkStatus({ state: 'pairing', pairingCode: code.match(/.{1,4}/g)?.join('-') ?? code })
             log.info(`KOPPLUNGSCODE: ${code.match(/.{1,4}/g)?.join('-') ?? code}  (am Handy eingeben; gilt nur kurz)`)
           } catch (e) {
             log.error({ err: (e as Error).message }, 'Kopplungscode konnte nicht angefordert werden')
+            writeLinkStatus({ state: 'closed', error: `Kopplungscode fehlgeschlagen: ${(e as Error).message}` })
           }
         }
       } else {
         log.info('Bitte QR-Code in WhatsApp scannen (Einstellungen > Verknüpfte Geräte > Gerät hinzufügen):')
         qrcode.generate(qr, { small: true })
+        writeLinkStatus({ state: 'qr', qr })
       }
     }
     if (connection === 'open') {
@@ -110,6 +130,7 @@ async function start() {
       setActionSocket(sock)
       setImageSocket(sock)
       log.info({ user: sock.user?.id }, 'WhatsApp verbunden')
+      writeLinkStatus({ state: 'open', user: sock.user?.id?.replace(/[:@].*$/, '') })
       await setWaStatus(true)
       clearInterval(groupTimer)
       setTimeout(() => void syncGroups(sock), 20_000)
@@ -118,6 +139,7 @@ async function start() {
     if (connection === 'close') {
       const code = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode
       if (code === DisconnectReason.loggedOut) {
+        writeLinkStatus({ state: 'logged_out' })
         log.error('Abgemeldet. Volume wa-auth löschen (docker compose down; docker volume rm jarvis_wa-auth) und neu verknüpfen.')
         process.exit(1)
       }
@@ -125,6 +147,7 @@ async function start() {
       setActionSocket(null)
       setImageSocket(null)
       await setWaStatus(false)
+      writeLinkStatus({ state: 'closed', error: (lastDisconnect?.error as Error | undefined)?.message })
       log.warn({ code, reason: (lastDisconnect?.error as Error | undefined)?.message }, 'Verbindung getrennt, starte neu ...')
       setTimeout(() => start().catch(fatal), 3000)
     }

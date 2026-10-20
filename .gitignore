@@ -1,4 +1,6 @@
 .env
+.env-backups/
+.env.tmp-*
 node_modules/
 dist/
 outgoing/*

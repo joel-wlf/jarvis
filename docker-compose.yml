@@ -21,9 +21,9 @@ services:
     mem_limit: 900m
     environment:
       POSTGRES_USER: jarvis
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
       POSTGRES_DB: jarvis
-      MCP_RO_PASSWORD: ${MCP_RO_PASSWORD:?set in .env}
+      MCP_RO_PASSWORD: ${MCP_RO_PASSWORD:-}
       TZ: Europe/Berlin
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -74,10 +74,11 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://jarvis:${POSTGRES_PASSWORD}@postgres:5432/jarvis
+      DATABASE_URL: postgres://jarvis:${POSTGRES_PASSWORD:-}@postgres:5432/jarvis
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       EMBED_PROVIDER: ${EMBED_PROVIDER:-}
       OPENAI_EMBED_MODEL: ${OPENAI_EMBED_MODEL:-text-embedding-3-small}
+      EMBED_BATCH: ${EMBED_BATCH:-}
       ORGANIZER_EXCLUDE_NAMES: ${ORGANIZER_EXCLUDE_NAMES:-}
       ORGANIZER_REDACT: ${ORGANIZER_REDACT:-true}
       TZ: Europe/Berlin
@@ -99,7 +100,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://jarvis:${POSTGRES_PASSWORD}@postgres:5432/jarvis
+      DATABASE_URL: postgres://jarvis:${POSTGRES_PASSWORD:-}@postgres:5432/jarvis
       WHISPER_URL: http://whisper:8080
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       TRANSCRIBE_PROVIDER: ${TRANSCRIBE_PROVIDER:-}
@@ -107,6 +108,11 @@ services:
       IMAGE_DESCRIBE: ${IMAGE_DESCRIBE:-true}
       IMAGE_MODEL: ${IMAGE_MODEL:-gpt-4.1-mini}
       IMAGE_DETAIL: ${IMAGE_DETAIL:-auto}
+      IMAGE_CONCURRENCY: ${IMAGE_CONCURRENCY:-3}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      MAX_AUDIO_SECONDS: ${MAX_AUDIO_SECONDS:-600}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      BAILEYS_LOG_LEVEL: ${BAILEYS_LOG_LEVEL:-warn}
       WHISPER_LANG: ${WHISPER_LANG:-de}
       TRANSCRIBE_MAX_AGE_DAYS: ${TRANSCRIBE_MAX_AGE_DAYS:-}
       AUTH_DIR: /data/auth
@@ -115,6 +121,8 @@ services:
       NODE_OPTIONS: --max-old-space-size=384
     volumes:
       - wa-auth:/data/auth
+      # Verknüpfungsstatus (QR/Kopplungscode) für die Admin-Oberfläche
+      - wa-status:/data/status
       # Dateien, die Claude per send_media(file=...) verschicken darf
       - ./outgoing:/outgoing:ro
     networks: [internal]
@@ -133,18 +141,19 @@ services:
       - "127.0.0.1:3000:3000"
     environment:
       OWNER_NAME: ${OWNER_NAME:-}
-      DATABASE_URL: postgres://mcp_ro:${MCP_RO_PASSWORD}@postgres:5432/jarvis
+      DATABASE_URL: postgres://mcp_ro:${MCP_RO_PASSWORD:-}@postgres:5432/jarvis
       # nur INSERT/SELECT auf die outbox (gleiches Passwort wie mcp_ro, siehe db/init/002_roles.sh)
-      ACTIONS_DATABASE_URL: postgres://mcp_act:${MCP_RO_PASSWORD}@postgres:5432/jarvis
+      ACTIONS_DATABASE_URL: postgres://mcp_act:${MCP_RO_PASSWORD:-}@postgres:5432/jarvis
       EMBED_URL: http://embedder:3001
       # Gedächtnis und manuelle Korrekturen (Rolle mcp_mem, siehe db/init/007_mem_role.sh)
-      MEM_DATABASE_URL: postgres://mcp_mem:${MCP_RO_PASSWORD}@postgres:5432/jarvis
+      MEM_DATABASE_URL: postgres://mcp_mem:${MCP_RO_PASSWORD:-}@postgres:5432/jarvis
       ENABLE_MEMORY: ${ENABLE_MEMORY:-true}
       ENABLE_ACTIONS: ${ENABLE_ACTIONS:-true}
       MAX_ACTIONS_PER_HOUR: ${MAX_ACTIONS_PER_HOUR:-30}
       # false = Aktionen laufen sofort (keine Vorschau-Stufe); true = erst Vorschau, dann confirm=true
       REQUIRE_CONFIRM: ${REQUIRE_CONFIRM:-false}
-      MCP_TOKEN: ${MCP_TOKEN:?set in .env}
+      SEARCH_MAX_TOPIC_DIST: ${SEARCH_MAX_TOPIC_DIST:-0.52}
+      MCP_TOKEN: ${MCP_TOKEN:-}
       PORT: "3000"
       TZ: Europe/Berlin
     healthcheck:
@@ -168,7 +177,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://jarvis:${POSTGRES_PASSWORD}@postgres:5432/jarvis
+      DATABASE_URL: postgres://jarvis:${POSTGRES_PASSWORD:-}@postgres:5432/jarvis
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ORGANIZER_ENABLED: ${ORGANIZER_ENABLED:-false}
       ORGANIZER_MODEL: ${ORGANIZER_MODEL:-gpt-4.1-mini}
@@ -180,7 +189,13 @@ services:
       ORGANIZER_MIN_MESSAGES: ${ORGANIZER_MIN_MESSAGES:-4}
       ORGANIZER_MAX_WAIT_HOURS: ${ORGANIZER_MAX_WAIT_HOURS:-12}
       ORGANIZER_IDLE_MINUTES: ${ORGANIZER_IDLE_MINUTES:-2}
+      ORGANIZER_MAX_MESSAGES: ${ORGANIZER_MAX_MESSAGES:-150}
+      ORGANIZER_MAX_CHARS: ${ORGANIZER_MAX_CHARS:-30000}
+      TOPIC_STALE_DAYS: ${TOPIC_STALE_DAYS:-21}
+      TOPIC_PAST_GRACE_HOURS: ${TOPIC_PAST_GRACE_HOURS:-24}
       # Personen-Profile: Neubewertung nur bei Veränderung (Wachstum, Gruppen, Aktivität), höchstens alle 14 Tage
+      PEOPLE_MIN_MESSAGES: ${PEOPLE_MIN_MESSAGES:-30}
+      PEOPLE_MIN_THEIRS: ${PEOPLE_MIN_THEIRS:-8}
       PEOPLE_MIN_INTERVAL_DAYS: ${PEOPLE_MIN_INTERVAL_DAYS:-14}
       PEOPLE_REFRESH_GROWTH: ${PEOPLE_REFRESH_GROWTH:-1.2}
       PEOPLE_GROUP_DELTA: ${PEOPLE_GROUP_DELTA:-3}
@@ -209,9 +224,38 @@ services:
       - mcp-server
     networks: [internal]
 
+  # Weboberfläche für Einrichtung und Einstellungen. Start: docker compose up -d admin, dann http://<adresse-des-pi>:8080
+  # Steuert Docker über den Socket (entspricht Root auf dem Pi): nur im Heimnetz, nie über den Tunnel veröffentlichen.
+  admin:
+    build: ./admin
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 192m
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "${ADMIN_BIND:-0.0.0.0}:${ADMIN_PORT:-8080}:8080"
+    environment:
+      ADMIN_PUBLIC_PORT: ${ADMIN_PORT:-8080}
+      TZ: Europe/Berlin
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/project
+      # Tresor-Modus: Ordner, auf den .env verweist (sonst noch einmal das Projekt)
+      - ${JARVIS_SECRETS_DIR:-.}:/secrets
+      - admin-data:/data
+      - wa-status:/wa-status:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [internal]
+
 volumes:
   pgdata:
   wa-auth:
+  wa-status:
+  admin-data:
 
 networks:
   internal:

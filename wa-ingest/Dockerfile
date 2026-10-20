@@ -16,6 +16,6 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
 # Auth-Volume muss dem Node-Benutzer gehören, damit der Ordner beim ersten Mounten übernommen wird
-RUN mkdir -p /data/auth && chown -R node:node /data
+RUN mkdir -p /data/auth /data/status && chown -R node:node /data
 USER node
 CMD ["node", "dist/index.js"]

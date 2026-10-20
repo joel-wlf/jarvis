@@ -4,7 +4,7 @@ import { env, pipeline } from '@xenova/transformers'
 import pg from 'pg'
 
 const MODEL = process.env.EMBED_MODEL ?? 'Xenova/multilingual-e5-small'
-const BATCH = Number(process.env.EMBED_BATCH ?? (process.env.OPENAI_API_KEY && process.env.EMBED_PROVIDER !== 'local' ? 100 : 32))
+const BATCH = Number(process.env.EMBED_BATCH || (process.env.OPENAI_API_KEY && process.env.EMBED_PROVIDER !== 'local' ? 100 : 32))
 const PORT = Number(process.env.PORT ?? 3001)
 const OPENAI_KEY = process.env.OPENAI_API_KEY
 const PROVIDER = process.env.EMBED_PROVIDER || (OPENAI_KEY ? 'openai' : 'local')

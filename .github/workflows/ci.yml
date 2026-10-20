@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [mcp-server, wa-ingest, organizer, embedder]
+        service: [mcp-server, wa-ingest, organizer, embedder, admin]
     defaults:
       run:
         working-directory: ${{ matrix.service }}
@@ -21,8 +21,11 @@ jobs:
           cache-dependency-path: ${{ matrix.service }}/package-lock.json
       - run: npm ci
       - run: npm run build
+      - if: matrix.service == 'admin'
+        run: npm test
   compose:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - run: docker compose config -q
       - run: cp .env.example .env && docker compose config -q
