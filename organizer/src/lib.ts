@@ -11,6 +11,11 @@ export const DAILY_BUDGET = Number(process.env.ORGANIZER_DAILY_TOKEN_BUDGET || 3
 export const REDACT = process.env.ORGANIZER_REDACT !== 'false'
 export const TZ = 'Europe/Berlin'
 
+/** Minimal query interface: the pg pool in production, PGlite in tests. */
+export interface Queryable {
+  query: (text: string, params?: unknown[]) => Promise<{ rows: any[]; rowCount?: number | null }>
+}
+
 export const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 3 })
 export const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
