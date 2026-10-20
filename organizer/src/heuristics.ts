@@ -17,7 +17,7 @@ const CHAT_JOIN = `LEFT JOIN chats c ON c.jid = m.chat_jid LEFT JOIN contacts ct
 
 /** Own messages that promise a reply or a delivery ("ich melde mich", "schick ich dir"). */
 export const PROMISE_RE =
-  /\b(?:ich\s+meld(?:e)?\s+mich|meld(?:e)?\s+mich\s+(?:morgen|nachher|später|gleich|heute|bald|die\s+tage|nochmal|wieder|bei\s+dir|bei\s+euch)|(?:ich\s+)?schick(?:e)?\s+(?:ich\s+)?(?:dir|euch|ihnen)|ich\s+(?:sag|gebe?)\s+(?:dir|euch)\s+(?:noch\s+)?bescheid|sag\s+(?:dir|euch)\s+(?:noch\s+)?bescheid|ich\s+(?:ruf|rufe)\s+(?:dich|euch)\s+(?:\w+\s+)?an|ich\s+schau(?:e)?\s+(?:mal\s+)?nach\s+und|ich\s+schreib(?:e)?\s+(?:dir|euch)\s+(?:\w+\s+)?(?:morgen|nachher|später|gleich|noch))/i
+  /\b(?:ich\s+meld(?:e)?\s+mich|meld(?:e)?\s+mich\s+(?:morgen|nachher|später|gleich|heute|bald|die\s+tage|nochmal|wieder|bei\s+dir|bei\s+euch)|(?:ich\s+)?schick(?:e)?\s+(?:ich\s+)?(?:dir|euch|ihnen)|(?:ich\s+)?(?:sag|gebe?)\s+(?:dir|euch)\s+(?:\S+\s+){0,3}bescheid|ich\s+(?:ruf|rufe)\s+(?:dich|euch)\s+(?:\w+\s+)?an|ich\s+schau(?:e)?\s+(?:mal\s+)?nach\s+und|ich\s+schreib(?:e)?\s+(?:dir|euch)\s+(?:\w+\s+)?(?:morgen|nachher|später|gleich|noch))/i
 
 const days = (from: Date, now: Date) => Math.max(0, Math.floor((now.getTime() - from.getTime()) / 86_400_000))
 const sinceLabel = (d: number) => (d === 0 ? 'heute' : d === 1 ? 'gestern' : `vor ${d} Tagen`)

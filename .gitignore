@@ -3,6 +3,7 @@
 .env.tmp-*
 node_modules/
 dist/
+dist-test/
 outgoing/*
 !outgoing/.gitkeep
 *.tgz
