@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { ApiError, DAILY_BUDGET, MODEL, OPENAI_KEY, REDACT, TZ, budgetLeft, complete, dayFmt, dayOnly, isAuthError, log, parseDate, fixWhen, sanitizeYear, pool, redact, retryable, sleep, memoryBlock } from './lib.js'
 import { linkNext, sweep } from './topics.js'
 import { profileNext } from './people.js'
+import { runCardRules } from './heuristics.js'
 import { OWNER, OWNER_GEN } from './config.js'
 
 // ---------------------------------------------------------------- Konfiguration (Stufe 1: Threads je Chat)
@@ -305,6 +306,8 @@ async function main() {
       if (Date.now() - lastSweep > 10 * 60_000) {
         lastSweep = Date.now()
         await sweep()
+        // Rule-based cards (followup, link, photos): SQL only, no model call
+        await runCardRules(pool).catch((e) => log('Cards (rules) failed:', (e as Error).message))
       }
       // Personen einschätzen (Beziehung, Ton, abweichende Namen): bei Leerlauf, sonst jeden 5. Durchlauf
       const profiled = !chat && !linked || ++iter % 5 === 0 ? await profileNext() : false
