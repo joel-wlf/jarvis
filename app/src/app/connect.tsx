@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { API_VERSION, type ServerInfo } from '@jarvis/contract'
 import { fetchInfo, login, pair } from '@/api/client'
-import { normalizeUrl } from '@/api/http'
+import { JarvisError, normalizeUrl } from '@/api/http'
 import { parsePairing } from '@/api/pairing'
 import { JarvisFigure } from '@/components/jarvis/JarvisFigure'
 import { BlockButton, Field, Micro, Notice, Seg } from '@/components/ui'
@@ -33,12 +33,19 @@ export default function Connect() {
   const scanned = useRef(false)
 
   const checkServer = async (base: string): Promise<ServerInfo> => {
-    const i = await fetchInfo(base)
+    let i: ServerInfo
+    try {
+      i = await fetchInfo(base)
+    } catch (e) {
+      // Reachable but not answering like Jarvis (404, HTML page, other app): say that plainly.
+      if (e instanceof JarvisError && e.code !== 'network' && e.code !== 'timeout') throw new Error(t('connect.notJarvis'))
+      throw e
+    }
     if (i?.name !== 'jarvis') throw new Error(t('connect.notJarvis'))
     if (i.apiVersion > API_VERSION) throw new Error(t('connect.tooNew'))
     return i
   }
-  const fail = (e: unknown) => setError(e instanceof Error && !('code' in e) ? e.message : errorText(e))
+  const fail = (e: unknown) => setError(e instanceof JarvisError ? errorText(e) : e instanceof Error ? e.message : errorText(e))
 
   const check = async () => {
     const base = normalizeUrl(url)

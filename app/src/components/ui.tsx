@@ -32,7 +32,7 @@ export function Meta({ stats, size = 21 }: { stats: Stat[]; size?: number }) {
     <View style={s.meta}>
       {stats.slice(0, 3).map((st) => (
         // Like CSS grid 1fr: equal columns, but a long micro label widens its column instead of wrapping.
-        <View key={st.label} style={{ flexGrow: 1, flexBasis: 0, minWidth: st.label.length * 7.7 }}>
+        <View key={st.label} style={{ flexGrow: 1, flexBasis: 0, minWidth: st.label.length * 8.4 }}>
           <Micro>{st.label}</Micro>
           <Text style={[type.value, { fontSize: size, marginTop: 3 }]} numberOfLines={1} adjustsFontSizeToFit>
             {st.value}

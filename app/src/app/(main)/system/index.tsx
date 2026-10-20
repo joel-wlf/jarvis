@@ -121,7 +121,7 @@ function Overview() {
           <Meta
             stats={[
               { label: t('system.appVersion'), value: Constants.expoConfig?.version ?? '–' },
-              { label: t('system.serverVersion'), value: session?.mode === 'mock' ? t('common.demo') : (info?.version ?? '–') },
+              { label: t('system.serverVersion'), value: session?.mode === 'mock' ? 'Demo' : (info?.version ?? '–') },
               { label: t('system.apiVersion'), value: `v${info?.apiVersion ?? API_VERSION}` },
             ]}
           />
