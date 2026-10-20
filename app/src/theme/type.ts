@@ -16,7 +16,7 @@ export const type = StyleSheet.create({
   tiny: { fontFamily: fonts.italic, fontSize: 11, lineHeight: 14, color: colors.faint },
   body: { fontFamily: fonts.regular, fontSize: 14.5, lineHeight: 21, color: colors.ink2 },
   bodyItalic: { fontFamily: fonts.italic, fontSize: 15, lineHeight: 20, color: colors.ink },
-  micro: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 14, letterSpacing: 1.1, textTransform: 'uppercase', color: colors.faint },
+  micro: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 14, letterSpacing: 1, textTransform: 'uppercase', color: colors.faint },
   button: { fontFamily: fonts.italic, fontSize: 14.5, lineHeight: 18, color: colors.ink2 },
   mono: { fontFamily: 'Menlo', fontSize: 11.5, lineHeight: 16, color: colors.ink2 },
 })

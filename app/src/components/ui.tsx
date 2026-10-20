@@ -31,7 +31,8 @@ export function Meta({ stats, size = 21 }: { stats: Stat[]; size?: number }) {
   return (
     <View style={s.meta}>
       {stats.slice(0, 3).map((st) => (
-        <View key={st.label} style={{ flex: 1 }}>
+        // Like CSS grid 1fr: equal columns, but a long micro label widens its column instead of wrapping.
+        <View key={st.label} style={{ flexGrow: 1, flexBasis: 0, minWidth: st.label.length * 7.7 }}>
           <Micro>{st.label}</Micro>
           <Text style={[type.value, { fontSize: size, marginTop: 3 }]} numberOfLines={1} adjustsFontSizeToFit>
             {st.value}
@@ -98,7 +99,7 @@ export function Seg({ items, style }: { items: SegItem[]; style?: StyleProp<View
           accessibilityState={{ selected: !!it.on }}
           style={({ pressed, hovered }) => [s.segBtn, i > 0 && s.segDivider, it.on ? { backgroundColor: pressed ? colors.block2 : colors.block } : (pressed || hovered) && { backgroundColor: colors.ground2 }]}
         >
-          <Text style={[s.segText, it.on && { color: colors.blockInk }]} numberOfLines={1}>
+          <Text style={[s.segText, it.on && { color: colors.blockInk }]} numberOfLines={2}>
             {it.label}
           </Text>
         </Press>
@@ -217,7 +218,7 @@ export const s = StyleSheet.create({
   seg: { flexDirection: 'row', borderWidth: 1, borderColor: colors.line },
   segBtn: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card, paddingHorizontal: 6 },
   segDivider: { borderLeftWidth: 1, borderLeftColor: colors.line },
-  segText: { fontFamily: fonts.italic, fontSize: 14.5, color: colors.ink2 },
+  segText: { fontFamily: fonts.italic, fontSize: 14.5, lineHeight: 17, textAlign: 'center', color: colors.ink2 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: colors.card },
   rowLine: { borderTopWidth: 1, borderTopColor: colors.line },
   panel: { backgroundColor: colors.card, boxShadow: '0px 1px 1px rgba(20, 26, 36, 0.03), 0px 8px 22px -12px rgba(20, 26, 36, 0.14)' },

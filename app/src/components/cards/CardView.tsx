@@ -311,7 +311,8 @@ export const CardView = memo(function CardView({ card, selected, onSelect, act }
       </View>
     )
 
-  const verb = primary ? t(`verb.${primary.action.kind}`) : ''
+  // Short labels fit the slab button; long ones (a full reply) become the verb, the reply text is in the card.
+  const verb = primary ? t(card.group === 'reply' && primary.action.kind === 'send' ? 'verb.reply' : `verb.${primary.action.kind}`) : ''
   return (
     <Press
       onPress={() => onSelect(card.key)}
@@ -348,7 +349,7 @@ export const CardView = memo(function CardView({ card, selected, onSelect, act }
       ) : null}
       {sp.seg ? <Seg items={sp.seg} style={{ marginBottom: 18 }} /> : null}
       {!sp.seg && !sp.bare && primary ? (
-        <Slab big={sp.headline ?? primary.label} button={sp.headline ? primary.label : verb} onPress={() => act(card, primary.action)} />
+        <Slab big={sp.headline ?? primary.label} button={sp.headline && primary.label.length <= 18 ? primary.label : verb} onPress={() => act(card, primary.action)} />
       ) : null}
       {!sp.seg && !sp.bare && !primary ? <View style={{ height: 4 }} /> : null}
     </Press>
