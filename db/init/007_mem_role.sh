@@ -21,5 +21,13 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
   GRANT UPDATE (topic_id, linked_at, link_locked, link_attempts, started_at, ended_at, message_count, participants, embedding, updated_at) ON threads TO mcp_mem;
   GRANT UPDATE (thread_id, embedding) ON messages TO mcp_mem;
   GRANT UPDATE (status) ON suggested_actions TO mcp_mem;
+  -- App API (db/init/014_app.sql): owner login, devices, OAuth, cards, reply cache. Only if the tables exist yet.
+  DO \$\$
+  BEGIN
+    IF to_regclass('public.cards') IS NOT NULL THEN
+      GRANT SELECT, INSERT, UPDATE, DELETE ON app_owner, devices, pairing_codes, oauth_clients, oauth_codes, oauth_tokens, cards, reply_suggestions TO mcp_mem;
+      GRANT USAGE ON SEQUENCE cards_id_seq TO mcp_mem;
+    END IF;
+  END \$\$;
   ALTER ROLE mcp_mem SET statement_timeout = '15s';
 EOSQL
