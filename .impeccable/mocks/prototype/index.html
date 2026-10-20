@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#EEF0F3">
+  <title>Jarvis Prototyp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,400..700;1,200..500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="rail" aria-label="Bereiche">
+    <div class="logo" aria-hidden="true">J</div>
+    <button class="on" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></svg><span>Heute</span></button>
+    <button><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/></svg><span>Personen</span></button>
+    <button><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Woche</span></button>
+    <button class="end"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg><span>System</span></button>
+  </nav>
+
+  <main class="home">
+    <section class="hero" aria-label="Jarvis">
+      <header class="top">
+        <div><h1>Heute</h1><p class="date">Dienstag, 21. Oktober</p></div>
+        <span class="live" id="live">aktualisiert gerade eben</span>
+      </header>
+
+      <div class="stage" id="stage">
+        <div class="floor" aria-hidden="true"><div class="grid"></div></div>
+        <figure class="jarvis" id="jarvis" data-state="idle">
+          <div class="body" id="figure"></div>
+          <div class="shadow"></div>
+        </figure>
+        <p class="voice" id="voice" aria-live="polite"></p>
+        <div class="states" id="states" role="group" aria-label="Zustand der Figur (nur Prototyp)"></div>
+      </div>
+
+      <dl class="stats" id="stats"></dl>
+      <div class="modules" id="modules"></div>
+
+      <form class="ask" id="ask" role="search">
+        <input id="askInput" placeholder="Frag Jarvis …" aria-label="Frag Jarvis" autocomplete="off">
+        <button type="button" class="mic" aria-label="Sprechen (kommt bald)" disabled><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+        <button type="submit" aria-label="Senden"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </form>
+    </section>
+
+    <section class="feed" aria-label="Offene Sachen">
+      <header class="feed-head">
+        <h2>Für dich <b id="count">11</b></h2>
+        <span class="demo">Beispieldaten</span>
+      </header>
+      <div class="tabs" id="tabs" role="tablist"></div>
+      <div class="cards" id="cards"></div>
+    </section>
+  </main>
+
+  <script type="module" src="shell.js"></script>
+</body>
+</html>
