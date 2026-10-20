@@ -237,7 +237,8 @@
     "noMemories": "Noch nichts gemerkt.",
     "addMemory": "Etwas merken",
     "recent": "Letzte Nachrichten",
-    "saved": "Profil gespeichert."
+    "saved": "Profil gespeichert.",
+    "relationshipLabel": "Beziehung"
   },
   "memory": {
     "title": "Gedächtnis",
@@ -305,7 +306,8 @@
     "pairing": "Koppelt …",
     "demo": "Ohne Server ausprobieren",
     "demoHelp": "Zeigt die App mit Beispieldaten. Nichts verlässt dieses Gerät.",
-    "private": "Deine Daten bleiben auf deinem Server. Die App speichert nur die Adresse und einen Geräteschlüssel."
+    "private": "Deine Daten bleiben auf deinem Server. Die App speichert nur die Adresse und einen Geräteschlüssel.",
+    "privateLabel": "Privat"
   },
   "system": {
     "title": "System",

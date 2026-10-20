@@ -229,3 +229,47 @@ export const s = StyleSheet.create({
   toggle: { width: 42, height: 24, borderWidth: 1, borderColor: colors.line2, backgroundColor: colors.ground2 },
   knob: { position: 'absolute', top: 3, width: 16, height: 16, backgroundColor: colors.faint },
 })
+
+/** Wrapping set of options; the chosen one is black. For choices with more options than a Seg holds. */
+export function Choice<T extends string | number>({ options, value, onChange, label }: { options: { value: T; label: string }[]; value: T | undefined; onChange: (v: T) => void; label: string }) {
+  return (
+    <View style={{ gap: 6 }}>
+      <Micro>{label}</Micro>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }} accessibilityRole="radiogroup" accessibilityLabel={label}>
+        {options.map((o) => {
+          const on = o.value === value
+          return (
+            <Press
+              key={String(o.value)}
+              onPress={() => onChange(o.value)}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: on }}
+              style={({ hovered }) => [{ minHeight: 38, paddingHorizontal: 12, justifyContent: 'center', borderWidth: 1, borderColor: on ? colors.block : colors.line2, backgroundColor: on ? colors.block : hovered ? colors.ground2 : colors.card }]}
+            >
+              <Text style={[s.segText, on && { color: colors.blockInk }]}>{o.label}</Text>
+            </Press>
+          )
+        })}
+      </View>
+    </View>
+  )
+}
+
+/** Five short bars for closeness; the count is also in the accessibility label. */
+export function Closeness({ n, label }: { n: number; label: string }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 2, alignItems: 'flex-end' }} accessible accessibilityLabel={label}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <View key={i} style={{ width: 4, height: 6 + i * 2, backgroundColor: i <= n ? colors.ink : colors.line2 }} />
+      ))}
+    </View>
+  )
+}
+
+export function Avatar({ initials, size = 44 }: { initials: string; size?: number }) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.ground2, borderWidth: 1, borderColor: colors.line }}>
+      <Text style={{ fontFamily: fonts.light, fontSize: size * 0.38, color: colors.ink2 }}>{initials}</Text>
+    </View>
+  )
+}

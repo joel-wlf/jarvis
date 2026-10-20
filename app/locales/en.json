@@ -237,7 +237,8 @@
     "noMemories": "Nothing remembered yet.",
     "addMemory": "Remember something",
     "recent": "Recent messages",
-    "saved": "Profile saved."
+    "saved": "Profile saved.",
+    "relationshipLabel": "Relationship"
   },
   "memory": {
     "title": "Memory",
@@ -305,7 +306,8 @@
     "pairing": "Pairing …",
     "demo": "Try without a server",
     "demoHelp": "Shows the app with sample data. Nothing leaves this device.",
-    "private": "Your data stays on your server. The app stores only the address and a device key."
+    "private": "Your data stays on your server. The app stores only the address and a device key.",
+    "privateLabel": "Private"
   },
   "system": {
     "title": "System",
