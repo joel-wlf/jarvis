@@ -2,7 +2,7 @@
 import { fail } from './http.js'
 
 export const AI_MODEL = process.env.APP_MODEL || 'gpt-4.1-mini'
-const BASE = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '')
+const base = () => (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '')
 
 export type ChatMessage =
   | { role: 'system' | 'user'; content: string }
@@ -16,7 +16,7 @@ export function aiAvailable() {
 
 async function post(body: unknown, signal?: AbortSignal): Promise<Response> {
   if (!aiAvailable()) throw fail('unavailable', 'No OpenAI API key configured (OPENAI_API_KEY)')
-  const res = await fetch(`${BASE}/chat/completions`, {
+  const res = await fetch(`${base()}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
     body: JSON.stringify(body),

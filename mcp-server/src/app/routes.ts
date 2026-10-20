@@ -422,8 +422,11 @@ async function events(req: Request, res: Response) {
     if (busy) return
     busy = true
     try {
+      // todayCount: incoming messages since local midnight; at: the latest message overall
       const m = await pool.query<{ n: number; at: Date | null }>(
-        `SELECT count(*)::int AS n, max(ts) AS at FROM messages WHERE NOT from_me AND type <> 'reaction' AND ts >= date_trunc('day', now() AT TIME ZONE 'Europe/Berlin') AT TIME ZONE 'Europe/Berlin'`,
+        `SELECT (SELECT count(*)::int FROM messages WHERE NOT from_me AND type <> 'reaction'
+                   AND ts >= date_trunc('day', now() AT TIME ZONE 'Europe/Berlin') AT TIME ZONE 'Europe/Berlin') AS n,
+                (SELECT max(ts) FROM messages WHERE type <> 'reaction') AS at`,
       )
       const msg = `${m.rows[0]?.n}|${iso(m.rows[0]?.at)}`
       if (msg !== last.msg && m.rows[0]?.at) send({ type: 'message', source: 'WhatsApp', at: iso(m.rows[0].at)!, todayCount: Number(m.rows[0].n) })
