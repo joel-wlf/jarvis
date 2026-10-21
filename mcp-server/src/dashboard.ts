@@ -1,39 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { pool } from './db.js'
+import { loadWatchState, POLL_RENOTIFY_MS, resolveState as resolve, type ItemState } from './watch.js'
 
-interface StateRow {
-  key: string
-  last_notified_at: Date | null
-  snoozed_until: Date | null
-  dismissed: boolean
-  note: string | null
-}
-
-type ItemState = 'new' | 'notified' | 'snoozed' | 'dismissed' | 'scheduled'
-
-const POLL_RENOTIFY_MS = 3 * 24 * 3600_000
-
-/** Ein Schlüssel ohne Zusatz gilt als Präfix: "frage:<jid>" deckt "frage:<jid>:<ts>" ab, "umfrage:" alle Umfragen. */
-function covers(entryKey: string, key: string): boolean {
-  return key === entryKey || key.startsWith(entryKey.endsWith(':') ? entryKey : `${entryKey}:`)
-}
-
-function resolve(key: string, rows: StateRow[], opts: { renotifyMs?: number } = {}): { state: ItemState; until?: Date; notified_at?: Date; note?: string } {
-  const now = Date.now()
-  const hit = rows.filter((r) => covers(r.key, key))
-  const dis = hit.find((r) => r.dismissed)
-  if (dis) return { state: 'dismissed', note: dis.note ?? undefined }
-  const sn = hit.filter((r) => r.snoozed_until && r.snoozed_until.getTime() > now).sort((a, b) => b.snoozed_until!.getTime() - a.snoozed_until!.getTime())[0]
-  if (sn) return { state: 'snoozed', until: sn.snoozed_until!, note: sn.note ?? undefined }
-  const exact = rows.find((r) => r.key === key)
-  if (exact?.last_notified_at) {
-    const afterSnooze = !exact.snoozed_until || exact.last_notified_at.getTime() > exact.snoozed_until.getTime()
-    const stale = opts.renotifyMs != null && now - exact.last_notified_at.getTime() > opts.renotifyMs
-    if (afterSnooze && !stale) return { state: 'notified', notified_at: exact.last_notified_at }
-  }
-  return { state: 'new' }
-}
 
 export function registerDashboardTool(server: McpServer) {
   server.registerTool(
@@ -48,7 +17,7 @@ export function registerDashboardTool(server: McpServer) {
     },
     async () => {
       const now = new Date()
-      const rows = (await pool.query<StateRow>(`SELECT key, last_notified_at, snoozed_until, dismissed, note FROM watch_state`).catch(() => ({ rows: [] as StateRow[] }))).rows
+      const rows = await loadWatchState()
       const muted: { key: string; kind: 'dismissed' | 'snoozed'; until?: string; note?: string }[] = []
       const mute = (key: string, r: ReturnType<typeof resolve>) => {
         if (r.state === 'dismissed' || r.state === 'snoozed') muted.push({ key, kind: r.state, until: r.until?.toISOString(), note: r.note })

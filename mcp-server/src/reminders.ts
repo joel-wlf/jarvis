@@ -1,13 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import pg from 'pg'
 import { z } from 'zod'
 import { fmtTs, pool } from './db.js'
+import { createReminder, markNotified, resetWatchFeedback, setReminderStatus, setWatchFeedback, snoozeReminder } from './watch.js'
 import { OWNER, OWNER_GEN } from './config.js'
 
 const ENABLED = process.env.ENABLE_MEMORY !== 'false'
 
-// Gleiche Rolle wie das Gedächtnis (mcp_mem): darf Erinnerungen und Wachdienst-Zustand schreiben, sonst nichts
-const memPool = new pg.Pool({ connectionString: process.env.MEM_DATABASE_URL, max: 2 })
 
 const text = (t: string, isError = false) => ({ content: [{ type: 'text' as const, text: t }], ...(isError ? { isError: true } : {}) })
 
@@ -41,8 +39,8 @@ export function registerReminderTools(server: McpServer) {
       const when = parseWhen(at, in_minutes)
       if (typeof when === 'string') return text(when, true)
       if (when.getTime() < Date.now() - 60_000) return text('Der Zeitpunkt liegt in der Vergangenheit.', true)
-      const r = await memPool.query(`INSERT INTO reminders (text, due_at, ref) VALUES ($1,$2,$3) RETURNING id`, [t, when, ref ?? null])
-      return text(`Erinnerung #${r.rows[0].id} gesetzt für ${fmtTs(when)}: ${t}. Der Wachdienst läuft stündlich (07 bis 21 Uhr), die Meldung kommt beim nächsten Lauf nach dem Zeitpunkt.`)
+      const id = await createReminder(t, when, ref)
+      return text(`Erinnerung #${id} gesetzt für ${fmtTs(when)}: ${t}. Der Wachdienst läuft stündlich (07 bis 21 Uhr), die Meldung kommt beim nächsten Lauf nach dem Zeitpunkt.`)
     },
   )
 
@@ -78,11 +76,11 @@ export function registerReminderTools(server: McpServer) {
       if (action === 'snooze') {
         const when = parseWhen(at, in_minutes)
         if (typeof when === 'string') return text(when, true)
-        const r = await memPool.query(`UPDATE reminders SET due_at = $2, status = 'open', fired_at = NULL WHERE id = $1`, [id, when])
-        return text(r.rowCount ? `Erinnerung #${id} verschoben auf ${fmtTs(when)}.` : `Erinnerung #${id} gibt es nicht.`, !r.rowCount)
+        const ok = await snoozeReminder(id, when)
+        return text(ok ? `Erinnerung #${id} verschoben auf ${fmtTs(when)}.` : `Erinnerung #${id} gibt es nicht.`, !ok)
       }
-      const r = await memPool.query(`UPDATE reminders SET status = $2 WHERE id = $1`, [id, action === 'done' ? 'done' : 'cancelled'])
-      return text(r.rowCount ? `Erinnerung #${id} ${action === 'done' ? 'als erledigt markiert' : 'gelöscht'}.` : `Erinnerung #${id} gibt es nicht.`, !r.rowCount)
+      const ok = await setReminderStatus(id, action === 'done' ? 'done' : 'cancelled')
+      return text(ok ? `Erinnerung #${id} ${action === 'done' ? 'als erledigt markiert' : 'gelöscht'}.` : `Erinnerung #${id} gibt es nicht.`, !ok)
     },
   )
 
@@ -104,7 +102,7 @@ export function registerReminderTools(server: McpServer) {
     },
     async ({ key, action, until, in_minutes, note }) => {
       if (action === 'reset') {
-        await memPool.query(`DELETE FROM watch_state WHERE key = $1`, [key])
+        await resetWatchFeedback(key)
         return text(`Rückmeldung für "${key}" gelöscht.`)
       }
       let snooze: Date | null = null
@@ -113,11 +111,7 @@ export function registerReminderTools(server: McpServer) {
         if (typeof when === 'string') return text(when, true)
         snooze = when
       }
-      await memPool.query(
-        `INSERT INTO watch_state (key, snoozed_until, dismissed, note) VALUES ($1,$2,$3,$4)
-         ON CONFLICT (key) DO UPDATE SET snoozed_until = excluded.snoozed_until, dismissed = excluded.dismissed, note = coalesce(excluded.note, watch_state.note), updated_at = now()`,
-        [key, snooze, action === 'dismiss', note ?? null],
-      )
+      await setWatchFeedback(key, action, { until: snooze ?? undefined, note })
       return text(action === 'dismiss' ? `"${key}" wird nicht mehr gemeldet.` : `"${key}" wird erst wieder ab ${fmtTs(snooze!)} gemeldet.`)
     },
   )
@@ -161,16 +155,7 @@ export function registerReminderTools(server: McpServer) {
       },
     },
     async ({ keys, reminder_ids }) => {
-      for (const k of keys) {
-        await memPool.query(
-          `INSERT INTO watch_state (key, last_notified_at) VALUES ($1, now())
-           ON CONFLICT (key) DO UPDATE SET last_notified_at = now(), updated_at = now()`,
-          [k],
-        )
-      }
-      if (reminder_ids.length) {
-        await memPool.query(`UPDATE reminders SET status = 'fired', fired_at = now() WHERE id = ANY($1) AND status = 'open'`, [reminder_ids])
-      }
+      await markNotified(keys, reminder_ids)
       return text(`${keys.length} Schlüssel und ${reminder_ids.length} Erinnerungen vermerkt.`)
     },
   )

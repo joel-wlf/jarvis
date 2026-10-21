@@ -86,6 +86,22 @@ export const FIELDS: Field[] = [
     adminOnly: true, services: [], placeholder: 'jarvis.example.com',
   },
   {
+    key: 'MCP_LEGACY_TOKEN', group: 'access', type: 'bool', default: 'true', label: 'MCP-Token weiter erlauben',
+    help: 'An: Die alte Connector-URL mit MCP-Token funktioniert weiter. Aus: Claude verbindet sich nur noch per Anmeldung (OAuth) mit deinem Passwort.',
+    services: ['mcp-server'],
+  },
+  {
+    key: 'APP_PUBLIC_URL', group: 'access', type: 'url', default: '', label: 'Öffentliche Adresse',
+    help: 'Adresse, unter der die App und Claude Jarvis über den Cloudflare-Tunnel erreichen, z.B. https://jarvis.example.com. Steht im Kopplungs-QR-Code und ist die Adresse der Anmeldung (OAuth).',
+    services: ['mcp-server'], placeholder: 'https://jarvis.example.com',
+  },
+  {
+    key: 'ADMIN_INTERNAL_SECRET', group: 'access', type: 'secret', default: '', label: 'Interner Schlüssel',
+    help: 'Damit erzeugt diese Oberfläche Kopplungscodes und setzt das App-Passwort. Nur im Docker-Netz gültig, nie über den Tunnel erreichbar.',
+    pattern: '^[A-Za-z0-9]{16,128}$', patternHelp: 'Mindestens 16 Zeichen, nur Buchstaben und Ziffern',
+    generate: 'hex24', services: ['mcp-server'],
+  },
+  {
     key: 'CLOUDFLARE_TUNNEL_TOKEN', group: 'access', type: 'secret', default: '', label: 'Cloudflare-Tunnel-Token',
     help: 'Macht den MCP-Server von außen erreichbar (Zero Trust → Networks → Tunnels). Gesetzt = Tunnel läuft. Den ganzen Installationsbefehl einfügen geht auch.',
     pattern: '^eyJ[A-Za-z0-9+/=_-]{20,}$', patternHelp: 'Beginnt mit eyJ…', services: ['cloudflared'],
@@ -107,12 +123,17 @@ export const FIELDS: Field[] = [
   {
     key: 'OPENAI_API_KEY', group: 'ai', type: 'secret', default: '', label: 'OpenAI-API-Schlüssel',
     help: 'Optional. Ohne Schlüssel läuft alles lokal (langsam, heizt den Pi) und es gibt keine Themen-Sortierung und keine Bildbeschreibung.',
-    pattern: '^sk-[A-Za-z0-9_-]{20,300}$', patternHelp: 'Beginnt mit sk-', services: ['embedder', 'wa-ingest', 'organizer'],
+    pattern: '^sk-[A-Za-z0-9_-]{20,300}$', patternHelp: 'Beginnt mit sk-', services: ['embedder', 'wa-ingest', 'organizer', 'mcp-server'],
   },
   {
     key: 'OPENAI_BASE_URL', group: 'ai', type: 'url', default: 'https://api.openai.com/v1', label: 'API-Adresse',
-    help: 'Für OpenAI-kompatible Anbieter oder einen Proxy. Gilt für Themen-Sortierung und Bildbeschreibung.',
-    advanced: true, services: ['organizer', 'wa-ingest'],
+    help: 'Für OpenAI-kompatible Anbieter oder einen Proxy. Gilt für Themen-Sortierung, Bildbeschreibung und die App.',
+    advanced: true, services: ['organizer', 'wa-ingest', 'mcp-server'],
+  },
+  {
+    key: 'APP_MODEL', group: 'ai', type: 'text', default: 'gpt-4.1-mini', label: 'Modell der App',
+    help: 'Für Antwortvorschläge und „Frag Jarvis" in der App. Braucht einen OpenAI-Schlüssel.',
+    pattern: MODEL, patternHelp: MODEL_HELP, advanced: true, services: ['mcp-server'],
   },
 
   // Datenschutz

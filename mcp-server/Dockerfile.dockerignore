@@ -1,0 +1,10 @@
+# Used instead of a root .dockerignore when building mcp-server/Dockerfile from the repository root (BuildKit).
+# Allowlist: only the contract and mcp-server sources go into the build context, never .env or data.
+*
+!packages/contract/package.json
+!packages/contract/tsconfig.json
+!packages/contract/src
+!mcp-server/package.json
+!mcp-server/package-lock.json
+!mcp-server/tsconfig.json
+!mcp-server/src
