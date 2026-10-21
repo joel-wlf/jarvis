@@ -107,6 +107,8 @@ else
   printf 'Lade Jarvis-Version %s …\n' "$commit"
   curl --fail --silent --show-error --location "https://github.com/joel-wlf/jarvis/archive/$commit.tar.gz" -o "$archive"
   tar -xzf "$archive" --strip-components=1 -C "$install_dir"
+  # umask 077 above would make db/init unreadable for the postgres container user; the sources are public anyway.
+  chmod -R u+rwX,go+rX "$install_dir"
   printf '%s\n' "$commit" > "$install_dir/.jarvis-install-version"
   # Only infrastructure settings are written here. The wizard generates secrets later.
   printf 'APP_WEB_PORT=%s\n' "$port" > "$install_dir/.env"
