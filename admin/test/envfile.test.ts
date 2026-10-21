@@ -84,3 +84,13 @@ test('fehlende .env ist kein Fehler', () => {
   assert.equal(r.exists, false)
   assert.deepEqual(r.env, {})
 })
+
+test('listBackups puts the newest first even when several backups share a millisecond', () => {
+  const dir = tmpdir()
+  const stamp = '20261021-161155-366'
+  for (const name of [`env-${stamp}.env`, `env-${stamp}-1.env`, `env-${stamp}-2.env`, 'env-20261021-161155-365.env', 'env-20261021-161155-367.env']) fs.writeFileSync(path.join(dir, name), 'A=1\n')
+  assert.deepEqual(
+    listBackups(dir).map((b) => b.name),
+    ['env-20261021-161155-367.env', `env-${stamp}-2.env`, `env-${stamp}-1.env`, `env-${stamp}.env`, 'env-20261021-161155-365.env'],
+  )
+})
