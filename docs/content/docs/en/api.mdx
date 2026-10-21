@@ -1,0 +1,166 @@
+---
+title: App API reference
+description: The /api/v1 interface the Jarvis app uses, with its shared types.
+---
+
+The app talks to `mcp-server` on port 3000 under `/api/v1`. The request and response types live in `packages/contract/src/api.ts` and `cards.ts` (the package `@jarvis/contract`), shared by the server, the organizer and the app. Everything here is also in `mcp-server/API.md`.
+
+## Authentication
+
+| Endpoint | Auth |
+|---|---|
+| `GET /info`, `POST /pair`, `POST /login` | None |
+| Everything else | `Authorization: Bearer <token>` with a device token (`jd_…`) or an OAuth access token |
+
+Failed passwords, pairing codes and bearer tokens are counted per client IP: after 10 in 15 minutes the server answers `429`. A valid high-entropy token is never locked out.
+
+### Errors
+
+Every non-2xx response has this body:
+
+```ts
+interface ApiError {
+  error: {
+    code: 'unauthorized' | 'forbidden' | 'not_found' | 'invalid' | 'rate_limited' | 'unavailable' | 'internal'
+    message: string
+    fields?: Record<string, string> // field -> message, for forms
+  }
+}
+```
+
+`code` is stable. Branch on it, not on the message.
+
+## Server and pairing
+
+| Method and path | Description |
+|---|---|
+| `GET /info` | `ServerInfo`: `name`, `apiVersion`, `version`, `ownerName?`, `passwordLogin`, `oauthMetadata` |
+| `POST /pair` | Body `{ code, deviceName, platform }`. Returns `AuthResponse` `{ token, deviceId, ownerName? }` |
+| `POST /login` | Body `{ password, deviceName, platform }`. Returns `AuthResponse` |
+| `GET /devices` | `{ devices: Device[] }`, including OAuth clients (`kind: 'oauth'`) |
+| `DELETE /devices/:id` | 204. A device id, or an OAuth client id (revokes all its tokens) |
+
+`platform` is `ios`, `android` or `web`. The pairing QR code contains `jarvis:` followed by JSON `{ v: 1, url, homeUrl?, code }`.
+
+## Home and cards
+
+| Method and path | Description |
+|---|---|
+| `GET /home` | `HomeResponse`: Jarvis state and line, stats, message flow, week, system health, and `counts` per group |
+| `GET /cards?group=` | `{ cards: Card[] }`, optionally filtered by `reply`, `schedule`, `todo` or `know` |
+| `POST /cards/:key/act` | Body `{ action: CardAction }`. Returns `{ ok: true, message, removed }` |
+| `POST /cards/:key/suggest` | Fresh reply suggestions, cached per card. `?refresh=1` skips the cache. Returns `{ suggestions, cached }` |
+
+Card keys contain `:` and `@`, so URL-encode them. They are the watch service keys (`frage:<jid>:<ts>`, `umfrage:<id>`, `event:<id>:<stage>`, `konflikt:<a>:<b>`, `reminder:<id>`, `aktion:<id>`, `digest:<jid>:<date>`, `person:<jid>`) plus organizer keys from the `cards` table. Dismissing or snoozing in the app and via Claude's `watch_feedback` is therefore the same thing.
+
+`source.when` and `say` are localised by `Accept-Language` (German by default, English).
+
+### CardAction
+
+```ts
+type CardAction =
+  | { kind: 'send'; text: string }
+  | { kind: 'react'; emoji: string; messageId: string }
+  | { kind: 'vote'; option: string; pollId: string }
+  | { kind: 'done' }
+  | { kind: 'snooze'; until: string } // ISO timestamp
+  | { kind: 'dismiss' }
+  | { kind: 'remind'; at: string; text: string }
+  | { kind: 'save_contact'; name: string; lines: string[] }
+  | { kind: 'open'; url: string }
+```
+
+`done`, `dismiss` and `snooze` write to `watch_state` (or `reminders`, `suggested_actions`, `cards.status` for those kinds). `remind` writes a reminder. `send`, `react` and `vote` go to the `outbox` with the same limits and offline check as the MCP tools. `open` and `save_contact` are handled in the app; the server answers `400`.
+
+### Card
+
+```ts
+interface CardBase<T, D> {
+  key: string
+  type: T
+  group: 'reply' | 'schedule' | 'todo' | 'know'
+  urgency: 1 | 2 | 3
+  state: 'new' | 'notified' | 'scheduled'
+  title: string
+  source: { chat: string; chatJid?: string; when: string; at?: string }
+  say: string
+  context?: string
+  suggestions: { id: string; label: string; action: CardAction; primary?: boolean }[]
+  data: D
+}
+```
+
+`Card` is the union of all 22 types, each with its own `data`. See [Card types](./card-types.mdx).
+
+## People
+
+| Method and path | Description |
+|---|---|
+| `GET /people?q=` | `{ people: PersonSummary[] }`: `jid`, `name`, `initials`, `relationship?`, `closeness?`, `lastContactAt?`, `openCards` |
+| `GET /people/:jid` | `PersonDetail`: adds `realName?`, `aliases`, `formality?`, `tone?`, `note?`, `locked`, `source` (`auto` or `user`), `stats`, `memories`, `recent` |
+| `PATCH /people/:jid` | Body `PersonPatch`: any of `realName`, `aliases`, `relationship`, `closeness`, `formality`, `tone`, `note`, `locked` |
+
+`relationship` is one of `family`, `partner`, `close_friend`, `friend`, `acquaintance`, `colleague`, `club`, `service`, `other`. The server stores `club` as `community` (what the MCP tools use) and maps it both ways.
+
+## Memory
+
+| Method and path | Description |
+|---|---|
+| `GET /memories?q=&scope=&active=all` | `{ memories: Memory[] }`. `active=all` includes paused entries |
+| `POST /memories` | Body `MemoryCreate`: `content`, `scope`, and `chatJid`, `contactJid`, `topicId`, `pinned` as needed |
+| `PATCH /memories/:id` | Body `MemoryPatch` |
+| `DELETE /memories/:id` | 204 |
+
+`scope` is `global`, `chat`, `topic`, `thread` or `contact`. The `thread` scope cannot be created or set from the app (the contract has no thread id); such memories are only listed.
+
+## Ask and live events
+
+Both are Server-Sent Events.
+
+`POST /ask` takes `{ question, conversationId? }` and streams `AskEvent`:
+
+```ts
+type AskEvent =
+  | { type: 'state'; state: JarvisState }
+  | { type: 'delta'; text: string }
+  | { type: 'source'; label: string; chatJid?: string; at?: string }
+  | { type: 'done'; conversationId: string }
+  | { type: 'error'; message: string }
+```
+
+`GET /events` streams `LiveEvent`:
+
+```ts
+type LiveEvent =
+  | { type: 'message'; source: string; at: string; todayCount: number }
+  | { type: 'cards'; counts: HomeResponse['counts'] }
+  | { type: 'health'; ok: boolean; whatsapp: string }
+```
+
+## OAuth and MCP
+
+These sit at the root, not under `/api/v1`:
+
+| Endpoint | Description |
+|---|---|
+| `GET /.well-known/oauth-authorization-server` | Metadata. The issuer is `APP_PUBLIC_URL` |
+| `GET /.well-known/oauth-protected-resource[/mcp]` | Resource metadata; the resource is `<APP_PUBLIC_URL>/mcp` |
+| `POST /register` | Dynamic client registration (public clients with PKCE, or with a secret) |
+| `GET /authorize` | Consent page (owner password) |
+| `POST /oauth/decision` | Form post from the consent page, rate limited like login |
+| `POST /token` | `authorization_code` (PKCE S256) and rotating `refresh_token` |
+| `POST /revoke` | Revoke an access or refresh token |
+| `POST /mcp` | MCP over Streamable HTTP with a bearer token |
+
+## Internal API
+
+On port 3001 inside the Docker network, with the header `x-jarvis-internal-secret: <ADMIN_INTERNAL_SECRET>`. Requests that carry Cloudflare headers are refused, so it is never reachable through the tunnel.
+
+- `POST /internal/pairing-codes` with `{ homeUrl? }` returns `{ code, expiresAt, payload, qr }`. Valid 10 minutes, single use.
+- `PUT /internal/owner-password` with `{ password }` (10 to 200 characters) returns 204.
+
+## Where the server differs from the contract
+
+- `PollData.voted` carries the number of votes so far, as a string. Poll cards exist only while you have not voted.
+- Snoozing a reminder card moves the reminder (`removed: false`, it stays `scheduled`).
+- Not in the contract: `?refresh=1` on suggest, `?active=all` on memories, and the internal endpoints.

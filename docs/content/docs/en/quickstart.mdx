@@ -1,0 +1,74 @@
+---
+title: Quickstart
+description: From a fresh Raspberry Pi to the app on your phone.
+---
+
+You need a Raspberry Pi (or any 64-bit Linux machine) with Docker and Docker Compose. See the [Raspberry Pi guide](./raspberry-pi.mdx) for hardware.
+
+## 1. Install
+
+### With the installer
+
+<InstallCommand />
+
+The installer fetches the prebuilt images, creates the project folder and starts the admin service.
+
+### Build from source
+
+If you prefer to build everything on the machine yourself:
+
+```bash
+git clone https://github.com/joel-wlf/jarvis.git ~/jarvis && cd ~/jarvis
+docker compose up -d admin
+docker compose logs admin        # shows the setup code
+```
+
+The first build takes a while on a Pi 4.
+
+## 2. Run the first-run wizard
+
+Open `http://<address-of-your-pi>:8080` in a browser on the same network. Enter the **setup code** from the admin log and choose an admin password.
+
+The wizard asks for:
+
+1. Your name (used in summaries and profiles).
+2. An AI provider and key (optional, with a live test). Without one, everything runs locally and slower.
+3. Privacy exclusions: chats whose name contains these words never go to the AI. Set this before the first start with a key.
+4. Which features to turn on (topic sorting, image descriptions, actions).
+5. An optional Cloudflare tunnel, so the app and Claude can reach you away from home.
+
+It then generates all passwords and tokens itself, builds and starts the services, and shows the next step.
+
+## 3. Link WhatsApp
+
+The wizard ends on the WhatsApp page. It shows the **QR code** in the browser, or a **pairing code** if you enter your phone number.
+
+On your phone: WhatsApp → Settings → Linked devices → Link a device → scan.
+
+Afterwards the phone sends your history in batches. This can take several minutes. Keep the phone online with WhatsApp open meanwhile. How much history you get is decided by WhatsApp.
+
+<Callout title="Linking from the terminal">
+Without the web interface: `docker compose logs -f wa-ingest` prints the QR code in the log.
+</Callout>
+
+## 4. Pair the app
+
+Install the Jarvis app (or open the web build at the admin address). On the connect screen you have two ways:
+
+- **Scan a code.** In the admin interface open the devices page and show the pairing code, then point the app's camera at it.
+- **Enter the address and password.** Type your public address (for example `https://jarvis.example.com`) and the owner password you chose, and tap Connect.
+
+Details are in [The app](./app.mdx).
+
+## 5. Connect Claude
+
+Add `https://jarvis.example.com` as a custom connector in Claude. See [Connect Claude](./connect-claude.mdx).
+
+## Check that it works
+
+```bash
+docker compose ps
+docker compose exec postgres psql -U jarvis -c "select count(*) from messages"
+```
+
+The count grows while the history imports. Voice messages are transcribed in the background.

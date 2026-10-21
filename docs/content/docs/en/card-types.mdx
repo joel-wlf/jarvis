@@ -1,0 +1,86 @@
+---
+title: Card types
+description: The 22 kinds of card Jarvis can put in front of you.
+---
+
+Every card is one decision for you: what happened, where it came from, and prepared next steps. The types are defined in `packages/contract/src/cards.ts`.
+
+## Common parts
+
+| Part | Meaning |
+|---|---|
+| Group | `reply`, `schedule`, `todo` or `know`. One tab per group in the app. |
+| Urgency | 1 can wait, 2 soon, 3 needs attention now. |
+| State | `new`, `notified` or `scheduled`, the same as the watch service. |
+| Source | Chat and time the card comes from. |
+| Say | One sentence in Jarvis' voice, shown when the card is selected. |
+| Context | Extra from other chats or memory, such as a clash with another plan. |
+| Suggestions | Prepared next steps. One is primary. |
+
+### What a tap does
+
+A suggestion carries one **action**, run by `POST /api/v1/cards/:key/act`:
+
+| Action | Effect |
+|---|---|
+| `send` | Sends a WhatsApp message into the card's chat (through the outbox). |
+| `react` | Reacts to a message with an emoji. |
+| `vote` | Votes in a poll. |
+| `done` | Marks the item done. |
+| `snooze` | Hides it until a time you choose. |
+| `dismiss` | Hides it as unimportant, for good. |
+| `remind` | Creates a reminder at a time. |
+| `save_contact` | Saves details to your contacts (handled in the app). |
+| `open` | Opens a link (handled in the app). |
+
+Sending, reacting and voting share the same hourly limit and offline check as Claude's tools. Done, dismiss and snooze behave exactly as they do via Claude's `watch_feedback`.
+
+## Reply
+
+| Type | What it is | Offers |
+|---|---|---|
+| `question` | Someone asked you something and is waiting. Shows the quote and how long. | Several reply options to send |
+| `voice` | A voice message, summarised from its transcript, with duration. | Reply options |
+| `reaction` | A message that invites a reaction, like good news in a group. | Emoji to react with |
+| `followup` | A promise you made ("I'll get back to you") with no later message from you in that chat. | Write now, or a holding reply |
+
+## Dates
+
+| Type | What it is | Offers |
+|---|---|---|
+| `event` | A date from a chat with place, attendees and how many said yes. | Accept, later, decline |
+| `conflict` | Two dates overlap. Shows both on a time axis and the free slot. | Propose a change |
+| `birthday` | A birthday with age and gift ideas that came up in chats. | Prepare a congratulation reminder |
+| `reminder` | Your own reminder for today. | Done, or snooze to a time |
+| `trip` | A train journey: departure, arrival, platform, delay, change. | Coordinate with a travel companion |
+| `place` | A meeting point from a chat, with detail. | Reply to organise rides or arrival |
+| `routine` | A habit that repeats ("call Gran on Sunday") with weeks done and streak. | Set a reminder |
+
+## To do
+
+| Type | What it is | Offers |
+|---|---|---|
+| `task` | A task with amount, recipient and days left. | Done, remind later |
+| `poll` | A poll you have not voted in. Shows votes and which option fits your calendar. | Vote |
+| `shopping` | A shopping list assembled from group messages, with who takes what. | Post the list to the group |
+| `parcel` | A parcel with steps from ordered to delivered and the delivery window. | Done |
+| `money` | Money owed either way: from, to, amount. | Settled, or remind later |
+
+## Good to know
+
+| Type | What it is | Offers |
+|---|---|---|
+| `insight` | Context from elsewhere that helps someone now, with sources. | Share it in the chat |
+| `digest` | A busy chat summarised in bullets, and what concerns you. | Mark as read |
+| `person` | A person you have not been in touch with, with facts Jarvis knows. | Get in touch |
+| `address` | A new address mentioned in a chat. | Save to contacts |
+| `link` | A shared link with domain and reading time. | Read later |
+| `photos` | Photos shared in a chat on one day, and how many include you. | Seen |
+
+## Where the cards come from
+
+- **Derived live from SQL** by the API: `question`, `voice`, `reaction`, `event`, `conflict`, `reminder`, `task`, `poll`, `digest`, `person`, `routine`.
+- **Written by the organizer** into the `cards` table in the same call that links a thread to a topic, with no extra cost: `shopping`, `parcel`, `money`, `trip`, `place`, `address`, `birthday`, `insight`. Usually zero, at most three per call.
+- **Written by rules** every 10 minutes, without AI: `followup` (open promises), `link` (shared links) and `photos` (per chat and day). Tune them with `CARDS_FOLLOWUP_MIN_HOURS`, `CARDS_FOLLOWUP_MAX_DAYS`, `CARDS_LINK_DAYS`, `CARDS_PHOTOS_MIN` and `CARDS_PHOTOS_DAYS`.
+
+Done and dismissed cards never come back, and excluded chats never produce cards. Card keys are stable (`card:<type>:<chat>:<slug>`), so a reworded model answer does not create a duplicate.

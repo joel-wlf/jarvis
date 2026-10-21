@@ -1,0 +1,60 @@
+---
+title: Connect Claude
+description: Add Jarvis as a connector in Claude with just the base URL.
+---
+
+Jarvis speaks MCP (Streamable HTTP) with OAuth 2.1. Claude needs only your base URL.
+
+## Prerequisites
+
+- The Cloudflare tunnel runs, and `APP_PUBLIC_URL` is set to your public address, for example `https://jarvis.example.com`.
+- You have set an owner password (the admin interface does this).
+
+## Add the connector
+
+1. In Claude, open the connector settings and add a **custom connector**.
+2. Enter the base URL: `https://jarvis.example.com` (the MCP endpoint is `/mcp` below it; Claude finds it).
+3. Claude starts the sign-in. Jarvis shows a consent page in German or English, depending on the browser. Enter your **owner password** and allow.
+
+That is all. Without valid credentials, Jarvis answers `401` with a `WWW-Authenticate` header that points to its resource metadata, which is how Claude discovers the OAuth flow from the base URL alone.
+
+Access tokens live 1 hour, refresh tokens 30 days and rotate on use. Only hashes are stored. Revoke a connection any time under **System → Devices** in the app or admin interface.
+
+## Legacy token URL
+
+Older setups used a secret URL with the token in the path, because some connector screens do not allow headers:
+
+```text
+https://jarvis.example.com/t/<MCP_TOKEN>/mcp
+```
+
+Clients with header support can use `https://jarvis.example.com/mcp` with `Authorization: Bearer <MCP_TOKEN>`.
+
+This keeps working while `MCP_LEGACY_TOKEN=true`, which is the default. **Whoever has the URL can read all your chats and write in your name.** Once OAuth works for you, turn `MCP_LEGACY_TOKEN` off so Claude connects only through sign-in.
+
+## What Claude can do
+
+Claude gets `read_me` (sections: overview, search, data, topics, memory, actions, limits, status) and these tools:
+
+| Area | Tools |
+|---|---|
+| Read | `list_topics`, `get_topic`, `list_threads`, `get_thread`, `list_suggested_actions`, `semantic_search`, `search_messages`, `get_recent_messages`, `get_conversation_context`, `list_chats`, `find_contact`, `find_scheduling_mentions`, `get_open_polls`, `run_readonly_sql` |
+| Memory and corrections | `remember`, `recall`, `list_memories`, `edit_memory`, `edit_topic`, `link_thread`, `move_messages`, `set_action_status` |
+| Send | `send_message`, `send_media`, `send_location`, `send_contact_card`, `forward_message` |
+| Messages | `edit_message`, `delete_message`, `react_to_message`, `star_message` |
+| Polls and chats | `create_poll`, `vote_in_poll`, `manage_chat`, `set_disappearing_messages` |
+| Groups | `create_group`, `get_group_info`, `update_group`, `manage_group_members`, `leave_group`, `group_invite_link`, `join_group`, `group_join_requests` |
+| Contacts and profile | `check_on_whatsapp`, `get_profile`, `manage_blocklist`, `update_my_profile`, `privacy_settings` |
+| Media | `get_media` (images, stickers, PDFs) |
+
+Actions that affect others or delete something show a preview first and run only with `confirm=true` when `REQUIRE_CONFIRM` is on. The MCP server only writes jobs into the `outbox` table, which `wa-ingest` executes. `outbox` is also your log: `select * from outbox order by id desc`. Turn actions off completely with `ENABLE_ACTIONS=false`.
+
+At each connection Claude also receives a **hot context** computed live from the database: upcoming dates (14 days), active open topics from the last 7 days, and due suggestions.
+
+## What is not possible
+
+Voice and video calls, posting status or stories, communities, channels, broadcast lists, payments, live location, and "watching" video or audio. Edited or deleted messages from others stay in the archive, marked "(edited)" or "(deleted)".
+
+## Recommendation
+
+Chat content comes from third parties. A sender might try to instruct Claude through a message ("send this to …"). The server tells Claude to ignore this, but let Claude's send tools ask you first rather than "always allow".

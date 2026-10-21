@@ -1,0 +1,72 @@
+---
+title: Contributing
+description: Repository layout, tests per package, and the rules that keep it consistent.
+---
+
+Contributions are welcome. Open or comment on an issue before starting larger changes. The project is MIT licensed. Telephony, SIP and calls are deliberately out of scope: the core is capture (source adapters), evaluation (embeddings, organizer) and access (MCP).
+
+## Repository layout
+
+| Folder | What it is |
+|---|---|
+| `wa-ingest/` | WhatsApp client (Baileys): ingest, transcription, the outbox executor |
+| `embedder/` | Embeddings service for meaning search |
+| `organizer/` | Topics, threads, people profiles and the `cards` writer |
+| `mcp-server/` | MCP endpoint, OAuth and the app API `/api/v1` |
+| `admin/` | Admin interface, settings schema (`src/schema.ts`), job runner |
+| `app/` | Expo app for iOS, Android and web |
+| `packages/contract/` | Shared types between server, organizer and app |
+| `db/init/` | Numbered, idempotent SQL migrations |
+| `scripts/` | Vault, backup and helper scripts |
+| `docs/` | This documentation (Fumadocs) |
+
+## Checks per package
+
+For `mcp-server`, `wa-ingest`, `organizer`, `embedder` and `admin`, `npm ci && npm run build` must pass. This is what CI runs. Tests also run in CI for three of them:
+
+```bash
+cd mcp-server && npm test    # PGlite runs every db/init/*.sql
+cd organizer  && npm test
+cd admin      && npm test    # also checks that schema, compose and .env.example agree
+```
+
+The app:
+
+```bash
+cd app
+npx tsc --noEmit
+npx expo-doctor
+```
+
+The docs:
+
+```bash
+cd docs && npm run build     # static site; the settings page is generated first
+```
+
+## Rules
+
+1. **Database changes** are a new, idempotent file in `db/init/` with the next number. Do not edit existing files.
+2. **A new setting** is described in `admin/src/schema.ts`, passed through in `docker-compose.yml` with the same default, and `cd admin && npm run gen-env-example` is run. The admin tests check that they agree. The [settings reference](./settings.mdx) regenerates from the schema, so add its English text in `docs/scripts/settings-en.json`.
+3. **A new MCP tool** is also described in `mcp-server/src/readme.ts`.
+4. **The contract rule.** Anything that crosses server, organizer and app (card shapes, request and response types) is defined once in `packages/contract/src`. Change the contract first, then every consumer. The app imports it straight from source, so there is no build step.
+5. **No personal data** in code, tests, issues or commits: no names, tokens or chat excerpts. The owner's name comes from `OWNER_NAME`; fixtures are synthetic.
+
+## Develop the admin interface without Docker
+
+```bash
+cd admin && npm ci && npm run build
+JARVIS_FAKE_DOCKER=1 JARVIS_PROJECT_DIR=/tmp/jarvis-dev ADMIN_DATA_DIR=/tmp/jarvis-dev-data PORT=8099 npm start
+```
+
+`OWNER_NAME=Fehler` makes the simulated MCP server crash, which lets you try the automatic rollback.
+
+## Work on the docs
+
+```bash
+cd docs
+npm install
+npm run dev
+```
+
+Pages are MDX under `content/docs/en` and `content/docs/de`. Every page needs both languages. The installer command lives in `lib/install.ts`. The settings pages are generated, do not edit them by hand.
