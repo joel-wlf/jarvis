@@ -502,6 +502,10 @@
       "review": {
         "title": "Alles prüfen",
         "lead": "Das wird gespeichert. Danach startet Jarvis seine Dienste."
+      },
+      "consent": {
+        "title": "Bevor es losgeht",
+        "lead": "Zwei Dinge solltest du wissen und bestätigen."
       }
     },
     "providers": {
@@ -583,7 +587,14 @@
     "suggested": "Vorschläge",
     "otherModel": "Anderes",
     "modelId": "Modell-Name",
-    "modelsNote": "Preise sind Listenpreise der Anbieter und können sich ändern. Die genaue Rechnung hängt davon ab, wie viel geschrieben wird; unter Wartung kannst du später die Kosten für dein Archiv schätzen lassen."
+    "modelsNote": "Preise sind Listenpreise der Anbieter und können sich ändern. Die genaue Rechnung hängt davon ab, wie viel geschrieben wird; unter Wartung kannst du später die Kosten für dein Archiv schätzen lassen.",
+    "consent": {
+      "whatsapp": "Jarvis ist ein unabhängiges Projekt und nicht mit WhatsApp oder Meta verbunden. Die WhatsApp-Verbindung ist inoffiziell (Baileys als verknüpftes Gerät), kann gegen die WhatsApp-Nutzungsbedingungen verstoßen und zur Sperrung meines Kontos führen.",
+      "ai": "Wenn ich KI-Funktionen einschalte, gehen Nachrichteninhalte, auch die meiner Kontakte, an den von mir gewählten KI-Anbieter (z. B. OpenAI).",
+      "responsibility": "Dein Archiv enthält Nachrichten anderer Menschen; du bist für einen rechtmäßigen Umgang damit verantwortlich (z. B. DSGVO).",
+      "legal": "Rechtliche Hinweise lesen",
+      "providerNote": "Nachrichteninhalte, auch die deiner Kontakte, gehen zur Auswertung an {{provider}}."
+    }
   },
   "mock": {
     "answer": "Samstag 15 Uhr Handball, ab 18 Uhr Grillen bei Lukas. Das WG-Kino um 21 Uhr überschneidet sich damit, Freitag 20 Uhr wäre frei. Sonntag 14 Uhr hilfst du Lena beim Umzug.",

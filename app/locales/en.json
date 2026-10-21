@@ -502,6 +502,10 @@
       "review": {
         "title": "Check everything",
         "lead": "This gets saved, then Jarvis starts its services."
+      },
+      "consent": {
+        "title": "Before you start",
+        "lead": "Two things you should know and confirm."
       }
     },
     "providers": {
@@ -583,7 +587,14 @@
     "suggested": "Suggestions",
     "otherModel": "Other",
     "modelId": "Model name",
-    "modelsNote": "Prices are the providers' list prices and can change. The real bill depends on how much is written; under maintenance you can later estimate the cost for your archive."
+    "modelsNote": "Prices are the providers' list prices and can change. The real bill depends on how much is written; under maintenance you can later estimate the cost for your archive.",
+    "consent": {
+      "whatsapp": "Jarvis is an independent project and not affiliated with WhatsApp or Meta. The WhatsApp connection is unofficial (Baileys as a linked device), may violate the WhatsApp Terms of Service and can get my account banned.",
+      "ai": "If I turn on AI features, message content, including my contacts' messages, is sent to the AI provider I choose (e.g. OpenAI).",
+      "responsibility": "Your archive contains other people's messages; you are responsible for handling them lawfully (e.g. GDPR).",
+      "legal": "Read the legal notes",
+      "providerNote": "Message content, including your contacts', is sent to {{provider}} for analysis."
+    }
   },
   "mock": {
     "answer": "Saturday 3 pm handball, from 6 pm barbecue at Lukas'. The flat's movie night at 9 pm clashes with it; Friday 8 pm would be free. Sunday 2 pm you're helping Lena move.",
