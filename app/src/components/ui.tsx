@@ -266,10 +266,10 @@ export function Closeness({ n, label }: { n: number; label: string }) {
   )
 }
 
-export function Avatar({ initials, size = 44 }: { initials: string; size?: number }) {
+export function Avatar({ initials, size = 44, inverted }: { initials: string; size?: number; inverted?: boolean }) {
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.ground2, borderWidth: 1, borderColor: colors.line }}>
-      <Text style={{ fontFamily: fonts.light, fontSize: size * 0.38, color: colors.ink2 }}>{initials}</Text>
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', backgroundColor: inverted ? colors.block : colors.ground2, borderWidth: 1, borderColor: inverted ? colors.block : colors.line }}>
+      <Text style={{ fontFamily: fonts.light, fontSize: size * 0.38, color: inverted ? colors.blockInk : colors.ink2 }}>{initials}</Text>
     </View>
   )
 }
