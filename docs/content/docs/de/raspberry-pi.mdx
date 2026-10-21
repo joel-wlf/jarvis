@@ -1,0 +1,68 @@
+---
+title: Raspberry-Pi-Anleitung
+description: Hardware, Speicher, Kühlung und Speicherlimits.
+---
+
+Jarvis ist für einen Raspberry Pi 4 mit 4 GB RAM gebaut und läuft auf allem, was stärker ist, ebenso.
+
+## Hardware
+
+| Teil | Empfehlung |
+|---|---|
+| Board | Raspberry Pi 4 mit 4 GB (ein Pi 5 ist schneller, vor allem bei lokaler KI) |
+| Betriebssystem | Ein 64-Bit-System, zum Beispiel Raspberry Pi OS Lite (64-bit) |
+| Speicher | Eine **SSD über USB 3** für das Docker-Datenverzeichnis |
+| Kühlung | Ein Gehäuse mit Kühlkörper oder ein Lüfter |
+| Strom | Das offizielle Netzteil, am besten an einer USV oder zumindest einem Überspannungsschutz |
+
+### Warum eine SSD
+
+Postgres auf einer SD-Karte funktioniert mit den schonenden Einstellungen von Jarvis (langes Checkpoint-Intervall, WAL-Kompression, `synchronous_commit=off`). Bei hartem Stromausfall gehen höchstens die letzten ~0,5 Sekunden Nachrichten verloren, dafür verschleißt die Karte deutlich weniger. Eine SSD ist trotzdem robuster und beim ersten Verlaufsimport viel schneller.
+
+### Kühlung
+
+Ein Pi 4 ohne Lüfter geht unter Volllast über 80 °C und drosselt. Jarvis bremst sich dort selbst: Der optionale lokale Whisper-Container läuft mit `cpus: 1.5`, lieber langsamer und kühl. Wenn du lokal transkribierst, lohnt sich ein Lüfter.
+
+## Speicherlimits
+
+Die Compose-Datei setzt je Dienst ein Speicherlimit:
+
+| Dienst | Limit | Hinweis |
+|---|---|---|
+| `postgres` | 900 MB | `shared_buffers=192MB`, `effective_cache_size=768MB`, `max_connections=30` |
+| `embedder` | 800 MB, 1 CPU | Lokales Embedding-Modell |
+| `whisper` | 1500 MB, 1,5 CPU | Nur mit `COMPOSE_PROFILES=local-whisper` |
+| `wa-ingest` | 512 MB | Node-Heap auf 384 MB begrenzt |
+| `mcp-server` | 256 MB | |
+| `organizer` | 256 MB | Nur mit dem Profil `organizer` |
+| `admin` | 192 MB | |
+| `cloudflared` | 128 MB | Nur mit dem Profil `tunnel` |
+
+### Limits wirksam machen
+
+Der Pi-Kernel setzt sie standardmäßig nicht durch („No memory limit support“). Ergänze am Ende der einen Zeile in `/boot/firmware/cmdline.txt` und starte neu:
+
+```text
+cgroup_enable=memory cgroup_memory=1
+```
+
+Bis dahin behalte `docker stats` im Auge. Wird der Speicher knapp, setze `WHISPER_MODEL=base` in der `.env`, oder nutze einen OpenAI-Schlüssel und verzichte ganz auf den lokalen Whisper-Container.
+
+## Besonderheiten des Pi
+
+- **Embedding-Bibliothek.** Der Embedder nutzt bewusst `@xenova/transformers` 2.17.2: Neuere ONNX-Binärdateien stürzen auf dem Pi 4 mit „illegale Instruktion“ ab. Fortschritt der Indexierung:
+
+  ```bash
+  docker compose exec postgres psql -U jarvis -c "select count(*) filter (where embedding is not null) as fertig, count(*) filter (where embedding is null and body is not null) as offen from messages"
+  ```
+
+- **WhatsApp-Verlaufs-Sync.** WhatsApp lehnt den vollen Sync mit den Browser-Profilen „macOS/Windows Desktop“ derzeit ab (Fehler 428). Jarvis meldet sich deshalb als „Ubuntu Chrome“ an.
+- **Lokale Transkription** ist auf einem Pi 4 langsam. Mit OpenAI-Schlüssel ist sie schnell, und alle Sprachnachrichten werden transkribiert, nicht nur neue.
+
+## Backups
+
+```bash
+docker compose exec -T postgres pg_dump -U jarvis jarvis | gzip > jarvis-$(date +%F).sql.gz
+```
+
+Per Cron ausführen. Auch das Volume `wa-auth` enthält die WhatsApp-Sitzung und gehört ins Backup. Diebstahlschutz steht unter [Sicherheit](./security.mdx#verschlüsselter-tresor).

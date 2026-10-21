@@ -1,0 +1,4 @@
+{
+  "title": "Jarvis",
+  "pages": ["index", "quickstart", "raspberry-pi", "app", "card-types", "connect-claude", "settings", "api", "security", "contributing", "disclaimer"]
+}
