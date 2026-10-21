@@ -3,6 +3,11 @@ title: Quickstart
 description: From a fresh Raspberry Pi to the app on your phone.
 ---
 
+<Callout type="warn" title="Unofficial and independent">
+Jarvis is not affiliated with WhatsApp or Meta and connects through an unofficial method that may violate WhatsApp's Terms of Service. Use at your own risk. Read the full [disclaimer](./disclaimer.mdx).
+</Callout>
+
+
 You need a Raspberry Pi (or any 64-bit Linux machine) with Docker and Docker Compose. See the [Raspberry Pi guide](./raspberry-pi.mdx) for hardware.
 
 ## 1. Install
@@ -37,9 +42,17 @@ The wizard asks for:
 4. Which features to turn on (topic sorting, image descriptions, actions).
 5. An optional Cloudflare tunnel, so the app and Claude can reach you away from home.
 
+<Callout type="warn">
+With an AI provider configured, message content is sent to that provider. Excluded chats and redaction limit what leaves your device. See the [disclaimer](./disclaimer.mdx#ai-provider).
+</Callout>
+
 It then generates all passwords and tokens itself, builds and starts the services, and shows the next step.
 
 ## 3. Link WhatsApp
+
+<Callout type="warn">
+This uses an unofficial connection. WhatsApp can restrict or ban accounts that use unofficial clients, so consider a secondary number. See the [disclaimer](./disclaimer.mdx).
+</Callout>
 
 The wizard ends on the WhatsApp page. It shows the **QR code** in the browser, or a **pairing code** if you enter your phone number.
 

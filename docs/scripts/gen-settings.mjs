@@ -16,6 +16,8 @@ const T = {
     description: 'Every setting in .env, generated from the admin schema.',
     intro:
       'Every setting lives in `.env`. You normally change them in the admin interface under **Settings**, which validates each value, shows the affected services and rolls back on failure. This page is generated from `admin/src/schema.ts` when the docs are built, so it always matches the code.',
+    aiWarn:
+      'With an AI provider configured, message content (including messages from your contacts) is sent to that provider. Its terms and privacy policy apply. Excluded chats and redaction limit what is sent. See the [disclaimer](./disclaimer.mdx#ai-provider).',
     advancedNote:
       'Settings marked **expert** only show in the interface when expert mode is on. **Required** settings are generated for you during first-run setup.',
     setting: 'Setting',
@@ -46,6 +48,8 @@ const T = {
     description: 'Alle Einstellungen aus der .env, erzeugt aus dem Admin-Schema.',
     intro:
       'Alle Einstellungen stehen in der `.env`. Normalerweise änderst du sie in der Admin-Oberfläche unter **Einstellungen**: Sie prüft jeden Wert, zeigt die betroffenen Dienste und stellt bei Fehlern den alten Stand wieder her. Diese Seite wird beim Bauen der Doku aus `admin/src/schema.ts` erzeugt und passt deshalb immer zum Code.',
+    aiWarn:
+      'Mit konfiguriertem KI-Anbieter geht Nachrichteninhalt (auch Nachrichten deiner Kontakte) an diesen Anbieter. Es gelten dessen Bedingungen und Datenschutzerklärung. Ausgeschlossene Chats und Schwärzung begrenzen, was gesendet wird. Siehe die [Rechtlichen Hinweise](./disclaimer.mdx#ki-anbieter).',
     advancedNote:
       'Mit **Experte** markierte Einstellungen erscheinen in der Oberfläche nur im Experten-Modus. **Pflicht**-Werte erzeugt die Ersteinrichtung für dich.',
     setting: 'Einstellung',
@@ -106,6 +110,7 @@ function build(lang) {
     if (!fields.length) continue
     const [gl, gh] = lang === 'en' ? en.groups[g.id] ?? [g.label, g.help] : [g.label, g.help]
     out.push(`## ${esc(gl)}`, '', esc(gh), '')
+    if (g.id === 'ai') out.push('<Callout type="warn">', t.aiWarn, '</Callout>', '')
     out.push(`| ${t.setting} | ${t.desc} |`, '|---|---|')
     for (const f of fields) {
       let label = f.label

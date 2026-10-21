@@ -303,3 +303,21 @@ figure.shiki pre {
 .prose td {
   vertical-align: top;
 }
+
+.jv-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  padding: 1rem 1.125rem;
+  border-top: 1px solid var(--jv-line-2);
+  background: #f3f5f7;
+  font-size: 0.85rem;
+  color: #5f6670;
+}
+.jv-footer a {
+  color: #15171a;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--jv-line-2);
+  text-underline-offset: 3px;
+}
