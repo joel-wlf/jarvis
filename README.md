@@ -29,17 +29,19 @@ WhatsApp ──QR──> wa-ingest ──> postgres (pgvector) <── mcp-serve
 
 ## Einrichtung auf dem Pi
 
-Voraussetzung: Docker + Docker Compose auf dem Pi (64-bit OS), idealerweise Daten auf SSD.
+Voraussetzung: Raspberry Pi OS, Debian oder Ubuntu (arm64 oder amd64, 64-bit), idealerweise Daten auf SSD. Auf dem Mac genügt Docker Desktop.
 
 ### Mit der Weboberfläche (empfohlen)
 
+Ein Befehl installiert Docker (nach Rückfrage), lädt die vorgebauten Images (kein Bauen auf dem Pi, kein Speicherproblem), startet die Oberfläche und zeigt Adresse und Einrichtungscode:
+
 ```bash
-git clone https://github.com/joel-wlf/jarvis.git ~/jarvis && cd ~/jarvis
-docker compose up -d admin
-docker compose logs admin        # zeigt den Einrichtungscode
+curl -fsSL https://raw.githubusercontent.com/joel-wlf/jarvis/main/install.sh | sh
 ```
 
-Dann im Browser `http://<adresse-des-pi>:8080` öffnen, den Einrichtungscode eingeben und ein Admin-Passwort festlegen. Der Assistent fragt Name, OpenAI-Schlüssel (optional, mit Live-Test), Datenschutz-Ausschlüsse, Funktionen und Cloudflare-Tunnel ab, erzeugt alle Passwörter und den MCP-Token selbst, baut und startet die Dienste und zeigt danach den **WhatsApp-QR-Code direkt im Browser** (oder einen Kopplungscode per Telefonnummer). Am Ende steht die Connector-URL zum Kopieren bereit.
+Optionen (hinter `sh -s --`): `--dir ORDNER` (Standard `~/jarvis`), `--version 1.2.0` (Standard: neuestes Release), `--yes` (alle Fragen mit Ja, ohne Terminal), `--uninstall` (stoppt Jarvis; fragt vor dem Löschen der Daten, `--purge` löscht sie ohne Rückfrage). Die Meldungen sind Englisch, bei `LANG=de_…` Deutsch. Das Skript ist wiederholbar: Erneutes Ausführen aktualisiert auf die gewählte Version, eine vorhandene `.env` bleibt erhalten (nur `JARVIS_VERSION` wird gesetzt). Die Images liegen unter `ghcr.io/joel-wlf/jarvis-<dienst>` (arm64 und amd64).
+
+Dann im Browser `http://<adresse-des-pi>:8080` öffnen, den Einrichtungscode eingeben und ein Admin-Passwort festlegen. Der Assistent fragt Name, OpenAI-Schlüssel (optional, mit Live-Test), Datenschutz-Ausschlüsse, Funktionen und Cloudflare-Tunnel ab, erzeugt alle Passwörter und den MCP-Token selbst, startet die Dienste und zeigt danach den **WhatsApp-QR-Code direkt im Browser** (oder einen Kopplungscode per Telefonnummer). Am Ende steht die Connector-URL zum Kopieren bereit.
 
 Danach ist die Oberfläche die Zentrale für alles Weitere:
 
@@ -49,7 +51,7 @@ Danach ist die Oberfläche die Zentrale für alles Weitere:
 | Einstellungen | Alle Einstellungen aus `.env` in Gruppen, mit Suche, Experten-Modus, Prüfung während der Eingabe, Vorschau der Unterschiede und betroffenen Dienste |
 | WhatsApp | QR-Code/Kopplungscode live, neu verknüpfen (das Archiv bleibt erhalten) |
 | Logs | Logs je Dienst, live, mit geschwärzten Geheimnissen |
-| Wartung | Dienste neu starten, nach `git pull` neu bauen, Kostenschätzung der Themen-Sortierung, MCP-Token und Datenbank-Passwörter wechseln, Admin-Passwort ändern, Protokolle früherer Vorgänge |
+| Wartung | Dienste neu starten, auf neue Images aktualisieren (lädt sie, prüft die Gesundheit und setzt bei Fehlern auf die alten zurück; ohne erreichbare Images wird aus dem Quellcode gebaut), Kostenschätzung der Themen-Sortierung, MCP-Token und Datenbank-Passwörter wechseln, Admin-Passwort ändern, Protokolle früherer Vorgänge |
 | Versionen | Jede frühere `.env` (die letzten 30), Unterschiede ansehen und wiederherstellen |
 
 **So schützt die Oberfläche vor Fehlern:** Jede Änderung wird erst geprüft (Format, Grenzen, Abhängigkeiten wie „Themen-Sortierung braucht einen Schlüssel"), dann von Docker Compose gegengeprüft, bevor irgendetwas geschrieben wird. Die alte `.env` wird gesichert, die neue atomar geschrieben (ein Stromausfall hinterlässt nie eine halbe Datei). Danach startet Compose nur die betroffenen Dienste neu, und die Oberfläche wartet, bis alle stabil laufen und sich an der Datenbank anmelden können. Klappt das nicht, stellt sie den vorherigen Stand automatisch wieder her. Docker-Profile (`tunnel`, `organizer`, `local-whisper`) setzt sie passend zu den Schaltern; Datenbank-Passwörter lassen sich nur über „Wechseln" ändern, das die Datenbank mit umstellt. Es läuft immer nur ein Vorgang gleichzeitig; schließt du den Browser, läuft er weiter.
@@ -58,11 +60,24 @@ Danach ist die Oberfläche die Zentrale für alles Weitere:
 
 Mit verschlüsseltem Tresor (siehe unten) zeigt `.env` auf `/srv/vault/secrets/.env`; dafür muss `JARVIS_SECRETS_DIR=/srv/vault/secrets` in `.env` stehen (das Tresor-Skript trägt es ein, die Oberfläche nennt sonst den genauen Befehl).
 
+### Aus dem Quellcode bauen
+
+Für Entwicklung oder eigene Änderungen. Jeder Dienst hat in `docker-compose.yml` neben `image:` auch `build:`:
+
+```bash
+git clone https://github.com/joel-wlf/jarvis.git ~/jarvis && cd ~/jarvis
+docker compose build          # auf einem Pi 4 dauert das 10 bis 30 Minuten
+docker compose up -d admin
+docker compose logs admin     # zeigt den Einrichtungscode
+```
+
+Mit `JARVIS_REGISTRY` (Präfix, Standard `ghcr.io/joel-wlf/jarvis`) und `JARVIS_VERSION` (Standard `latest`) in `.env` wählst du andere Images, etwa die eines Forks.
+
 ### Von Hand
 
 1. `cp .env.example .env`, Pflichtwerte eintragen (Zufallswerte mit `openssl rand -hex 24`) und `OWNER_NAME` setzen. Alle Einstellungen sind in `.env.example` beschrieben.
 2. **Cloudflare Tunnel** anlegen: Zero Trust → Networks → Tunnels → *Create* (Cloudflared). Token in `.env` als `CLOUDFLARE_TUNNEL_TOKEN`, dazu `COMPOSE_PROFILES=tunnel`. Public Hostname z.B. `jarvis.deine-domain.de` → Service `http://mcp-server:3000`.
-3. Starten: `docker compose up -d --build`
+3. Starten: `docker compose pull && docker compose up -d` (oder `docker compose up -d --build`, um aus dem Quellcode zu bauen)
 4. **WhatsApp verknüpfen**: `docker compose logs -f wa-ingest` → QR-Code erscheint im Log. Am Handy: WhatsApp → Einstellungen → Verknüpfte Geräte → Gerät hinzufügen → scannen.
    Danach schickt das Handy den Verlauf in Batches (Log: „History-Batch importiert"). Das kann einige Minuten dauern; das Handy sollte dabei online und die App geöffnet sein.
 5. Prüfen: `docker compose exec postgres psql -U jarvis -c "select count(*) from messages"`
