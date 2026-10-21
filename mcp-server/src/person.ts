@@ -1,12 +1,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import pg from 'pg'
 import { z } from 'zod'
-import { findContacts, fmtTs, likeEscape, pool } from './db.js'
+import { findContacts, fmtTs, likeEscape, pool, memDb as memPool } from './db.js'
 import { OWNER, OWNER_GEN } from './config.js'
 
 // Personen-Ebene: echter Name/Spitznamen, Beziehung, Nähe, Anrede, Ton. Schreibrechte nur über die Rolle mcp_mem.
 const ENABLED = process.env.ENABLE_MEMORY !== 'false'
-const memPool = new pg.Pool({ connectionString: process.env.MEM_DATABASE_URL, max: 2 })
 
 const text = (t: string, isError = false) => ({ content: [{ type: 'text' as const, text: t }], ...(isError ? { isError: true } : {}) })
 const REL = ['family', 'partner', 'close_friend', 'friend', 'acquaintance', 'colleague', 'community', 'service', 'other'] as const
@@ -30,6 +28,36 @@ function line(p: any): string {
   const name = p.name ?? p.jid
   const real = p.real_name && p.real_name.toLowerCase() !== String(name).toLowerCase() ? ` (eigentlich ${p.real_name})` : ''
   return `${name}${real}: ${p.relationship ? REL_DE[p.relationship] ?? p.relationship : 'Beziehung unbekannt'}${p.closeness ? `, Nähe ${p.closeness}/5` : ''}${p.formality ? `, ${p.formality}` : ''}${p.tone ? ` – ${p.tone}` : ''}`
+}
+
+export interface PersonUpdate {
+  /** "" removes the real name */
+  real_name?: string
+  aliases?: string[]
+  relationship?: string
+  closeness?: number
+  formality?: string
+  tone?: string
+  note?: string
+  /** explicit lock/unlock; otherwise setting relationship, closeness, formality or tone locks the profile */
+  locked?: boolean
+}
+
+/** Owner correction of a person profile. Same rules as the edit_person tool; shared with PATCH /api/v1/people/:jid. */
+export async function updatePerson(jid: string, u: PersonUpdate) {
+  const lock = u.relationship !== undefined || u.closeness !== undefined || u.formality !== undefined || u.tone !== undefined
+  await memPool.query(
+    `INSERT INTO contact_profiles (jid, real_name, aliases, relationship, closeness, formality, tone, note, source, locked, updated_at)
+     VALUES ($1, nullif($2,''), coalesce($3::text[], '{}'), $4, $5, $6, $7, $8, CASE WHEN $9 OR $11::boolean THEN 'user' ELSE 'auto' END, coalesce($11::boolean, $9), now())
+     ON CONFLICT (jid) DO UPDATE SET
+       real_name = CASE WHEN $10 THEN nullif($2,'') ELSE contact_profiles.real_name END,
+       aliases = coalesce($3::text[], contact_profiles.aliases),
+       relationship = coalesce($4, contact_profiles.relationship), closeness = coalesce($5, contact_profiles.closeness),
+       formality = coalesce($6, contact_profiles.formality), tone = coalesce($7, contact_profiles.tone), note = coalesce($8, contact_profiles.note),
+       source = CASE WHEN $9 OR $11::boolean THEN 'user' ELSE contact_profiles.source END,
+       locked = coalesce($11::boolean, contact_profiles.locked OR $9), updated_at = now()`,
+    [jid, u.real_name ?? null, u.aliases ?? null, u.relationship ?? null, u.closeness ?? null, u.formality ?? null, u.tone ?? null, u.note ?? null, lock, u.real_name !== undefined, u.locked ?? null],
+  )
 }
 
 export function registerPersonTools(server: McpServer) {
@@ -121,17 +149,7 @@ export function registerPersonTools(server: McpServer) {
       if ('error' in c) return text(c.error, true)
       const lock = relationship !== undefined || closeness !== undefined || formality !== undefined || tone !== undefined
       if (real_name === undefined && !aliases && !lock && note === undefined) return text('Keine Änderung angegeben.', true)
-      await memPool.query(
-        `INSERT INTO contact_profiles (jid, real_name, aliases, relationship, closeness, formality, tone, note, source, locked, updated_at)
-         VALUES ($1, nullif($2,''), coalesce($3::text[], '{}'), $4, $5, $6, $7, $8, 'user', $9, now())
-         ON CONFLICT (jid) DO UPDATE SET
-           real_name = CASE WHEN $10 THEN nullif($2,'') ELSE contact_profiles.real_name END,
-           aliases = coalesce($3::text[], contact_profiles.aliases),
-           relationship = coalesce($4, contact_profiles.relationship), closeness = coalesce($5, contact_profiles.closeness),
-           formality = coalesce($6, contact_profiles.formality), tone = coalesce($7, contact_profiles.tone), note = coalesce($8, contact_profiles.note),
-           source = CASE WHEN $9 THEN 'user' ELSE contact_profiles.source END, locked = contact_profiles.locked OR $9, updated_at = now()`,
-        [c.jid, real_name ?? null, aliases ?? null, relationship ?? null, closeness ?? null, formality ?? null, tone ?? null, note ?? null, lock, real_name !== undefined],
-      )
+      await updatePerson(c.jid, { real_name, aliases, relationship, closeness, formality, tone, note })
       const parts = [real_name !== undefined && (real_name ? `echter Name "${real_name}"` : 'echter Name entfernt'), aliases && `Spitznamen: ${aliases.join(', ')}`, relationship && `Beziehung: ${REL_DE[relationship]}`, closeness && `Nähe ${closeness}/5`, formality && `Anrede ${formality}`, tone && `Ton: ${tone}`, note && 'Hinweis gespeichert'].filter(Boolean)
       return text(`${c.name} aktualisiert: ${parts.join('; ')}.${lock ? ' Beziehung/Ton sind jetzt fest.' : ''}`)
     },
