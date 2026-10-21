@@ -74,6 +74,7 @@ function Overview() {
     { href: '/system/devices', title: t('system.devices'), sub: t('system.devicesSub') },
     { href: '/system/logs', title: t('system.logs'), sub: t('system.logsSub') },
     { href: '/system/maintenance', title: t('system.maintenance'), sub: t('system.maintenanceSub') },
+    { href: '/legal', title: t('system.legal'), sub: t('system.legalSub') },
     { href: '/setup', title: t('system.setup'), sub: t('system.setupSub') },
   ]
 
