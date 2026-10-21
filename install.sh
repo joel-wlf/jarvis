@@ -5,15 +5,19 @@
 #   curl -fsSL https://raw.githubusercontent.com/joel-wlf/jarvis/main/install.sh | sh
 #   curl -fsSL .../install.sh | sh -s -- --yes --dir /srv/jarvis --version 1.2.0
 #
-# Options: --dir DIR  --version X.Y.Z|latest  --yes  --uninstall [--purge]  --help
+# Options: --dir DIR  --version X.Y.Z|latest  --yes  --accept-risks  --uninstall [--purge]  --help
 set -eu
 
 # The one place that names the repository (owner/name). Images live at ghcr.io/<repo>-<service>.
 REPO="${JARVIS_REPO:-joel-wlf/jarvis}"
 
+# Disclaimer page of the docs site (one place; update if the docs move).
+DISCLAIMER_URL="${JARVIS_DISCLAIMER_URL:-https://joel-wlf.github.io/jarvis/docs/disclaimer}"
+
 DIR="${HOME:-.}/jarvis"
 VERSION=""
 YES=0
+ACCEPT=0
 UNINSTALL=0
 PURGE=0
 SUDO=0 # 1 = run docker through sudo
@@ -24,7 +28,14 @@ case "${LANG:-}" in de*) L=de ;; *) L=en ;; esac
 t() {
   if [ "$L" = de ]; then
     case "$1" in
-      usage) echo "Verwendung: install.sh [--dir ORDNER] [--version X.Y.Z|latest] [--yes] [--uninstall [--purge]]" ;;
+      usage) echo "Verwendung: install.sh [--dir ORDNER] [--version X.Y.Z|latest] [--yes] [--accept-risks] [--uninstall [--purge]]" ;;
+      disc_title) echo "Wichtige Hinweise, bitte vor der Installation lesen:" ;;
+      disc_1) echo "Jarvis ist ein unabhängiges Projekt und steht in keiner Verbindung zu WhatsApp oder Meta und wird von ihnen nicht unterstützt." ;;
+      disc_2) echo "Jarvis verbindet sich über ein inoffizielles Verfahren (Baileys, als verknüpftes Gerät) mit WhatsApp. Das kann gegen die Nutzungsbedingungen von WhatsApp verstoßen; WhatsApp kann dein Konto einschränken oder sperren, und die Verbindung kann jederzeit nicht mehr funktionieren. Nutzung auf eigenes Risiko; erwäge eine Zweitnummer." ;;
+      disc_3) echo "Wenn du KI-Funktionen aktivierst, werden Nachrichteninhalte (auch Nachrichten deiner Kontakte, Sprachtranskripte und Bildbeschreibungen) an den von dir eingestellten KI-Anbieter gesendet, z.B. OpenAI. Dessen Bedingungen und Datenschutzerklärung gelten." ;;
+      disc_more) echo "Mehr dazu: %s" ;;
+      disc_ask) echo "Hast du das gelesen und möchtest du fortfahren?" ;;
+      disc_no) echo "Abgebrochen. Es wurde nichts installiert." ;;
       badarg) echo "Unbekannte Option: %s" ;;
       needval) echo "Die Option %s braucht einen Wert." ;;
       os) echo "System: %s (%s)" ;;
@@ -69,7 +80,14 @@ t() {
     esac
   else
     case "$1" in
-      usage) echo "Usage: install.sh [--dir DIR] [--version X.Y.Z|latest] [--yes] [--uninstall [--purge]]" ;;
+      usage) echo "Usage: install.sh [--dir DIR] [--version X.Y.Z|latest] [--yes] [--accept-risks] [--uninstall [--purge]]" ;;
+      disc_title) echo "Important, please read before installing:" ;;
+      disc_1) echo "Jarvis is an independent project, not affiliated with or endorsed by WhatsApp or Meta." ;;
+      disc_2) echo "It connects to WhatsApp through an unofficial method (Baileys, as a linked device). This may violate WhatsApp's Terms of Service; WhatsApp can restrict or ban your account, and the connection can stop working at any time. Use at your own risk; consider a secondary number." ;;
+      disc_3) echo "If you enable AI features, message content (including your contacts' messages, voice transcripts and image descriptions) is sent to the AI provider you configure, e.g. OpenAI. Their terms and privacy policy apply." ;;
+      disc_more) echo "More details: %s" ;;
+      disc_ask) echo "Have you read this and do you want to continue?" ;;
+      disc_no) echo "Aborted. Nothing was installed." ;;
       badarg) echo "Unknown option: %s" ;;
       needval) echo "Option %s needs a value." ;;
       os) echo "System: %s (%s)" ;;
@@ -181,6 +199,7 @@ parse_args() {
   while [ $# -gt 0 ]; do
     case "$1" in
       --yes | -y) YES=1 ;;
+      --accept-risks) ACCEPT=1 ;;
       --uninstall) UNINSTALL=1 ;;
       --purge) PURGE=1 ;;
       --dir | --version)
@@ -355,7 +374,25 @@ wait_admin() {
   die waitfail "$DIR"
 }
 
+# Shown before anything is installed; needs an explicit yes unless --yes or --accept-risks was given.
+disclaimer() {
+  echo
+  say disc_title
+  echo
+  say disc_1
+  echo
+  say disc_2
+  echo
+  say disc_3
+  echo
+  say disc_more "$DISCLAIMER_URL"
+  echo
+  if [ "$ACCEPT" = 1 ] || [ "$YES" = 1 ]; then return 0; fi
+  ask disc_ask || die disc_no
+}
+
 install() {
+  disclaimer
   detect_platform
   ensure_docker
   resolve_version

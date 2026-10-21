@@ -1,5 +1,15 @@
 # Jarvis: persönlicher Kontext-Manager
 
+> **Wichtig**
+>
+> - Jarvis ist ein unabhängiges Projekt und steht in keiner Verbindung zu WhatsApp oder Meta und wird von ihnen nicht unterstützt.
+> - Die Verbindung zu WhatsApp läuft über ein inoffizielles Verfahren (Baileys, als verknüpftes Gerät). Das kann gegen die Nutzungsbedingungen von WhatsApp verstoßen; WhatsApp kann dein Konto einschränken oder sperren, und die Verbindung kann jederzeit nicht mehr funktionieren. Nutzung auf eigenes Risiko; erwäge eine Zweitnummer.
+> - Wenn du KI-Funktionen aktivierst, werden Nachrichteninhalte (auch Nachrichten deiner Kontakte, Sprachtranskripte und Bildbeschreibungen) an den von dir eingestellten KI-Anbieter gesendet, z.B. OpenAI. Dessen Bedingungen und Datenschutzerklärung gelten.
+> - Dein Archiv enthält Nachrichten anderer Menschen. Du bist selbst dafür verantwortlich, mit deren Daten rechtmäßig umzugehen (z.B. nach der DSGVO).
+> - Bereitgestellt wie besehen, ohne Gewährleistung (siehe [LICENSE](LICENSE)).
+>
+> Mehr dazu auf der Disclaimer-Seite der Dokumentation (`/docs/disclaimer`).
+
 Jarvis ist als persönlicher Kontext-Manager gedacht: ein privates System, das über die Zeit alles zusammenführt, was für dich Kontext ist, es nach Themen, Personen und Fristen ordnet, sich merkt, was du korrigierst, und Claude als Agent damit arbeiten lässt (suchen, erinnern, vorbereiten, antworten, handeln).
 
 **Heute** ist WhatsApp die erste Quelle (Nachrichten, Sprachnachrichten, Bilder, Umfragen, Reaktionen, Gruppen). Weitere Quellen wie Mail, Kalender, Dokumente und Notizen sollen dazukommen. Die Architektur trennt dafür drei Dinge:
@@ -33,13 +43,13 @@ Voraussetzung: Raspberry Pi OS, Debian oder Ubuntu (arm64 oder amd64, 64-bit), i
 
 ### Mit der Weboberfläche (empfohlen)
 
-Ein Befehl installiert Docker (nach Rückfrage), lädt die vorgebauten Images (kein Bauen auf dem Pi, kein Speicherproblem), startet die Oberfläche und zeigt Adresse und Einrichtungscode:
+Ein Befehl zeigt zuerst die Hinweise oben und lässt sie bestätigen, installiert dann Docker (nach Rückfrage), lädt die vorgebauten Images (kein Bauen auf dem Pi, kein Speicherproblem), startet die Oberfläche und zeigt Adresse und Einrichtungscode:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/joel-wlf/jarvis/main/install.sh | sh
 ```
 
-Optionen (hinter `sh -s --`): `--dir ORDNER` (Standard `~/jarvis`), `--version 1.2.0` (Standard: neuestes Release), `--yes` (alle Fragen mit Ja, ohne Terminal), `--uninstall` (stoppt Jarvis; fragt vor dem Löschen der Daten, `--purge` löscht sie ohne Rückfrage). Die Meldungen sind Englisch, bei `LANG=de_…` Deutsch. Das Skript ist wiederholbar: Erneutes Ausführen aktualisiert auf die gewählte Version, eine vorhandene `.env` bleibt erhalten (nur `JARVIS_VERSION` wird gesetzt). Die Images liegen unter `ghcr.io/joel-wlf/jarvis-<dienst>` (arm64 und amd64).
+Optionen (hinter `sh -s --`): `--dir ORDNER` (Standard `~/jarvis`), `--version 1.2.0` (Standard: neuestes Release), `--yes` (alle Fragen mit Ja, auch den Hinweis oben; ohne Terminal nötig), `--accept-risks` (nur den Hinweis bestätigen), `--uninstall` (stoppt Jarvis; fragt vor dem Löschen der Daten, `--purge` löscht sie ohne Rückfrage). Die Meldungen sind Englisch, bei `LANG=de_…` Deutsch. Das Skript ist wiederholbar: Erneutes Ausführen aktualisiert auf die gewählte Version, eine vorhandene `.env` bleibt erhalten (nur `JARVIS_VERSION` wird gesetzt). Die Images liegen unter `ghcr.io/joel-wlf/jarvis-<dienst>` (arm64 und amd64).
 
 Dann im Browser `http://<adresse-des-pi>:8080` öffnen, den Einrichtungscode eingeben und ein Admin-Passwort festlegen. Der Assistent fragt Name, OpenAI-Schlüssel (optional, mit Live-Test), Datenschutz-Ausschlüsse, Funktionen und Cloudflare-Tunnel ab, erzeugt alle Passwörter und den MCP-Token selbst, startet die Dienste und zeigt danach den **WhatsApp-QR-Code direkt im Browser** (oder einen Kopplungscode per Telefonnummer). Am Ende steht die Connector-URL zum Kopieren bereit.
 
