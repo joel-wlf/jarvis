@@ -1,63 +1,75 @@
-// The Jarvis figure, centred and breathing: a slow rise and swell with a ground shadow that
-// narrows in step. Thinking breathes faster, sleep slower. Rendered images cross-fade between states.
-import { useEffect } from 'react'
+// The Jarvis figure: stop-motion sprites at 2 fps with hard cuts, over a slow, smooth hover.
+// Every frame stays mounted (only the current one is visible), so cuts never flash while loading.
+import { useEffect, useRef, useState } from 'react'
 import { View } from 'react-native'
 import { Image } from 'expo-image'
-import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg'
 import Animated, { Easing, cancelAnimation, interpolate, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
 import { useTranslation } from 'react-i18next'
 import type { JarvisState } from '@jarvis/contract'
-import { JARVIS_IMAGES } from './images'
-import { Pebble } from './Pebble'
+import { bridge, DAMP, FRAME_MS, FRAMES, SEQUENCES, SHADOW, SPRITES, type Frame } from './sprites'
 
-const PERIOD: Partial<Record<JarvisState, number>> = { thinking: 2400, sleep: 7000 }
+/** The figure fills about half of each sprite, so the sprite square is drawn larger than the layout box. */
+const SPRITE_SCALE = 1.35
+const HOVER_MS = 4500
 
 export function JarvisFigure({ state, size }: { state: JarvisState; size: number }) {
   const { t } = useTranslation()
   const reduced = useReducedMotion()
-  const breath = useSharedValue(0)
-  const period = PERIOD[state] ?? 4200
+  const [frame, setFrame] = useState<Frame>(SEQUENCES[state][0]!)
+  const current = useRef(state)
+  const queue = useRef<Frame[]>([])
+  const index = useRef(0)
+
+  // A state change queues its bridge frames; the timer picks them up on the next tick.
+  useEffect(() => {
+    if (state === current.current) return
+    queue.current = bridge(current.current, state)
+    current.current = state
+    index.current = 0
+  }, [state])
 
   useEffect(() => {
+    const timer = setInterval(() => {
+      const seq = SEQUENCES[current.current]
+      setFrame(queue.current.shift() ?? seq[index.current++ % seq.length]!)
+    }, FRAME_MS)
+    return () => clearInterval(timer)
+  }, [])
+
+  // Smooth hover on top of the stop motion; off when the system asks for reduced motion.
+  const hover = useSharedValue(0)
+  useEffect(() => {
     if (reduced) {
-      cancelAnimation(breath)
-      breath.value = 0
+      cancelAnimation(hover)
+      hover.value = 0
       return
     }
-    breath.value = 0
-    breath.value = withRepeat(withTiming(1, { duration: period / 2, easing: Easing.inOut(Easing.sin) }), -1, true)
-  }, [period, reduced, breath])
+    hover.value = withRepeat(withTiming(1, { duration: HOVER_MS / 2, easing: Easing.inOut(Easing.ease) }), -1, true)
+  }, [reduced, hover])
 
-  const bodyStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: interpolate(breath.value, [0, 1], [0, -7]) }, { scale: interpolate(breath.value, [0, 1], [1, 1.016]) }],
-  }))
+  const S = size * SPRITE_SCALE
+  const floatStyle = useAnimatedStyle(() => ({ transform: [{ translateY: interpolate(hover.value, [0, 1], [0, -0.022 * S]) }] }))
   const shadowStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(breath.value, [0, 1], [1, 0.7]),
-    transform: [{ scaleX: interpolate(breath.value, [0, 1], [1, 0.88]) }],
+    opacity: interpolate(hover.value, [0, 1], [1, 0.7]),
+    transform: [{ scale: interpolate(hover.value, [0, 1], [1, 0.93]) }],
   }))
 
-  const src = JARVIS_IMAGES[state] ?? JARVIS_IMAGES.idle
-  const shadowW = size * 0.46
-
+  const layer = { position: 'absolute' as const, left: (size - S) / 2, top: (size - S) / 2, width: S, height: S }
   return (
-    <View style={{ width: size, alignItems: 'center' }}>
-      <Animated.View style={[{ width: size, height: size, transformOrigin: '50% 80%' }, bodyStyle]}>
-        {src ? (
-          <Image source={src} style={{ width: size, height: size }} contentFit="contain" transition={450} accessibilityLabel={t('jarvis.figure', { state: t(`jarvis.state.${state}`) })} />
-        ) : (
-          <Pebble size={size} state={state} />
-        )}
+    <View style={{ width: size, height: size }} accessible accessibilityRole="image" accessibilityLabel={t('jarvis.figure', { state: t(`jarvis.state.${state}`) })}>
+      <Animated.View style={[layer, { transformOrigin: '50% 76%' }, shadowStyle]} pointerEvents="none">
+        <Image source={SHADOW} style={{ width: S, height: S }} contentFit="contain" />
       </Animated.View>
-      <Animated.View style={[{ width: shadowW, height: 14, marginTop: -18 }, shadowStyle]} pointerEvents="none">
-        <Svg width={shadowW} height={14}>
-          <Defs>
-            <RadialGradient id="gs" cx="50%" cy="50%" rx="50%" ry="50%">
-              <Stop offset="0" stopColor="#1E2632" stopOpacity="0.26" />
-              <Stop offset="1" stopColor="#1E2632" stopOpacity="0" />
-            </RadialGradient>
-          </Defs>
-          <Ellipse cx={shadowW / 2} cy={7} rx={shadowW / 2} ry={7} fill="url(#gs)" />
-        </Svg>
+      <Animated.View style={[layer, floatStyle]} pointerEvents="none">
+        {FRAMES.map((f) => (
+          <Image
+            key={f}
+            source={SPRITES[f]}
+            style={{ position: 'absolute', width: S, height: S, opacity: f === frame ? 1 : 0, transform: [{ translateY: ((DAMP[f] ?? 0) / 100) * S }] }}
+            contentFit="contain"
+            cachePolicy="memory"
+          />
+        ))}
       </Animated.View>
     </View>
   )

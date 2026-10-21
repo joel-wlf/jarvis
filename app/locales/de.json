@@ -53,8 +53,7 @@
       "sleep": "Nacht",
       "error": "Störung"
     },
-    "figure": "Jarvis: {{state}}",
-    "placeholder": "Platzhalter"
+    "figure": "Jarvis: {{state}}"
   },
   "today": {
     "title": "Heute",
