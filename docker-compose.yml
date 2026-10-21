@@ -242,7 +242,11 @@ services:
   # Weboberfläche für Einrichtung und Einstellungen. Start: docker compose up -d admin, dann http://<adresse-des-pi>:8080
   # Steuert Docker über den Socket (entspricht Root auf dem Pi): nur im Heimnetz, nie über den Tunnel veröffentlichen.
   admin:
-    build: ./admin
+    # Built from the repository root: the image contains the Expo web app (app/) as its interface.
+    # admin/Dockerfile.dockerignore keeps everything else out.
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
     restart: unless-stopped
     logging: *logging
     mem_limit: 192m
@@ -251,6 +255,9 @@ services:
       - "${ADMIN_BIND:-0.0.0.0}:${ADMIN_PORT:-8080}:8080"
     environment:
       ADMIN_PUBLIC_PORT: ${ADMIN_PORT:-8080}
+      # App API and OAuth (proxied for the web app) and mcp-server's internal admin API
+      APP_API_URL: http://mcp-server:3000
+      APP_INTERNAL_URL: http://mcp-server:3001
       TZ: Europe/Berlin
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

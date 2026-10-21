@@ -103,6 +103,14 @@ export interface Backup { name: string; at: string; changed: string[] }
 export const SERVICES = ['postgres', 'embedder', 'wa-ingest', 'mcp-server', 'organizer', 'whisper', 'cloudflared', 'admin'] as const
 export const RELINK_WORD = 'NEU VERKNÜPFEN'
 
+/** POST /api/pairing on the admin interface: one-time code and QR for a new device. */
+export interface PairingCode {
+  code: string
+  expiresAt: string
+  qr: string
+  qrSvg: string
+}
+
 export interface AdminApi {
   healthy(): Promise<boolean>
   state(): Promise<AdminState>
@@ -124,6 +132,8 @@ export interface AdminApi {
   restart(service: string): Promise<Job>
   rebuild(): Promise<Job>
   estimate(): Promise<Job>
+  pairing(): Promise<PairingCode>
+  ownerPassword(adminPassword: string, newPassword: string): Promise<void>
 }
 
 export function createHttpAdmin(homeUrl: string): AdminApi {
@@ -161,5 +171,7 @@ export function createHttpAdmin(homeUrl: string): AdminApi {
     restart: (service) => job(call('/api/maintenance/restart', 'POST', { service })),
     rebuild: () => job(call('/api/maintenance/rebuild', 'POST')),
     estimate: () => job(call('/api/maintenance/estimate', 'POST')),
+    pairing: () => call('/api/pairing', 'POST'),
+    ownerPassword: async (adminPassword, newPassword) => void (await call('/api/owner-password', 'POST', { password: adminPassword, newPassword })),
   }
 }

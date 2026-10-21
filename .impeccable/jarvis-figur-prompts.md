@@ -8,7 +8,7 @@ Ziel: Eine Figur mit Charakter, die mitten auf der hellen Bühne steht, ruhig at
 2. **Zustände.** Für jeden Zustand ein Bild mit demselben Grundprompt, dem Hauptbild als Referenz und dem Zusatz aus der Tabelle. Gleiche Kamera, gleiches Licht, gleiche Größe im Bild.
 3. **Atmen.** Bei einem reinen Bildmodell reicht ein Standbild pro Zustand: Das Atmen (minimales Heben und Weiten plus Schatten) baue ich im Code. Wenn dein Modell auch Videos kann, ist pro Zustand eine nahtlose Schleife von 3–4 Sekunden besser.
 4. **Lieferformat.** PNG mit transparentem Hintergrund, quadratisch, mindestens 1536 × 1536. Falls kein transparenter Hintergrund geht: einfarbig `#E9ECF0` (das ist der Bühnengrund), dann stanze ich frei. Videos als MP4 auf `#E9ECF0` oder WebM mit Alpha.
-5. **Ablage.** In den Ordner `admin/public/jarvis/`, benannt nach Zustand: `idle.png`, `listening.png` usw.
+5. **Ablage.** In den Ordner `app/assets/jarvis/`, benannt nach Zustand: `idle.png`, `listening.png` usw.
 
 ## Drei Richtungen für die Figur (eine wählen)
 

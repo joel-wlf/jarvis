@@ -405,7 +405,19 @@
     "revoke": "Revoke",
     "revokeConfirm": "{{name}} loses access immediately. Continue?",
     "revoked": "Access revoked.",
-    "empty": "No other devices."
+    "empty": "No other devices.",
+    "pair": "Pair a new device",
+    "pairHelp": "Scan the code with the Jarvis app on the new device. It is valid for 10 minutes and works once.",
+    "pairCreate": "Create code",
+    "pairCode": "Code to type in",
+    "pairExpires": "valid until {{time}}",
+    "pairOnlyHome": "Pairing only works on the home network, through the admin interface.",
+    "owner": "Password for the app",
+    "ownerHelp": "Use it to sign in to the app without a QR code and to approve Claude access. It is separate from the admin password.",
+    "ownerAdmin": "Admin password to confirm",
+    "ownerNew": "New app password",
+    "ownerSave": "Set password",
+    "ownerSaved": "App password set."
   },
   "logs": {
     "title": "Logs",
@@ -449,7 +461,129 @@
     "running": "Setting up Jarvis",
     "done": "Done. Next, link WhatsApp.",
     "toWa": "Link WhatsApp",
-    "already": "Jarvis is already set up. Make changes under Settings."
+    "already": "Jarvis is already set up. Make changes under Settings.",
+    "steps": {
+      "welcome": {
+        "title": "Welcome to Jarvis",
+        "lead": "A few steps and your Jarvis is ready. Everything stays on your device at home; only the AI provider you pick next receives selected text to analyse."
+      },
+      "account": {
+        "title": "Your access",
+        "lead": "You find the setup code in the admin service log. Then choose a password for the admin area."
+      },
+      "database": {
+        "title": "Existing data",
+        "lead": "This device already holds a Jarvis archive. Enter its two passwords, otherwise Jarvis cannot reach your messages. They are in your old .env or your password manager."
+      },
+      "name": {
+        "title": "What's your name?",
+        "lead": "Jarvis uses it in summaries and profiles."
+      },
+      "provider": {
+        "title": "AI provider",
+        "lead": "Jarvis needs a language model to sort chats, suggest replies and answer your questions. Any provider with an OpenAI-compatible API works, including a model running at home."
+      },
+      "models": {
+        "title": "Models",
+        "lead": "One model per job. Small models are fine for sorting; replies and questions benefit from a stronger one."
+      },
+      "privacy": {
+        "title": "Privacy",
+        "lead": "Decide what must never reach the AI. This applies from the first message."
+      },
+      "features": {
+        "title": "What Jarvis may do",
+        "lead": "You can change all of this later in settings."
+      },
+      "remote": {
+        "title": "On the go",
+        "lead": "Optional. A Cloudflare tunnel lets you reach Jarvis and the app outside your Wi-Fi without opening ports. You enter the public address in the app later."
+      },
+      "review": {
+        "title": "Check everything",
+        "lead": "This gets saved, then Jarvis starts its services."
+      }
+    },
+    "providers": {
+      "openai": {
+        "name": "OpenAI",
+        "desc": "GPT models. Also handles voice messages and meaning search."
+      },
+      "anthropic": {
+        "name": "Anthropic",
+        "desc": "Claude models. Voice and search then run locally."
+      },
+      "openrouter": {
+        "name": "OpenRouter",
+        "desc": "One key for many providers: Gemini, Mistral, Llama and more."
+      },
+      "ollama": {
+        "name": "Ollama, at home",
+        "desc": "Models on your own computer. Nothing leaves your network and it's free, but slower."
+      },
+      "custom": {
+        "name": "Other provider",
+        "desc": "Any OpenAI-compatible address, for example Mistral, Groq or LM Studio."
+      },
+      "none": {
+        "name": "No AI",
+        "desc": "Archive and search work, but no topics, cards or reply suggestions."
+      }
+    },
+    "roles": {
+      "app": {
+        "title": "Replies and questions",
+        "desc": "Reply suggestions, Ask Jarvis, the line under the figure."
+      },
+      "organizer": {
+        "title": "Sorting",
+        "desc": "Reads every message once and turns it into topics, dates and cards. Runs most often."
+      },
+      "images": {
+        "title": "Images",
+        "desc": "Describes shared photos so you can search them. Needs a model that understands images."
+      }
+    },
+    "features": {
+      "ORGANIZER_ENABLED": {
+        "title": "Topics and cards",
+        "desc": "Jarvis sorts your chats and prepares decisions."
+      },
+      "IMAGE_DESCRIBE": {
+        "title": "Describe images",
+        "desc": "Makes photos searchable."
+      },
+      "ENABLE_ACTIONS": {
+        "title": "Send on your behalf",
+        "desc": "Replies, reactions and votes, only when you tap them."
+      },
+      "REQUIRE_CONFIRM": {
+        "title": "Always ask first",
+        "desc": "Claude also shows every message before sending."
+      },
+      "ENABLE_MEMORY": {
+        "title": "Memory",
+        "desc": "Jarvis remembers what you correct and tell it."
+      }
+    },
+    "cost": {
+      "perMonth": "Per month about",
+      "unknown": "Price unknown",
+      "total": "Estimated per month",
+      "basis": "Guide value at about 300 messages a day",
+      "partial": "Excluding models with unknown price"
+    },
+    "baseUrl": "API address",
+    "baseUrlHelp": "Usually ends in /v1.",
+    "baseUrlOllama": "Address of the computer running Ollama on your network, port 11434, ending in /v1.",
+    "apiKey": "API key",
+    "keyWhere": "Get one at {{url}}",
+    "localServices": "This provider can't do voice messages or meaning search. Jarvis handles both locally on the device, a bit slower.",
+    "noAi": "Jarvis still archives and searches your chats. You can turn on AI later in settings.",
+    "suggested": "Suggestions",
+    "otherModel": "Other",
+    "modelId": "Model name",
+    "modelsNote": "Prices are the providers' list prices and can change. The real bill depends on how much is written; under maintenance you can later estimate the cost for your archive."
   },
   "mock": {
     "answer": "Saturday 3 pm handball, from 6 pm barbecue at Lukas'. The flat's movie night at 9 pm clashes with it; Friday 8 pm would be free. Sunday 2 pm you're helping Lena move.",

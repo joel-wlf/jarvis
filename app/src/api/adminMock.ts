@@ -148,5 +148,12 @@ export function createMockAdmin(): AdminApi {
     restart: async (service) => run('restart', `${service} neu starten`, [`${service} gestoppt`, `${service} gestartet`, 'Gesund']),
     rebuild: async () => run('rebuild', 'Alles neu bauen', ['Images gebaut', 'Dienste neu erstellt', 'Alle Dienste laufen']),
     estimate: async () => run('estimate', 'Kosten schätzen', ['48 213 Nachrichten gezählt', 'Geschätzt: 0,42 € für die erste Sortierung']),
+    pairing: async () => ({ code: 'DEMO-1234', expiresAt: new Date(Date.now() + 600_000).toISOString(), qr: 'jarvis:{"v":1,"url":"https://jarvis.example.org","code":"DEMO-1234"}', qrSvg: DEMO_QR }),
+    ownerPassword: async (_admin, pw) => {
+      if (pw.length < 10) throw new Error('Das Passwort braucht mindestens 10 Zeichen.')
+    },
   }
 }
+
+/** A static stand-in QR (not scannable) for the demo mode. */
+const DEMO_QR = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21"><path fill="#fff" d="M0 0h21v21H0z"/><path fill="#121416" d="M1 1h7v7H1zm1 1v5h5V2zm1 1h3v3H3zm10-2h7v7h-7zm1 1v5h5V2zm1 1h3v3h-3zM1 13h7v7H1zm1 1v5h5v-5zm1 1h3v3H3zm7-14h2v2h-2zm0 4h2v3h-2zm3 6h2v2h-2zm-4 1h2v2H9zm6 2h2v2h-2zm2-3h3v2h-3zm-6 5h2v3h-2zm4 1h3v2h-3z"/></svg>'
