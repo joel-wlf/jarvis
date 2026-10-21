@@ -23,9 +23,11 @@ interface Props {
   onRefresh?: () => void
   /** full-screen pages (ask, setup) have no bottom bar to clear */
   bare?: boolean
+  /** content width on wide screens (default 820) */
+  wideMax?: number
 }
 
-export function Page({ title, sub, back, right, children, footer, refreshing, onRefresh, bare }: Props) {
+export function Page({ title, sub, back, right, children, footer, refreshing, onRefresh, bare, wideMax }: Props) {
   const { t } = useTranslation()
   const router = useRouter()
   const insets = useSafeAreaInsets()
@@ -39,7 +41,7 @@ export function Page({ title, sub, back, right, children, footer, refreshing, on
         keyboardShouldPersistTaps="handled"
         refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.faint} /> : undefined}
       >
-        <View style={[st.inner, wide && { maxWidth: 820 }]}>
+        <View style={[st.inner, wide && { maxWidth: wideMax ?? 820 }]}>
           <View style={[st.top, { paddingHorizontal: pad, paddingTop: wide ? 24 : Math.max(18, insets.top) }]}>
             {back ? (
               <Press
