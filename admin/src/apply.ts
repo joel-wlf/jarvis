@@ -157,7 +157,12 @@ async function deployAndVerify(
   }
   const targets = active.filter((s) => s !== SELF)
   log('info', `${o.rollback ? 'Starte vorherigen Stand' : 'Starte Dienste'}: ${targets.join(', ')}${o.build ? ' (mit Neubau)' : ''}`)
-  if (o.initial) log('info', 'Beim ersten Mal werden die Container gebaut. Auf einem Raspberry Pi kann das 10 bis 30 Minuten dauern.')
+  if (o.initial) {
+    // Prebuilt images first (instant); only what cannot be pulled is built by `up` below
+    log('info', 'Lade vorgebaute Images …')
+    const pulled = await ctx.docker.compose(['pull', '--ignore-pull-failures', ...targets], { profiles, timeoutMs: 30 * 60_000, onLine: (l) => log('out', l) })
+    if (pulled.code !== 0) log('warn', 'Images konnten nicht geladen werden; fehlende werden gebaut. Auf einem Raspberry Pi kann das 10 bis 30 Minuten dauern.')
+  }
   const args = ['up', '-d', ...(o.build ? ['--build'] : []), ...targets]
   const up = await ctx.docker.compose(args, { profiles, timeoutMs: o.initial || o.build ? 90 * 60_000 : 20 * 60_000, onLine: (l) => log('out', l) })
   if (up.code !== 0) return `docker compose up fehlgeschlagen (Code ${up.code}).`

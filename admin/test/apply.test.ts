@@ -8,7 +8,7 @@ import { FakeDb } from '../src/db.js'
 import { FakeDocker } from '../src/docker.js'
 import { listBackups, serializeEnv } from '../src/envfile.js'
 import { BusyError, JobRunner } from '../src/jobs.js'
-import { startApply, startRelink, startRestore, startRotate } from '../src/ops.js'
+import { startApply, startRebuild, startRelink, startRestore, startRotate } from '../src/ops.js'
 
 const base = { POSTGRES_PASSWORD: 'a'.repeat(48), MCP_RO_PASSWORD: 'b'.repeat(48), MCP_TOKEN: 'c'.repeat(64), TRANSCRIBE_PROVIDER: 'off' }
 
@@ -145,4 +145,27 @@ test('Neu verknüpfen löscht nur die WhatsApp-Sitzung', async () => {
   assert.ok(!docker.volumes.has('jarvis_wa-auth'))
   assert.ok(docker.volumes.has('jarvis_pgdata'))
   assert.equal(readCurrent(ctx).env.WA_PAIRING_PHONE, '4915112345678')
+})
+
+test('Aktualisieren: lädt vorgebaute Images, baut nichts', async () => {
+  const { ctx, docker } = setup(base)
+  const job = await run(ctx, { job: startRebuild(ctx) })
+  assert.equal(job.status, 'ok', job.lines.map((l) => l.msg).join('\n'))
+  assert.ok(docker.calls.some((c) => c[1] === 'pull'))
+  assert.ok(!docker.calls.some((c) => c[1] === 'build'))
+})
+
+test('Aktualisieren: ohne erreichbare Images wird gebaut', async () => {
+  const { ctx, docker } = setup(base)
+  docker.pullFails = true
+  const job = await run(ctx, { job: startRebuild(ctx) })
+  assert.equal(job.status, 'ok', job.lines.map((l) => l.msg).join('\n'))
+  assert.ok(docker.calls.some((c) => c[1] === 'build'))
+})
+
+test('Aktualisieren: neue Images laufen nicht, die alten werden wieder gesetzt', async () => {
+  const { ctx, docker } = setup({ ...base, OWNER_NAME: 'Fehler' })
+  const job = await run(ctx, { job: startRebuild(ctx) })
+  assert.equal(job.status, 'rolled_back', job.lines.map((l) => l.msg).join('\n'))
+  assert.ok(docker.calls.some((c) => c[0] === 'tag' && c[1] === 'sha256:old-mcp-server' && c[2] === 'img-mcp-server:latest'))
 })

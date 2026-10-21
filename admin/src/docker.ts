@@ -156,6 +156,8 @@ export class FakeDocker implements DockerApi {
   failWith: (env: Record<string, string>) => string[] = (env) => (env.OWNER_NAME === 'Fehler' ? ['mcp-server'] : [])
   configError: (env: Record<string, string>) => string | null = () => null
   delayMs = 0
+  /** pull fails (registry unreachable) */
+  pullFails = false
   volumes = new Set(['jarvis_pgdata', 'jarvis_wa-auth'])
   /** wie bei CliDocker: ohne envFile gilt die .env des Projekts */
   defaultEnvFile?: string
@@ -194,7 +196,10 @@ export class FakeDocker implements DockerApi {
         if (rest.includes('--services')) return { code: 0, out: this.active(o).join('\n') + '\n' }
         return { code: 0, out: '' }
       }
+      case 'pull':
+        return this.pullFails ? { code: 1, out: 'manifest unknown' } : { code: 0, out: '' }
       case 'ps':
+        if (rest.includes('-q')) return { code: 0, out: this.svcs.has(rest.at(-1)!) ? `cid-${rest.at(-1)}\n` : '' }
         return {
           code: 0,
           out: [...this.svcs.entries()].map(([s, v]) => JSON.stringify({ Service: s, State: v.state, Health: v.health, Status: v.state })).join('\n'),
@@ -235,6 +240,7 @@ export class FakeDocker implements DockerApi {
 
   async docker(args: string[]): Promise<RunResult> {
     this.calls.push(args)
+    if (args[0] === 'inspect') return { code: 0, out: `sha256:old-${args.at(-1)!.replace('cid-', '')} img-${args.at(-1)!.replace('cid-', '')}:latest\n` }
     if (args[0] === 'volume' && args[1] === 'inspect') return this.volumes.has(args[2]) ? { code: 0, out: '[]' } : { code: 1, out: 'no such volume' }
     if (args[0] === 'volume' && args[1] === 'rm') {
       this.volumes.delete(args.at(-1)!)
