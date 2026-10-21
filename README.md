@@ -6,7 +6,7 @@ Jarvis ist als persönlicher Kontext-Manager gedacht: ein privates System, das �
 
 - **Erfassung** (Quellen-Adapter wie `wa-ingest`) schreiben normalisiert in Postgres.
 - **Auswertung** (`embedder`, `organizer`) ist quellenunabhängig: Vektoren, Threads, Topics, Personenprofile.
-- **Zugriff** (`mcp-server`, Wachdienst, Zentrale-Seite) arbeitet auf dem gemeinsamen Datenmodell, nicht auf einer Quelle.
+- **Zugriff** (`mcp-server`, Watch, Zentrale-Seite) arbeitet auf dem gemeinsamen Datenmodell, nicht auf einer Quelle.
 
 Alle Daten bleiben auf deinem Gerät (Raspberry Pi). Nur die KI-Schritte (Embeddings, Transkription, Bildbeschreibung, Sortierung) gehen an die OpenAI-API.
 

@@ -1,6 +1,6 @@
 // Request and response types of the app API (/api/v1) served by mcp-server, and of the pairing flow.
 // Auth: every request except pair/login/info carries "Authorization: Bearer <deviceToken or OAuth access token>".
-import type { Card, CardAction, CardGroup, Stat, Suggestion } from './cards.js'
+import type { Card, CardAction, CardGroup, Stat, Suggestion, Urgency } from './cards.js'
 
 export const API_VERSION = 1
 export const API_PREFIX = '/api/v1'
@@ -84,6 +84,13 @@ export interface CardsResponse { cards: Card[] }
 /** POST /api/v1/cards/:key/act */
 export interface ActRequest { action: CardAction }
 export interface ActResponse { ok: true; message: string; removed: boolean }
+
+/**
+ * PUT /api/v1/cards/:key/priority. The owner's importance for a card: 3 important (always reported by the watch service),
+ * 2 normal, 1 later (never reported actively), null = back to Jarvis' guess. The card list then returns it as `urgency`.
+ */
+export interface PriorityRequest { priority: Urgency | null }
+export interface PriorityResponse { ok: true; priority: Urgency | null }
 
 /** POST /api/v1/cards/:key/suggest -> fresh reply suggestions (OpenAI, cached per card) */
 export interface SuggestResponse { suggestions: Suggestion[]; cached: boolean }

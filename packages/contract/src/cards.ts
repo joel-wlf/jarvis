@@ -45,6 +45,8 @@ export interface CardBase<T extends CardType, D> {
   type: T
   group: CardGroup
   urgency: Urgency
+  /** ISO timestamp by which the owner has to act (answer, pay, sign up). The app sorts cards of equal importance by it. */
+  dueAt?: string
   state: CardState
   title: string
   source: CardSource
@@ -91,6 +93,22 @@ export interface AddressData { lines: string[] }
 export interface LinkData { url: string; domain: string; headline: string; readingTime?: string }
 export interface RoutineData { weeks: boolean[]; streak: number; stats: Stat[] }
 export interface PhotosData { count: number; withOwner: number; thumbnails: string[] }
+/** A group message that addresses the owner, shown with the lines before it. `mention` is the part of `hit.text` to highlight. */
+export interface MentionData { before: { who: string; text: string }[]; hit: { who: string; time: string; text: string; mention?: string }; stats: Stat[] }
+/** Something the owner asked or proposed that the other side has not confirmed. `askedAt` and `dueAt` are ISO timestamps. */
+export interface WaitingData { person: Person; askedAt: string; dueAt?: string; quote: string; stats: Stat[] }
+/** Who drives, who rides, who still has no seat. `seats` counts passenger seats. Suggestion ids `ride:<index>` pick a car. */
+export interface RideData { cars: { driver: Person; riders: Person[]; seats: number }[]; without: Person[]; stats: Stat[] }
+/** A sign-up with limited places (bring list, shifts, helpers). Suggestion ids `need:<id>` pick a line. `have` counts people already in. */
+export interface SignupData { needs: { id: string; label: string; have: number; need: number; hint?: string }[]; stats: Stat[] }
+/** One share per head that somebody collects. */
+export interface LevyData { amount: string; payee: Person; reason: string; way: string; paid: { person: Person; paid: boolean; me?: boolean }[] }
+/** A code, PIN or password somebody sent. Shown as cells, can be hidden in the app. */
+export interface CodeData { code: string; stats: Stat[] }
+/** A file that belongs to a date. `ext` is the short type label on the sheet. */
+export interface MaterialData { fileName: string; ext: string; detail: string; url: string; event: { title: string; when: string } }
+/** What happened in a chat on this day in an earlier year. `at` is an ISO timestamp, `photos` counts the pictures of that day. */
+export interface ThrowbackData { at: string; quote: string; quoteBy: string; photos: number }
 
 export type QuestionCard = CardBase<'question', QuestionData>
 export type VoiceCard = CardBase<'voice', VoiceData>
@@ -114,24 +132,34 @@ export type AddressCard = CardBase<'address', AddressData>
 export type LinkCard = CardBase<'link', LinkData>
 export type RoutineCard = CardBase<'routine', RoutineData>
 export type PhotosCard = CardBase<'photos', PhotosData>
+export type MentionCard = CardBase<'mention', MentionData>
+export type WaitingCard = CardBase<'waiting', WaitingData>
+export type RideCard = CardBase<'ride', RideData>
+export type SignupCard = CardBase<'signup', SignupData>
+export type LevyCard = CardBase<'levy', LevyData>
+export type CodeCard = CardBase<'code', CodeData>
+export type MaterialCard = CardBase<'material', MaterialData>
+export type ThrowbackCard = CardBase<'throwback', ThrowbackData>
 
 export type Card =
   | QuestionCard | VoiceCard | ReactionCard | EventCard | ConflictCard | BirthdayCard | ReminderCard
   | TaskCard | PollCard | InsightCard | DigestCard | ShoppingCard | ParcelCard | MoneyCard | FollowupCard
   | TripCard | PlaceCard | PersonCard | AddressCard | LinkCard | RoutineCard | PhotosCard
+  | MentionCard | WaitingCard | RideCard | SignupCard | LevyCard | CodeCard | MaterialCard | ThrowbackCard
 
 export const CARD_TYPES = [
   'question', 'voice', 'reaction', 'event', 'conflict', 'birthday', 'reminder', 'task', 'poll', 'insight', 'digest',
   'shopping', 'parcel', 'money', 'followup', 'trip', 'place', 'person', 'address', 'link', 'routine', 'photos',
+  'mention', 'waiting', 'ride', 'signup', 'levy', 'code', 'material', 'throwback',
 ] as const
 export type CardType = (typeof CARD_TYPES)[number]
 
 /** Default group per type. The server may override it, the app only uses it as a fallback. */
 export const CARD_GROUP: Record<CardType, CardGroup> = {
-  question: 'reply', voice: 'reply', reaction: 'reply', followup: 'reply',
-  event: 'schedule', conflict: 'schedule', birthday: 'schedule', reminder: 'schedule', trip: 'schedule', place: 'schedule', routine: 'schedule',
-  task: 'todo', poll: 'todo', shopping: 'todo', parcel: 'todo', money: 'todo',
-  insight: 'know', digest: 'know', person: 'know', address: 'know', link: 'know', photos: 'know',
+  question: 'reply', voice: 'reply', reaction: 'reply', followup: 'reply', mention: 'reply', waiting: 'reply',
+  event: 'schedule', conflict: 'schedule', birthday: 'schedule', reminder: 'schedule', trip: 'schedule', place: 'schedule', routine: 'schedule', ride: 'schedule',
+  task: 'todo', poll: 'todo', shopping: 'todo', parcel: 'todo', money: 'todo', signup: 'todo', levy: 'todo',
+  insight: 'know', digest: 'know', person: 'know', address: 'know', link: 'know', photos: 'know', code: 'know', material: 'know', throwback: 'know',
 }
 
 /** Types the organizer produces into the `cards` table; the rest are derived live from SQL by the API. */

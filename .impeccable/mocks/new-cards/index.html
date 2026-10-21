@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#E9ECEF">
+  <title>Jarvis: neue Kartentypen</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,400..700;1,200..500&display=swap" rel="stylesheet">
+  <style>
+/* Tokens und Kartengrundlagen 1:1 aus .impeccable/mocks/prototype/style.css */
+:root {
+  --ground: #E9ECEF; --ground-2: #F3F5F7; --card: #FFFFFF;
+  --ink: #15171A; --ink-2: #41474F; --muted: #5F6670; --faint: #697079;
+  --line: #E4E7EB; --line-2: #D3D8DE;
+  --block: #121416; --block-2: #2A2D31; --block-ink: #F2F3F5;
+  --blue: #3274F0; --green: #2FA45A; --warn: #D9483B;
+  --shadow: 0 1px 1px rgba(20, 26, 36, .03), 0 8px 22px -12px rgba(20, 26, 36, .14);
+  --shadow-lift: 0 1px 2px rgba(20, 26, 36, .04), 0 22px 44px -22px rgba(20, 26, 36, .3);
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  --font: Urbanist, system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; font: 400 15px/1.45 var(--font); color: var(--ink); background: var(--ground); -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; padding-bottom: 80px; }
+button { font: inherit; color: inherit; border-radius: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 1.5px solid var(--ink); outline-offset: 2px; }
+svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+h1, h2, h3, p { margin: 0; font-weight: 400; }
+.wrap { max-width: 460px; margin: 0 auto; }
+
+.top { padding: max(18px, env(safe-area-inset-top)) 18px 0; }
+.top h1 { font: italic 300 32px/1 var(--font); letter-spacing: -.02em; }
+.top p { margin-top: 8px; font: italic 400 14.5px/1.4 var(--font); color: var(--muted); max-width: 40ch; }
+.demo { display: inline-block; margin-top: 12px; font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); border: 1px solid var(--line-2); padding: 3px 7px; }
+
+.tabs { display: flex; gap: 8px; padding: 18px 18px 16px; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; display: inline-flex; align-items: center; gap: 9px; border: 1px solid var(--line); border-bottom: 1.5px solid var(--c, var(--ink)); background: var(--card); padding: 8px 12px 7px; font: italic 400 15px var(--font); color: var(--ink-2); opacity: .78; }
+.tab b { font: 500 11.5px var(--font); padding: 1px 6px; color: color-mix(in srgb, var(--c, var(--ink)) 85%, black); background: color-mix(in srgb, var(--c, var(--ink)) 12%, white); }
+.tab[aria-selected="true"] { color: var(--ink); box-shadow: var(--shadow); opacity: 1; }
+
+.cards { display: flex; flex-direction: column; gap: 6px; padding: 0 18px 24px; }
+.item { display: grid; gap: 8px; margin-bottom: 14px; }
+.note { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: baseline; padding: 0 2px; }
+.note b { font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+.note span { font: italic 400 12.5px/1.4 var(--font); color: var(--muted); }
+
+/* ---------- Karte ---------- */
+.card { position: relative; background: var(--card); box-shadow: var(--shadow); cursor: pointer; padding: 16px 18px 0; display: grid; gap: 14px; transition: box-shadow .3s var(--ease); }
+.card.sel { box-shadow: inset 0 0 0 1px var(--line-2), var(--shadow-lift); }
+.card.sel::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--c); }
+.card > :last-child:not(.slab):not(.seg) { margin-bottom: 18px; }
+.card > .seg { margin-bottom: 18px; }
+.c-head { position: relative; padding: 0 34px 12px 0; border-bottom: 1px solid var(--line); }
+.c-head .mark { display: inline-block; margin-bottom: 8px; }
+.c-head h2 { font: italic 400 20px/1.2 var(--font); letter-spacing: -.01em; text-wrap: balance; }
+.c-head .sub { margin-top: 3px; font: italic 400 13.5px var(--font); color: var(--muted); }
+.mark { font: italic 400 12.5px var(--font); color: color-mix(in srgb, var(--c) 82%, black); background: color-mix(in srgb, var(--c) 10%, white); padding: 2px 8px; white-space: nowrap; }
+.dismiss { position: absolute; top: -6px; right: -8px; width: 36px; height: 36px; border: 0; background: transparent; color: var(--faint); display: grid; place-items: center; }
+.dismiss:hover { color: var(--ink); }
+.dismiss svg { width: 15px; height: 15px; }
+.quote { font-size: 14.5px; color: var(--ink-2); line-height: 1.5; }
+.meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0; }
+.meta dt { font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); white-space: nowrap; }
+.meta dd { margin: 3px 0 0; font: italic 300 21px/1.1 var(--font); white-space: nowrap; }
+.slab { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--block); color: var(--block-ink); margin: 0 -18px; padding: 10px 10px 10px 18px; min-height: 60px; }
+.slab span { font: italic 300 21px/1.15 var(--font); letter-spacing: -.01em; }
+.slab button { flex: none; min-height: 40px; border: 0; background: var(--block-2); color: var(--block-ink); padding: 0 16px; font: italic 400 14.5px var(--font); }
+.slab button:active, .slab button:hover { background: #3A3E44; }
+.more { display: none; margin: 0 -18px; border-top: 1px solid var(--line); }
+.card.sel .more { display: block; }
+.more p { padding: 12px 18px 4px; font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+.more button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 18px; border: 0; border-top: 1px solid var(--line); background: white; text-align: left; font-size: 15px; color: var(--ink-2); }
+.more p + button { border-top: 0; }
+.more button:active, .more button:hover { background: var(--ground-2); }
+.more svg { width: 15px; height: 15px; flex: none; color: var(--faint); }
+.ctx { font: italic 400 14.5px var(--font); display: none; gap: 8px; align-items: baseline; color: var(--ink-2); }
+.card.sel .ctx { display: flex; }
+.ctx::before { content: ""; width: 6px; height: 6px; flex: none; background: var(--c); transform: translateY(-1px); }
+.seg { display: flex; border: 1px solid var(--line); }
+.seg button { flex: 1; min-height: 44px; border: 0; background: white; font: italic 400 14.5px var(--font); color: var(--ink-2); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--block); color: var(--block-ink); }
+.seg button:not(.on):hover { background: var(--ground-2); }
+.route { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; }
+.route b { display: block; font: italic 400 15px var(--font); }
+.route small { display: block; font: italic 400 12px var(--font); color: var(--muted); }
+.route .r { text-align: right; }
+.route .line { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; color: var(--c); }
+.route .line i { border-top: 1.5px dotted color-mix(in srgb, var(--c) 70%, white); }
+.route .line em { font: italic 400 12.5px var(--font); color: var(--ink-2); }
+.due { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; font: italic 400 13px var(--font); color: var(--muted); }
+.track { height: 2px; background: var(--line); }
+.track i { display: block; height: 100%; background: var(--c); }
+.promise { margin: 0; padding: 12px 14px; background: var(--ground-2); }
+.promise blockquote { margin: 0; font: italic 300 18px/1.35 var(--font); }
+.promise figcaption { margin-top: 6px; font: italic 400 12.5px var(--font); color: var(--muted); }
+
+/* ---------- 1 Erwähnung ---------- */
+.chatx { border: 1px solid var(--line); }
+.chatx .m { padding: 9px 12px; display: grid; gap: 1px; }
+.chatx .m + .m { border-top: 1px solid var(--line); }
+.chatx small { font: italic 400 12px var(--font); color: var(--faint); }
+.chatx .m span { font-size: 14px; color: var(--faint); }
+.chatx .hit { position: relative; background: var(--ground-2); padding-left: 14px; }
+.chatx .hit::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--c); }
+.chatx .hit small { color: var(--muted); }
+.chatx .hit span { font-size: 15.5px; color: var(--ink); line-height: 1.4; }
+.at { background: color-mix(in srgb, var(--c) 14%, white); color: color-mix(in srgb, var(--c) 70%, black); padding: 0 3px; font-style: italic; }
+.gap { padding: 5px 12px; font: italic 400 12px var(--font); color: var(--faint); border-top: 1px solid var(--line); background: repeating-linear-gradient(90deg, transparent 0 6px, var(--line) 6px 7px); background-size: 100% 1px; background-repeat: no-repeat; background-position: 0 0; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.chips i { width: 24px; height: 24px; display: grid; place-items: center; font: 500 10.5px var(--font); font-style: normal; background: var(--ground-2); color: var(--ink-2); }
+#needs-body, #ride-body { display: grid; gap: 14px; }
+/* ---------- Anmeldung ---------- */
+.needs { border-top: 1px solid var(--line); }
+.needs button { width: 100%; display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; min-height: 48px; padding: 0; border: 0; border-bottom: 1px solid var(--line); background: white; text-align: left; position: relative; }
+.needs button:hover { background: var(--ground-2); }
+.needs button.on { box-shadow: inset 2px 0 0 var(--ink); padding-left: 10px; }
+.needs .nm { font: italic 400 16px var(--font); }
+.needs .nm small { display: block; font: italic 400 12px var(--font); color: color-mix(in srgb, var(--c) 70%, black); }
+.needs button.full .nm { color: var(--faint); }
+.needs .sq { display: flex; gap: 3px; }
+.needs .sq i { width: 14px; height: 14px; border: 1.5px solid var(--line-2); background: white; }
+.needs .sq i.f { background: var(--ink); border-color: var(--ink); }
+.needs button.on .sq i:not(.f) { border-color: var(--c); background: color-mix(in srgb, var(--c) 14%, white); }
+.needs .ct { min-width: 44px; text-align: right; font: italic 400 13px var(--font); color: var(--muted); padding-right: 2px; }
+
+/* ---------- Mitfahrt ---------- */
+.cars { border-top: 1px solid var(--line); }
+.car { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; min-height: 52px; border-bottom: 1px solid var(--line); }
+.car b { display: block; font: italic 400 16px var(--font); }
+.car small { display: block; font: italic 400 12px var(--font); color: var(--muted); }
+.seats { display: flex; gap: 3px; }
+.seats i { width: 26px; height: 26px; display: grid; place-items: center; font: 500 10.5px var(--font); font-style: normal; background: var(--ground-2); color: var(--ink-2); }
+.seats i.drv { background: var(--ink); color: #fff; }
+.seats i.open { background: white; box-shadow: inset 0 0 0 1.5px var(--line-2); color: transparent; }
+.seats i.pick { box-shadow: inset 0 0 0 1.5px var(--c); background: color-mix(in srgb, var(--c) 12%, white); }
+.nopl { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.nopl .chips i { background: white; box-shadow: inset 0 0 0 1px var(--line-2); }
+
+/* ---------- Umlage ---------- */
+.levy { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
+.levy b { font: italic 200 50px/1 var(--font); letter-spacing: -.03em; }
+.levy span { display: block; font: italic 400 15px var(--font); }
+.levy small { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+.paid { display: grid; gap: 8px; }
+.paid .row { display: flex; align-items: center; justify-content: space-between; }
+.paid .row span { font: italic 400 13px var(--font); color: var(--muted); }
+.paid .chips i { background: var(--ink); color: #fff; }
+.paid .chips i.no { background: white; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line-2); }
+.paid .chips i.me { background: white; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.way { display: grid; grid-template-columns: 84px 1fr; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.way dt { font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); padding-top: 3px; }
+.way dd { margin: 0; font: italic 400 15px var(--font); }
+
+/* ---------- Unterlagen ---------- */
+.docrow { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start; }
+.sheet { position: relative; width: 62px; height: 82px; border: 1px solid var(--line-2); background: white; padding: 16px 9px 0; display: grid; gap: 6px; align-content: start; box-shadow: 3px 3px 0 var(--ground-2); }
+.sheet::before { content: ""; position: absolute; top: -1px; right: -1px; width: 16px; height: 16px; background: linear-gradient(225deg, var(--card) 50%, var(--ground-2) 50%); border-left: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); }
+.sheet i { height: 2px; background: var(--line); }
+.sheet i:nth-child(3) { width: 70%; }
+.sheet em { position: absolute; left: 9px; bottom: 6px; font: 500 11px var(--font); font-style: normal; letter-spacing: .1em; color: var(--faint); }
+.docrow b { display: block; font: italic 400 17px/1.25 var(--font); word-break: break-word; }
+.docrow small { display: block; margin-top: 3px; font: italic 400 13px/1.35 var(--font); color: var(--muted); }
+
+/* ---------- Zugangscode ---------- */
+.digits { display: grid; grid-template-columns: repeat(var(--n, 4), 1fr); gap: 5px; }
+.digits span { height: 62px; display: grid; place-items: center; border: 1px solid var(--line); border-top: 2px solid var(--ink); background: white; font: italic 200 36px/1 var(--font); letter-spacing: -.02em; position: relative; }
+.digits.hide span { color: transparent; }
+.digits.hide span::after { content: ""; position: absolute; width: 10px; height: 2px; background: var(--ink); }
+.reveal { justify-self: start; border: 0; background: transparent; padding: 0; font: italic 400 13px var(--font); color: var(--muted); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.qt { padding: 6px 12px 7px; border-left: 2px solid var(--line-2); margin: 2px 0 6px; font: italic 400 13px/1.35 var(--font); color: var(--muted); }
+/* ---------- 8 Rückblick ---------- */
+.shots { display: grid; grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 50px 50px; gap: 4px; }
+.shots span { background: #D9DEE4; display: grid; place-items: center; font: italic 300 20px var(--font); color: white; }
+.shots .t0 { grid-row: span 2; background: linear-gradient(160deg, #CBD3DC, #AEB8C4); }
+.shots .t1 { background: linear-gradient(160deg, #D8D2C8, #BDB4A6); }
+.shots .t2 { background: linear-gradient(160deg, #C8D4CC, #A9B9AE); }
+.shots .t3 { grid-column: span 2; background: var(--block-2); }
+
+.toast { position: fixed; z-index: 30; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: var(--block); color: var(--block-ink); padding: 11px 16px; font: italic 400 14.5px var(--font); box-shadow: var(--shadow-lift); animation: rise .4s var(--ease); white-space: nowrap; max-width: calc(100vw - 24px); }
+.toast svg { width: 16px; height: 16px; color: #7EE0A8; flex: none; }
+@keyframes rise { from { transform: translate(-50%, 10px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Neue Kartentypen</h1>
+    <p>Heute gibt es 22 Typen. Diese acht basieren auf deinem echten Archiv (Anmeldungen, Mitfahren, Umlagen, Codes …), mit erfundenen Namen. Sie schließen Lücken, für die es noch keine Karte gibt. Tippe eine Karte an, um ihre weiteren Vorschläge zu sehen.</p>
+    <span class="demo">Prototyp · Beispieldaten</span>
+  </header>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Gruppen"></nav>
+  <main class="cards" id="cards"></main>
+</div>
+<div id="toastHost" aria-live="polite"></div>
+
+<script>
+const GROUPS = {
+  reply: { name: 'Antworten', c: '#E39A2D' },
+  schedule: { name: 'Termine', c: '#2FA45A' },
+  todo: { name: 'Aufgaben', c: '#3274F0' },
+  know: { name: 'Wissen', c: '#7D8798' },
+};
+const I = {
+  x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  arrow: '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+};
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const meta = (rows) => `<dl class="meta">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
+const chips = (arr) => arr.map((n) => `<i${n === 'Du' ? ' class="me"' : ''}>${n === 'Du' ? 'DU' : n.slice(0, 2).toUpperCase()}</i>`).join('');
+
+/* ---------- Kartendaten und Körper ---------- */
+const state = { need: 3, ride: null };
+const NEEDS = [
+  { id: 0, nm: 'Herzhaftes Gebäck', have: 2, need: 3 },
+  { id: 1, nm: 'Süßes Gebäck', have: 2, need: 2 },
+  { id: 2, nm: 'Gemüseplatte', have: 1, need: 2 },
+  { id: 3, nm: 'Getränke', have: 0, need: 2, rec: 'Das hast du letztes Mal gemacht' },
+];
+function needsBody() {
+  return `<div class="needs">${NEEDS.map((n) => {
+    const full = n.have >= n.need;
+    const on = state.need === n.id;
+    const have = n.have + (on && !full ? 1 : 0);
+    return `<button data-need="${n.id}" class="${on ? 'on ' : ''}${full ? 'full' : ''}" ${full ? 'disabled' : ''} aria-pressed="${on}">
+      <span class="nm">${n.nm}${n.rec && !full ? `<small>${n.rec}</small>` : ''}</span>
+      <span class="sq">${Array.from({ length: n.need }, (_, i) => `<i class="${i < have ? 'f' : ''}"></i>`).join('')}</span>
+      <span class="ct">${full ? 'voll' : `${have} / ${n.need}`}</span></button>`;
+  }).join('')}</div>
+  ${meta([['Frei', '3 Plätze'], ['Schließt', 'Do 13:00'], ['Weg', 'Umfrage']])}`;
+}
+const CARS = [
+  { who: 'Heidi', seats: ['HE', 'LE', 'TI', null] },
+  { who: 'Marco', seats: ['MA', 'SA', null, null] },
+];
+function ridesBody() {
+  return `<div class="cars">${CARS.map((c, ci) => {
+    const free = c.seats.filter((x) => !x).length - (state.ride === ci ? 1 : 0);
+    let marked = false;
+    return `<div class="car"><div><b>${c.who}</b><small>${free === 0 ? 'voll' : free === 1 ? '1 Platz frei' : free + ' Plätze frei'}</small></div>
+      <div class="seats">${c.seats.map((x, i) => {
+        if (x) return `<i class="${i === 0 ? 'drv' : ''}">${x}</i>`;
+        if (state.ride === ci && !marked) { marked = true; return '<i class="pick">DU</i>'; }
+        return '<i class="open"></i>';
+      }).join('')}</div></div>`;
+  }).join('')}</div>
+  <div class="nopl"><span class="chips">${state.ride === null ? chips(['Du', 'Jonas']) : chips(['Jonas'])}</span><small style="font:italic 400 12.5px var(--font);color:var(--muted)">noch ohne Platz</small></div>`;
+}
+
+const CARDS = [
+  {
+    key: 'mention', group: 'reply', mark: 'Antwort an dich',
+    title: 'Lukas hat dir in der Gruppe geantwortet', sub: 'Jugendgruppe · vor 40 Min.',
+    ctx: 'Der Spieleabend ist am Donnerstag um 18 Uhr im Jugendraum.',
+    body: () => `
+      <div class="chatx">
+        <div class="m"><small>Mia</small><span>Wer kann beim Aufbauen helfen?</span></div>
+        <div class="m"><small>Du · 17:58</small><span>Ich könnte, wenn es nicht zu früh ist</span></div>
+        <div class="m hit"><small>Lukas · 18:41</small><span>Super, komm um halb sechs, <i class="at">@Alex</i> bringst du Tische mit?</span></div>
+      </div>
+      ${meta([['Gruppe', '23'], ['Seitdem', '14 neu'], ['Wartet', '40 Min.']])}`,
+    headline: 'Direkt gefragt', button: 'Antworten',
+    others: ['Ja, Tische bringe ich mit', 'Halb sechs geht, Tische nur wenn jemand mit anpackt'],
+    note: 'Echte Daten: 154 Antworten auf deine Nachrichten in 90 Tagen, dazu @-Nennungen. Die Karte zeigt die Zeile davor und deine eigene Nachricht, damit du die Frage ohne den Chat verstehst.',
+  },
+  {
+    key: 'waiting', group: 'reply', mark: 'Wartet auf',
+    title: 'Nele hat den Termin nicht bestätigt', sub: 'Einzelchat Nele · du hast gestern gefragt',
+    body: () => `
+      <div class="route">
+        <div><b>Nele</b><small>Gefragt · Di 16:44</small></div>
+        <div class="line"><i></i><em>keine Antwort</em><i></i></div>
+        <div class="r"><b>Termin</b><small>Mi 10:00 · in 8 Std.</small></div>
+      </div>
+      <p class="quote">„Passt dir morgen 10 Uhr für das Gespräch?“</p>
+      ${meta([['Termin', 'in 8 Std.'], ['Nachgehakt', '0 mal'], ['Gefragt', 'Di']])}`,
+    headline: 'Nachhaken vorbereitet', button: 'Nachhaken',
+    others: ['Hey, klappt 10 Uhr morgen bei dir? Sonst gern später.', 'Ich komme einfach um 10, sag Bescheid wenn nicht.'],
+    note: 'Das Gegenstück zu „Nachfassen“: du hast etwas vorgeschlagen oder gefragt, und jemand muss noch bestätigen. So lief es zuletzt mit einem Gesprächstermin für morgen 10 Uhr. Gilt auch für Zusagen anderer („schick ich dir“).',
+  },
+  {
+    key: 'ride', group: 'schedule', mark: 'Mitfahrt',
+    title: 'Padel: Wer fährt, wer fährt mit?', sub: 'Padel · Sa 09:15 ab Leckermühle',
+    ctx: 'Jonas fährt mit niemandem, du hast Samstag kein Auto, weil es in der Werkstatt ist.',
+    body: () => `<div id="ride-body">${ridesBody()}</div>`,
+    dynamic: 'ride',
+    others: ['Ich fahre selbst und habe 3 Plätze', 'Ich komme direkt zur Halle'],
+    note: 'Echte Daten: 67 Nachrichten in 90 Tagen rund ums Mitfahren, zuletzt „schreibt rein, wer Fahrer ist und wie viele Plätze ihr habt“. Die Karte sortiert Fahrer und Plätze und zeigt, wer noch ohne Platz ist. Tippe ein Auto an.',
+  },
+  {
+    key: 'signup', group: 'todo', mark: 'Anmeldung',
+    title: 'Spieleabend: Wer bringt was mit?', sub: 'Jugendgruppe · Umfrage · schließt Do 13:00',
+    body: () => `<div id="needs-body">${needsBody()}</div>`,
+    dynamic: 'need',
+    others: ['Ich bringe Getränke mit', 'Gebäck backe ich selbst, wie viel brauchst du?'],
+    note: 'Echte Daten: die Jugendgruppe sammelt Mitbringsel und Helfer per Umfrage, andere Gruppen per 👍 unter der Nachricht, mit „Anmeldung schließt um 13 Uhr“ und „hier ist voll“. Die Karte zeigt, was noch offen ist, und trägt dich per Tipp ein.',
+  },
+  {
+    key: 'levy', group: 'todo', mark: 'Umlage',
+    title: '12 € pro Person für den Platz', sub: 'Padel · Heidi sammelt',
+    body: () => `
+      <div class="levy"><b>12 €</b><div><span>an Heidi</span><small>pro Person, für Sa 09:15</small></div></div>
+      <dl class="way"><dt>Zahlweg</dt><dd>IBAN, kein PayPal</dd></dl>
+      <div class="paid"><div class="row"><span>Bezahlt</span><span>5 von 7</span></div>
+        <div class="chips">${['HE', 'MA', 'LE', 'TI', 'SA'].map((n) => `<i>${n}</i>`).join('')}<i class="me">DU</i><i class="no">JO</i></div></div>`,
+    headline: 'Du schuldest Heidi 12 €', button: 'Bezahlt',
+    others: ['Ich überweise heute Abend', 'Schick mir bitte nochmal die IBAN'],
+    note: 'Echte Daten: „12 € pro Mann“, „jeder der da war bitte 6,10 € an Liam“, „kein PayPal, hier die IBAN“. Eine Sammlung pro Kopf, bei der du nur wissen willst, ob du dran bist. Die Karte „Geld“ kennt nur zwei Personen.',
+  },
+  {
+    key: 'code', group: 'know', mark: 'Zugangscode',
+    title: 'Teamcode für das Planspiel', sub: 'Linus · Mi 12:40',
+    body: () => `
+      <div class="digits" id="digits" style="--n:6"><span>K</span><span>7</span><span>M</span><span>4</span><span>Q</span><span>2</span></div>
+      <button class="reveal" data-reveal>Zeichen verbergen</button>
+      ${meta([['Wofür', 'Planspiel'], ['Gültig', 'bis 31.10.'], ['Von', 'Linus']])}`,
+    seg: [['Nicht merken', 'Aus dem Archiv entfernt'], ['Gemerkt', 'Code gemerkt', true]],
+    others: [],
+    note: 'Echte Daten: Team- und Startcodes fürs Planspiel, die du „mehrfach“ weitergegeben hast, dazu PINs und WLAN-Codes. Statt jedes Mal zu suchen, liegt der Code hier und lässt sich verbergen.',
+  },
+  {
+    key: 'files', group: 'know', mark: 'Unterlagen',
+    title: 'Programm zur Hochzeit von Eli & Lisa', sub: 'Familie · gestern',
+    body: () => `
+      <div class="docrow">
+        <div class="sheet" aria-hidden="true"><i></i><i></i><i></i><i></i><em>PDF</em></div>
+        <div><b>Hochzeit-Programm.pdf</b><small>3 Seiten · 212 KB<br>von Eli</small></div>
+      </div>
+      <div class="route">
+        <div><b>Datei</b><small>liegt im Chat</small></div>
+        <div class="line"><i></i><em>gehört zu</em><i></i></div>
+        <div class="r"><b>Hochzeit Eli &amp; Lisa</b><small>Sa 14:00 · in 3 Tagen</small></div>
+      </div>`,
+    seg: [['Nicht nötig', 'Wird nicht mehr gezeigt'], ['Öffnen', 'Datei geöffnet', true]],
+    others: [],
+    note: 'Echte Daten: 65 Dokumente in 90 Tagen, fast alle Unterlagen zu einem Termin (Programm, Noten, Infoblatt, Listen). Jarvis hängt die Datei an den passenden Termin, damit du sie genau dann findest, wenn er ansteht.',
+  },
+  {
+    key: 'throwback', group: 'know', mark: 'Rückblick',
+    title: 'Vor einem Jahr: Abi-Treffen', sub: 'Abi 2019 · 21. Okt 2025',
+    body: () => `
+      <div class="route">
+        <div><b>21. Okt 2025</b><small>Dienstag</small></div>
+        <div class="line"><i></i><em>vor 1 Jahr</em><i></i></div>
+        <div class="r"><b>Heute</b><small>Mi</small></div>
+      </div>
+      <figure class="promise"><blockquote>„Wir müssen das jedes Jahr machen!“</blockquote><figcaption>Lena · 23:48</figcaption></figure>
+      <div class="shots" aria-hidden="true"><span class="t0"></span><span class="t1"></span><span class="t2"></span><span class="t3">+3</span></div>`,
+    seg: [['Nicht mehr zeigen', 'Okay, kein Rückblick mehr'], ['An Lena schicken', 'Rückblick an Lena gesendet', true]],
+    others: [],
+    note: 'Echte Daten: 109 Nachrichten und 12 Fotos stammen von genau vor einem Jahr. Ein ruhiger Blick zurück mit dem Satz des Abends, ohne Druck und ohne Frist.',
+  },
+];
+
+/* ---------- Aufbau ---------- */
+let filter = 'all', selected = null;
+
+function slabFor(c) {
+  if (c.dynamic === 'need') {
+    const n = NEEDS[state.need];
+    return { headline: `Du trägst dich ein: ${n.nm}`, button: 'Eintragen' };
+  }
+  if (c.dynamic === 'ride') {
+    return state.ride === null ? { headline: 'Noch kein Platz für dich', button: 'Mitfahren' } : { headline: `Du fährst bei ${CARS[state.ride].who} mit`, button: 'Anfragen' };
+  }
+  return { headline: c.headline, button: c.button };
+}
+
+function cardHtml(c) {
+  const g = GROUPS[c.group];
+  const sl = c.seg ? null : slabFor(c);
+  const seg = c.seg ? `<div class="seg">${c.seg.map(([l, , on], i) => `<button data-seg="${i}"${on ? ' class="on"' : ''}>${l}</button>`).join('')}</div>` : '';
+  const more = c.others && c.others.length && !c.seg
+    ? `<div class="more"><p>Weitere Vorschläge</p>${c.others.map((o, i) => `<button data-other="${i}"><span>${esc(o)}</span>${I.arrow}</button>`).join('')}</div>` : '';
+  const inner = c.body();
+  return `<div class="item" data-group="${c.group}">
+    <article class="card${selected === c.key ? ' sel' : ''}" data-key="${c.key}" style="--c:${g.c}" tabindex="0" aria-label="${esc(c.mark)}: ${esc(c.title)}">
+      <div class="c-head"><span class="mark">${c.mark}</span><h2>${esc(c.title)}</h2><p class="sub">${esc(c.sub)}</p>
+        <button class="dismiss" data-dismiss aria-label="Nicht mehr zeigen">${I.x}</button></div>
+      ${inner}
+      ${c.ctx ? `<p class="ctx">${esc(c.ctx)}</p>` : ''}
+      ${more}
+      ${seg}
+      ${sl ? `<div class="slab"><span>${esc(sl.headline)}</span><button data-slab>${sl.button}</button></div>` : ''}
+    </article>
+    <p class="note"><b>Idee</b><span>${c.note}</span></p>
+  </div>`;
+}
+
+function render() {
+  const tabs = document.getElementById('tabs');
+  const count = (g) => CARDS.filter((c) => g === 'all' || c.group === g).length;
+  tabs.innerHTML = [['all', 'Alle', 'var(--ink)'], ...Object.entries(GROUPS).map(([k, v]) => [k, v.name, v.c])]
+    .map(([k, n, col]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${filter === k}" style="--c:${col}">${n}<b>${count(k)}</b></button>`).join('');
+  document.getElementById('cards').innerHTML = CARDS.filter((c) => filter === 'all' || c.group === filter).map(cardHtml).join('');
+}
+
+let toastTimer;
+function toast(msg) {
+  const host = document.getElementById('toastHost');
+  host.innerHTML = `<div class="toast">${I.check}<span>${esc(msg)} · Prototyp</span></div>`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (host.innerHTML = ''), 2200);
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  const tab = t.closest('[data-tab]');
+  if (tab) { filter = tab.dataset.tab; render(); return; }
+  const card = t.closest('.card');
+  if (!card) return;
+  const c = CARDS.find((x) => x.key === card.dataset.key);
+
+  if (t.closest('[data-dismiss]')) { toast('Wird nicht mehr gezeigt'); card.closest('.item').remove(); return; }
+  const need = t.closest('[data-need]');
+  if (need) { state.need = +need.dataset.need; selected = c.key; render(); return; }
+  const car = t.closest('.car');
+  if (car) { const i = [...car.parentNode.children].indexOf(car); const free = CARS[i].seats.filter((x) => !x).length; if (free) { state.ride = state.ride === i ? null : i; selected = c.key; render(); } return; }
+  if (t.closest('[data-reveal]')) {
+    const d = card.querySelector('#digits');
+    const hid = d.classList.toggle('hide');
+    t.closest('[data-reveal]').textContent = hid ? 'Zeichen zeigen' : 'Zeichen verbergen';
+    return;
+  }
+  if (t.closest('[data-slab]')) {
+    const s = slabFor(c);
+    toast(c.dynamic === 'need' ? `Eingetragen: ${NEEDS[state.need].nm}` : c.dynamic === 'ride' ? (state.ride === null ? 'Wähle zuerst ein Auto' : `Anfrage an ${CARS[state.ride].who} gesendet`) : `${s.button}: ${c.title}`);
+    return;
+  }
+  const seg = t.closest('[data-seg]');
+  if (seg) { toast(c.seg[+seg.dataset.seg][1]); return; }
+  const other = t.closest('[data-other]');
+  if (other) { toast('Antwort vorbereitet'); return; }
+  if (selected !== c.key) { selected = c.key; render(); const el = document.querySelector(`[data-key="${c.key}"]`); if (el) el.focus({ preventScroll: true }); }
+});
+document.addEventListener('keydown', (e) => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('card')) {
+    e.preventDefault();
+    selected = e.target.dataset.key; render();
+    const el = document.querySelector(`[data-key="${selected}"]`); if (el) el.focus({ preventScroll: true });
+  }
+});
+render();
+</script>
+</body>
+</html>

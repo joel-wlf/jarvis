@@ -6,6 +6,10 @@ export function longDate(d = new Date()): string {
   return d.toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
+export function weekday(d: Date | string = new Date(), style: 'short' | 'long' = 'short'): string {
+  return new Date(d).toLocaleDateString(locale(), { weekday: style })
+}
+
 export function clock(d: Date | string = new Date()): string {
   return new Date(d).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
 }

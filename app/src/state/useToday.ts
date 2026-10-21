@@ -2,13 +2,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Linking } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import type { Card, CardAction, HomeResponse, JarvisState } from '@jarvis/contract'
+import type { Card, CardAction, HomeResponse, JarvisState, Urgency } from '@jarvis/contract'
 import type { Filter } from '@/components/today/GroupTabs'
 import { errorText } from '@/i18n/format'
 import { useSession } from './session'
 import { useToast } from './toast'
 
-const byUrgency = (a: Card, b: Card) => b.urgency - a.urgency
+const due = (c: Card) => (c.dueAt ? new Date(c.dueAt).getTime() : Infinity)
+/** Importance first (the server already applies the owner's own choice), then the nearest deadline, cards without one last. */
+const byUrgency = (a: Card, b: Card) => b.urgency - a.urgency || due(a) - due(b)
 
 export function useToday(wide: boolean) {
   const { t } = useTranslation()
@@ -49,6 +51,22 @@ export function useToday(wide: boolean) {
   useEffect(() => {
     void load()
   }, [load])
+
+  // The owner's importance is stored on the server (the watch service follows it); the list shows it optimistically.
+  const setPriority = useCallback(
+    async (key: string, level: Urgency) => {
+      const before = cardsRef.current
+      setCards(before.map((c) => (c.key === key ? { ...c, urgency: level } : c)))
+      try {
+        await api.setPriority(key, level)
+      } catch (e) {
+        setCards(before)
+        toast(errorText(e))
+      }
+    },
+    [api, toast],
+  )
+  const priorityOf = useCallback((c: Card): Urgency => c.urgency, [])
 
   // Wide screens always have one card selected, like the prototype desktop.
   useEffect(() => {
@@ -144,11 +162,11 @@ export function useToday(wide: boolean) {
     return { all: list.length, reply: by('reply'), schedule: by('schedule'), todo: by('todo'), know: by('know') }
   }, [cards])
 
-  const visible = useMemo(() => (cards ?? []).filter((c) => filter === 'all' || c.group === filter), [cards, filter])
+  const visible = useMemo(() => (cards ?? []).filter((c) => filter === 'all' || c.group === filter).sort(byUrgency), [cards, filter])
 
   return {
     home, cards, visible, counts, error, reload: load,
-    filter, setFilter, selected, select, act,
+    filter, setFilter, selected, select, act, priorityOf, setPriority,
     figure, setFigure, say, setSay, onSayDone, lastSource, updatedAt,
   }
 }

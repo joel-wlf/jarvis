@@ -31,7 +31,7 @@ Everything is distilled from the owner's own conversations, on hardware they own
 - Self-hosted on a Raspberry Pi with Docker Compose; the interface is reachable only in the home network (port 8080), never through the Cloudflare tunnel.
 - Data lives in Postgres (pgvector): messages, chats, contacts, threads, topics (with event dates and people), suggested_actions, reminders, watch_state (notified, snoozed, dismissed per item key), polls and votes, contact profiles, memory.
 - The organizer (optional, OpenAI) sorts messages into threads and topics with summaries, dates, todos, and open questions. Without an OpenAI key everything runs locally and slower, and the organizer is off.
-- A scheduled "Wachdienst" (watch service) uses the same item keys and states (`event:<id>:<stage>`, `frage:<chat>:<ts>`, `umfrage:<id>`, `aktion:<id>`, `reminder:<id>`) to decide what to notify.
+- A scheduled "Watch" (watch service) uses the same item keys and states (`event:<id>:<stage>`, `frage:<chat>:<ts>`, `umfrage:<id>`, `aktion:<id>`, `reminder:<id>`) to decide what to notify.
 - Outgoing actions (send, vote, react) go through the `outbox` table and are executed by wa-ingest, with confirmation and an hourly limit configurable.
 - Interface language is German.
 

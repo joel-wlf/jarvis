@@ -28,7 +28,7 @@ Access tokens live 1 hour, refresh tokens 30 days. Only hashes are stored.
 No auth: `GET /info`, `POST /pair`, `POST /login`. Everything else: `Authorization: Bearer <device token "jd_..." or OAuth access token>`.
 
 `GET /devices`, `DELETE /devices/:id` (device id, or an OAuth client id: revokes all its tokens),
-`GET /home`, `GET /cards?group=`, `POST /cards/:key/act`, `POST /cards/:key/suggest` (`?refresh=1` skips the cache),
+`GET /home`, `GET /cards?group=`, `POST /cards/:key/act`, `PUT /cards/:key/priority` `{ priority: 1 | 2 | 3 | null }`, `POST /cards/:key/suggest` (`?refresh=1` skips the cache),
 `GET /people?q=`, `GET /people/:jid`, `PATCH /people/:jid`,
 `GET /memories?q=&scope=&active=all`, `POST /memories`, `PATCH /memories/:id`, `DELETE /memories/:id`,
 `POST /ask` (SSE), `GET /events` (SSE).
@@ -38,6 +38,12 @@ Card keys are the watch service keys (`frage:<jid>:<ts>`, `umfrage:<id>`, `event
 dismissing or snoozing in the app and via Claude's `watch_feedback` is the same. `act` writes:
 done/dismiss/snooze → `watch_state` (or `reminders`, `suggested_actions`, `cards.status` for those card kinds),
 remind → `reminders` (ref = card key), send/react/vote → `outbox` (same limits and offline check as the MCP tools).
+
+Importance: `PUT /cards/:key/priority` stores the owner's choice in `watch_state.priority` (3 important, 2 normal, 1 later,
+`null` = Jarvis decides; migration `016_card_priority.sql`). The card list returns it as `urgency` and sorts by urgency, then by
+`dueAt`. The watch service (`get_dashboard`) follows it: important items are always in `to_notify` while new, items set to
+later never. Event keys store it per event (`event:<id>`), so it survives the stage change. The MCP tool `watch_feedback`
+sets it too (`action: priority`, `level: wichtig | normal | spaeter | standard`).
 
 Failed passwords, pairing codes and bearer tokens are counted per client IP (`cf-connecting-ip`): 10 per 15 minutes,
 then 429. Password and pairing code checks are refused while blocked; a valid high-entropy token is never locked out.

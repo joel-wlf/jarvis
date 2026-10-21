@@ -21,8 +21,10 @@ import {
   type PeopleResponse,
   type PersonDetail,
   type PersonPatch,
+  type PriorityResponse,
   type ServerInfo,
   type SuggestResponse,
+  type Urgency,
 } from '@jarvis/contract'
 import { readSse, requestJson } from './http'
 
@@ -31,6 +33,8 @@ export interface JarvisApi {
   home(): Promise<HomeResponse>
   cards(group?: CardGroup): Promise<CardsResponse>
   act(key: string, action: CardAction): Promise<ActResponse>
+  /** Importance of a card; null hands the decision back to Jarvis. The server stores it and the watch service follows it. */
+  setPriority(key: string, priority: Urgency | null): Promise<PriorityResponse>
   suggest(key: string): Promise<SuggestResponse>
   people(q?: string): Promise<PeopleResponse>
   person(jid: string): Promise<PersonDetail>
@@ -73,6 +77,7 @@ export function createHttpApi(baseUrl: string, token: string, onUnauthorized?: (
     home: () => call('/home'),
     cards: (group) => call(`/cards${qs({ group })}`),
     act: (key, action) => call(`/cards/${encodeURIComponent(key)}/act`, { method: 'POST', body: { action } }),
+    setPriority: (key, priority) => call(`/cards/${encodeURIComponent(key)}/priority`, { method: 'PUT', body: { priority } }),
     suggest: (key) => call(`/cards/${encodeURIComponent(key)}/suggest`, { method: 'POST', timeoutMs: 30_000 }),
     people: (q) => call(`/people${qs({ q })}`),
     person: (jid) => call(`/people/${encodeURIComponent(jid)}`),

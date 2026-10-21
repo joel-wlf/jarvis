@@ -23,7 +23,7 @@ npx expo-doctor
 
 - `src/app/` – routes (Expo Router). `(main)/` holds the screens with navigation (Today, People, Memory, System); `ask`, `connect` and `setup` are full-screen.
 - `src/api/` – `client.ts` (app API `/api/v1`, typed by `@jarvis/contract`), `admin.ts` (admin interface on the home network), `mock.ts` / `adminMock.ts` (in-memory versions), `http.ts` (fetch, errors, SSE).
-- `src/components/` – the visual language of the approved prototype (`.impeccable/mocks/prototype`): `ui.tsx` primitives, `cards/` (all 22 card types), `jarvis/` (figure, floor, subtitle), `today/`, `system/`.
+- `src/components/` – the visual language of the approved prototype (`.impeccable/mocks/prototype`): `ui.tsx` primitives, `cards/` (all 30 card types), `jarvis/` (figure, floor, subtitle), `today/`, `system/`.
 - `src/theme/` – colour, type and layout tokens. Sharp corners, hairlines, thin italic Urbanist (bundled in `assets/fonts`), group colours only as small marks.
 - `locales/de.json`, `locales/en.json` – UI text. The device language picks the locale; German is the default.
 

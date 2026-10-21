@@ -9,7 +9,7 @@ import { loadPollResults, memDb, pool } from '../db.js'
 import { OWNER } from '../config.js'
 import { runJob, type Outcome } from '../outbox.js'
 import {
-  createReminder, loadWatchState, POLL_RENOTIFY_MS, resolveState, setReminderStatus, setWatchFeedback, snoozeReminder,
+  createReminder, loadWatchState, POLL_RENOTIFY_MS, priorityOf, resolveState, setReminderStatus, setWatchFeedback, snoozeReminder,
 } from '../watch.js'
 import { berlinParts, initials, tomorrowMorning, when } from './fmt.js'
 import { fail, type Lang } from './http.js'
@@ -77,9 +77,9 @@ function laterSuggestions(l: Lang, now: Date): Suggestion[] {
   ]
 }
 
-function base<T extends CardType>(type: T, key: string, o: { urgency: Urgency; state: CardState; title: string; chat: string; chatJid?: string; at?: Date; whenText?: string; say: string; context?: string; suggestions: Suggestion[]; group?: CardGroup }, l: Lang, now: Date) {
+function base<T extends CardType>(type: T, key: string, o: { urgency: Urgency; state: CardState; title: string; chat: string; chatJid?: string; at?: Date; dueAt?: Date; whenText?: string; say: string; context?: string; suggestions: Suggestion[]; group?: CardGroup }, l: Lang, now: Date) {
   return {
-    key, type, group: o.group ?? CARD_GROUP[type], urgency: o.urgency, state: o.state, title: o.title,
+    key, type, group: o.group ?? CARD_GROUP[type], urgency: o.urgency, ...(o.dueAt ? { dueAt: iso(o.dueAt) } : {}), state: o.state, title: o.title,
     source: { chat: o.chat, ...(o.chatJid ? { chatJid: o.chatJid } : {}), when: o.whenText ?? (o.at ? when(o.at, l, now) : ''), ...(o.at ? { at: iso(o.at) } : {}) },
     say: o.say, ...(o.context ? { context: o.context } : {}), suggestions: o.suggestions,
   }
@@ -184,7 +184,7 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
       at: at.getTime(), ref: {},
       card: {
         ...base('event', key, {
-          urgency: h <= 3.5 ? 3 : h <= 30 ? 2 : 1, state, title: x.title, chat: x.chat_count > 1 ? `${x.chat_count} ${t.chats}` : 'WhatsApp', at, whenText: when(at, l, now),
+          urgency: h <= 3.5 ? 3 : h <= 30 ? 2 : 1, dueAt: at, state, title: x.title, chat: x.chat_count > 1 ? `${x.chat_count} ${t.chats}` : 'WhatsApp', at, whenText: when(at, l, now),
           say: t.eventSay(x.title, when(at, l, now)), context: cut(x.summary, 220) || undefined,
           suggestions: [{ id: 'remind', label: t.remindMe, action: { kind: 'remind', at: iso(remindAt), text: x.title }, primary: true }, laterSuggestions(l, now)[2]],
         }, l, now),
@@ -203,7 +203,7 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
       const hour = (ms: number) => { const p = berlinParts(new Date(ms), 'en'); return p.hour + p.minute / 60 }
       const slots = [a, b].map((e) => ({ label: e.title, from: hour(new Date(e.event_at).getTime()), to: Math.min(24, hour(new Date(e.event_at).getTime()) + 2), group: 'schedule' as const }))
       const axis: [number, number] = [Math.max(0, Math.floor(Math.min(...slots.map((s) => s.from))) - 1), Math.min(24, Math.ceil(Math.max(...slots.map((s) => s.to))) + 1)]
-      out.push({ at: ta, ref: {}, card: { ...base('conflict', key, { urgency: 3, state, title: `${a.title} / ${b.title}`, chat: t.conflict, at: new Date(ta), whenText: when(new Date(ta), l, now), say: t.conflictSay, suggestions: laterSuggestions(l, now) }, l, now), data: { axis, slots, stats: [] } } })
+      out.push({ at: ta, ref: {}, card: { ...base('conflict', key, { urgency: 3, dueAt: new Date(ta), state, title: `${a.title} / ${b.title}`, chat: t.conflict, at: new Date(ta), whenText: when(new Date(ta), l, now), say: t.conflictSay, suggestions: laterSuggestions(l, now) }, l, now), data: { axis, slots, stats: [] } } })
     }
   }
 
@@ -225,7 +225,7 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
       at: due.getTime(), ref: { reminderId: Number(x.id) },
       card: {
         ...base('reminder', key, {
-          urgency: minsLeft <= 0 ? 3 : minsLeft <= 120 ? 2 : 1, state, title: x.text, chat: t.reminder, at: due, whenText: when(due, l, now), say: t.reminderSay(x.text),
+          urgency: minsLeft <= 0 ? 3 : minsLeft <= 120 ? 2 : 1, dueAt: due, state, title: x.text, chat: t.reminder, at: due, whenText: when(due, l, now), say: t.reminderSay(x.text),
           suggestions: [{ id: 'done', label: t.done, action: { kind: 'done' }, primary: true }, { id: 'snooze-1h', label: t.in1h, action: { kind: 'snooze', until: snoozeOptions[0].until } }, { id: 'snooze-tomorrow', label: t.tomorrow, action: { kind: 'snooze', until: snoozeOptions[2].until } }],
         }, l, now),
         data: { time: berlinParts(due, l).time, ...(x.ref ? { note: x.ref } : {}), snoozeOptions },
@@ -249,7 +249,7 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
       at: (due ?? new Date(x.created_at)).getTime(), ref: { actionId: Number(x.id) },
       card: {
         ...base('task', key, {
-          urgency: daysLeft !== undefined && daysLeft <= 1 ? 2 : 1, state, title: cut(x.title, 120), chat: t.task, at: due ?? new Date(x.created_at), say: t.taskSay(cut(x.title, 120)),
+          urgency: daysLeft !== undefined && daysLeft <= 1 ? 2 : 1, ...(due ? { dueAt: due } : {}), state, title: cut(x.title, 120), chat: t.task, at: due ?? new Date(x.created_at), say: t.taskSay(cut(x.title, 120)),
           suggestions: [{ id: 'done', label: t.done, action: { kind: 'done' }, primary: true }, ...laterSuggestions(l, now)],
         }, l, now),
         data: { ...(x.detail ? { note: cut(x.detail, 300) } : {}), ...(due ? { dueAt: iso(due), daysLeft } : {}) },
@@ -303,12 +303,20 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
     if (!state) continue
     const card = {
       ...p, key: x.key, type: x.type, group: p.group ?? CARD_GROUP[x.type], urgency: ([1, 2, 3].includes(p.urgency) ? p.urgency : 1) as Urgency,
+      ...(x.due_at ? { dueAt: iso(new Date(x.due_at)) } : {}),
       state: p.state === 'scheduled' ? 'scheduled' : state, suggestions: Array.isArray(p.suggestions) ? p.suggestions : [], say: p.say ?? '', data: p.data ?? {},
     } as Card
     out.push({ at: new Date(x.due_at ?? x.created_at).getTime(), ref: { storedId: Number(x.id), ...(x.chat_jid ? { chatJid: x.chat_jid } : {}) }, card })
   }
 
-  return out.sort((a, b) => b.card.urgency - a.card.urgency || b.at - a.at)
+  // The owner's own importance (watch_state.priority) beats Jarvis' guess.
+  for (const b of out) {
+    const p = priorityOf(b.card.key, watch)
+    if (p) b.card.urgency = p
+  }
+  // Importance first, then the nearest deadline, then the newest.
+  const due = (b: Built) => (b.card.dueAt ? new Date(b.card.dueAt).getTime() : Infinity)
+  return out.sort((a, b) => b.card.urgency - a.card.urgency || due(a) - due(b) || b.at - a.at)
 }
 
 export function countCards(cards: Built[]): Record<CardGroup | 'all', number> {
