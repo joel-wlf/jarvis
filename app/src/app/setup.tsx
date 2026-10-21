@@ -47,7 +47,6 @@ export default function Setup() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [failedJob, setFailedJob] = useState<Job | null>(null)
-  const [showAi, setShowAi] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [needsReload, setNeedsReload] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -155,14 +154,15 @@ export default function Setup() {
     } else if (step === 'source') {
       if (source === 'whatsapp' && !consent) throw new Error('Bitte bestätige zuerst die Hinweise zur WhatsApp-Verbindung.')
       await save('source', false, from)
-      await apply(state?.initialized ? {} : { TRANSCRIBE_PROVIDER: 'off', EMBED_PROVIDER: 'local', IMAGE_DESCRIBE: 'false', ORGANIZER_ENABLED: 'false', REQUIRE_CONFIRM: 'true' })
+      await apply(state?.initialized ? {} : { REQUIRE_CONFIRM: 'true' })
     } else if (step === 'whatsapp') {
       if (source === 'whatsapp' && wa?.state !== 'open') throw new Error('WhatsApp ist noch nicht verbunden. Scanne den Code oder wähle „Später verbinden“.')
       await save('settings', false, from)
     } else if (step === 'settings') {
+      if (!changes.OPENAI_API_KEY && !settings?.secrets.OPENAI_API_KEY?.set) throw new Error(`${name} arbeitet mit KI. Bitte trage deinen API-Schlüssel ein.`)
       const selected = Object.fromEntries(Object.entries(changes).filter(([key]) => SETTINGS_KEYS.includes(key)))
-      if (Object.keys(selected).length) await apply(selected)
-      else await save('remote', false, from)
+      if (settings?.values.ORGANIZER_ENABLED !== 'true' && selected.ORGANIZER_ENABLED === undefined) selected.ORGANIZER_ENABLED = 'true'
+      await apply(selected)
     } else if (step === 'remote') {
       const url = changes.APP_PUBLIC_URL ?? settings?.values.APP_PUBLIC_URL ?? ''
       if (remote !== 'local') {
@@ -250,7 +250,7 @@ export default function Setup() {
               <Seg items={[{ key: 'whatsapp', label: 'WhatsApp', on: source === 'whatsapp', onPress: () => setSource('whatsapp') }, { key: 'later', label: 'Später verbinden', on: source === 'later', onPress: () => setSource('later') }]} />
               {source === 'whatsapp' ? <>
                 <Notice level="warn" text="Jarvis nutzt eine inoffizielle WhatsApp-Anbindung. WhatsApp unterstützt diese Nutzung nicht offiziell; eine Einschränkung oder Sperre des Kontos ist möglich." />
-                <Text style={type.body}>Nachrichten und Metadaten werden auf deinem Server archiviert. KI-Verarbeitung ist zunächst ausgeschaltet. Wie viel Verlauf importiert wird, bestimmt WhatsApp.</Text>
+                <Text style={type.body}>Nachrichten und Metadaten werden auf deinem Server archiviert. Den KI-Anbieter richtest du gleich ein. Wie viel Verlauf importiert wird, bestimmt WhatsApp.</Text>
                 <Toggle label="Ich habe die Hinweise gelesen und möchte WhatsApp verbinden" value={consent} onChange={setConsent} />
               </> : null}
               <Text style={type.small}>Als Nächstes werden die Basisdienste eingerichtet. Das kann beim ersten Mal einige Minuten dauern.</Text>
@@ -272,17 +272,14 @@ export default function Setup() {
               </>}
             </> : null}
             {step === 'settings' ? <>
-              <Text style={type.h1} accessibilityRole="header">So arbeitet {name} für dich</Text>
-              <Text style={type.body}>Ohne API-Schlüssel bleiben Suche und Archiv lokal. Externe KI ist optional. Vor dem Aktivieren wählst du, welche Inhalte verarbeitet werden.</Text>
+              <Text style={type.h1} accessibilityRole="header">Verbinde die KI von {name}</Text>
+              <Text style={type.body}>{name} ist ein KI-Assistent: Er versteht deine Nachrichten, sortiert sie nach Themen, transkribiert Sprachnachrichten und beantwortet deine Fragen. Dafür braucht er einen KI-Anbieter. Aktuell wird OpenAI unterstützt.</Text>
               {field('OWNER_NAME')}
-              <Toggle label="Optionale KI-Funktionen einrichten" help="Du kannst diesen Schritt überspringen und später in den Einstellungen darauf zurückkommen." value={showAi} onChange={(enabled) => { setShowAi(enabled); if (!enabled) setChanges((values) => Object.fromEntries(Object.entries(values).filter(([key]) => key === 'OWNER_NAME' || !SETTINGS_KEYS.includes(key)))) }} />
-              {showAi ? <>
-              {field('ORGANIZER_EXCLUDE_NAMES')}{field('ORGANIZER_REDACT')}
-              <Notice level="info" text="Mit externer KI werden je nach aktivierter Funktion Texte, Audios oder Bilder an den Anbieter übertragen. Dabei entstehen API-Kosten. Chat-Ausschlüsse gelten für Suche und Themen-Sortierung, nicht automatisch für Audio und Bilder." />
+              <Notice level="info" text="Dabei werden Texte, Audios und Bilder an den Anbieter übertragen und es entstehen API-Kosten. Chat-Ausschlüsse gelten für Suche und Themen-Sortierung, nicht automatisch für Audio und Bilder. Lege unten fest, was nie an die KI gehen darf." />
               {field('OPENAI_API_KEY')}
               <BlockButton label="API-Schlüssel prüfen" variant="line" busy={busy} onPress={() => void act(async () => { const r = await admin.testOpenAi(changes.OPENAI_API_KEY || undefined); if (!r.ok) throw new Error(r.message); setMessage(r.message) })} />
-              {field('TRANSCRIBE_PROVIDER')}{field('IMAGE_DESCRIBE')}{field('EMBED_PROVIDER')}{field('ORGANIZER_ENABLED')}
-              </> : <Text style={type.small}>Dein Archiv und die Suche funktionieren ohne externe KI. Deine bestehenden KI-Einstellungen bleiben beim Überspringen erhalten.</Text>}
+              {field('ORGANIZER_EXCLUDE_NAMES')}{field('ORGANIZER_REDACT')}
+              <Text style={type.small}>Weitere Einstellungen wie Transkription, Bildbeschreibung und Themen-Sortierung stehen auf sinnvollen Werten und lassen sich später unter Einstellungen ändern.</Text>
             </> : null}
             {step === 'remote' ? <>
               <Text style={type.h1} accessibilityRole="header">Wo möchtest du {name} nutzen?</Text>

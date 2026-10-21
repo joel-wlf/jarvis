@@ -36,7 +36,7 @@ Prefer Compose? `git clone https://github.com/joel-wlf/jarvis.git && cd jarvis &
 - **Topics across chats** with short summaries, sorted automatically if you enable it.
 - **Ask Jarvis** in the app, or from Claude and other AI clients through MCP.
 - **Safe actions**: send, vote and react only when you allow it, always with a preview and rate limits.
-- **Your hardware, your rules**: external AI is off until you switch it on; excluded chats are never sent.
+- **Your hardware, your rules**: your archive stays on your machine, you choose the AI provider, and excluded chats are never sent.
 
 ## How it works
 

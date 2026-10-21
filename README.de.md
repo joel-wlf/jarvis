@@ -36,7 +36,7 @@ Lieber Compose? `git clone https://github.com/joel-wlf/jarvis.git && cd jarvis &
 - **Themen über Chats hinweg** mit kurzen Zusammenfassungen, automatisch sortiert, wenn du es einschaltest.
 - **Jarvis fragen** in der App oder aus Claude und anderen KI-Clients per MCP.
 - **Sichere Aktionen**: Senden, Abstimmen und Reagieren nur mit deiner Erlaubnis, immer mit Vorschau und Limit.
-- **Deine Hardware, deine Regeln**: Externe KI ist aus, bis du sie einschaltest; ausgeschlossene Chats werden nie gesendet.
+- **Deine Hardware, deine Regeln**: Dein Archiv bleibt auf deinem Rechner, du wählst den KI-Anbieter, ausgeschlossene Chats werden nie gesendet.
 
 ## So funktioniert es
 
