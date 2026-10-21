@@ -6,7 +6,7 @@
 
 web
 
-A native mobile app is planned later; the web interface must work equally well on phone and laptop today, and its card and action vocabulary should carry over to native without redesign.
+Expo serves the same application on web and native mobile. Web discovers its server from the page origin; native first accepts the server URL or scans a URL-only QR, then asks for the same single-owner password.
 
 ## Users
 
@@ -28,9 +28,9 @@ Everything is distilled from the owner's own conversations, on hardware they own
 
 ## Operating Context
 
-- Self-hosted on a Raspberry Pi with Docker Compose; the interface is reachable only in the home network (port 8080), never through the Cloudflare tunnel.
+- Self-hosted on Linux (including Raspberry Pi) with Docker Compose. The GitHub installer and Compose open the same resumable Expo setup wizard at port 8081. An optional Cloudflare tunnel exposes that same entry point, including authenticated administration; internal service ports are not published.
 - Data lives in Postgres (pgvector): messages, chats, contacts, threads, topics (with event dates and people), suggested_actions, reminders, watch_state (notified, snoozed, dismissed per item key), polls and votes, contact profiles, memory.
-- The organizer (optional, OpenAI) sorts messages into threads and topics with summaries, dates, todos, and open questions. Without an OpenAI key everything runs locally and slower, and the organizer is off.
+- The organizer (optional, OpenAI) sorts messages into threads and topics with summaries, dates, todos, and open questions. Without an API key the archive and local search continue; voice transcription, image descriptions and the organizer are off. Local voice transcription is not supported.
 - A scheduled "Watch" (watch service) uses the same item keys and states (`event:<id>:<stage>`, `frage:<chat>:<ts>`, `umfrage:<id>`, `aktion:<id>`, `reminder:<id>`) to decide what to notify.
 - Outgoing actions (send, vote, react) go through the `outbox` table and are executed by wa-ingest, with confirmation and an hourly limit configurable.
 - Interface language is German.
@@ -42,7 +42,7 @@ Confirmed for the interface:
 - Item handling: mark done, snooze/remind later, dismiss as unimportant; these must use the same watch_state/reminders semantics as the watch service.
 - Jarvis proposes next steps per item type: reply suggestions with several alternatives, reactions, a vote choice for polls, and additional context pulled from other chats or memory. The set of item types and their modes is open and should be intuitive.
 - Existing admin functions stay: first-run setup wizard, settings with validation and automatic rollback, WhatsApp linking (QR / pairing code), logs, maintenance, versions.
-- Secrets never go to the browser in clear text; sensitive actions re-ask the admin password.
+- Settings responses mask secrets; explicit reveal and rotation re-ask the owner password. The mobile connection QR carries only a server URL. MCP is introduced during setup and remains discoverable under System → Verbindungen.
 
 Open decisions:
 
@@ -50,7 +50,7 @@ Open decisions:
 
 ## Brand Commitments
 
-- Name: Jarvis. German UI copy, direct "du" address.
+- Default assistant name: Jarvis, configurable separately from OWNER_NAME. German UI copy, direct "du" address. A single password belongs to the owner across web, mobile, administration and MCP OAuth. Passwordless QR pairing is disabled in this deployment.
 - The owner's name comes from `OWNER_NAME`; nothing in the interface may hardcode a person.
 
 ## Evidence on Hand

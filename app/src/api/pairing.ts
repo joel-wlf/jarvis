@@ -1,14 +1,19 @@
-import type { PairingPayload } from '@jarvis/contract'
-import { normalizeUrl } from './http'
+import { normalizeUrl } from './server-url'
 
-/** Parses "jarvis:{...}" from the pairing QR code. */
-export function parsePairing(data: string): PairingPayload | null {
-  if (!data.startsWith('jarvis:')) return null
+/** Server discovery only. A QR code never authenticates a device. Legacy codes lose their secret. */
+export function parsePairing(data: string): { url: string } | null {
   try {
-    const p = JSON.parse(data.slice(7)) as Partial<PairingPayload>
-    if (p.v !== 1 || typeof p.url !== 'string' || typeof p.code !== 'string') return null
-    return { v: 1, url: normalizeUrl(p.url), code: p.code, homeUrl: typeof p.homeUrl === 'string' ? normalizeUrl(p.homeUrl) : undefined }
-  } catch {
-    return null
-  }
+    let input = data.trim()
+    if (input.startsWith('jarvis:')) {
+      const p = JSON.parse(input.slice(7)) as { v?: number; url?: string }
+      if (p.v !== 1 || typeof p.url !== 'string') return null
+      input = p.url
+    }
+    const u = new URL(normalizeUrl(input))
+    if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password || u.search || u.hash || u.pathname !== '/') return null
+    const host = u.hostname.replace(/^\[|\]$/g, '').toLowerCase()
+    const local = host === 'localhost' || host === '::1' || (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) && /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) || (host.includes(':') && /^(fc|fd|fe80:)/.test(host)) || /\.(local|lan|home\.arpa)$/.test(host) || !host.includes('.') && !host.includes(':')
+    if (u.protocol === 'http:' && !local) return null
+    return { url: u.origin }
+  } catch { return null }
 }

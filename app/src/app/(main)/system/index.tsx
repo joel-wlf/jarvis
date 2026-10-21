@@ -67,6 +67,8 @@ function Overview() {
   }, [session])
 
   const areas: { href: Href; title: string; sub: string }[] = [
+    { href: '/system/access', title: 'Dein Passwort', sub: 'Ein Passwort für Web, Mobile und MCP-Anmeldung' },
+    { href: '/system/connections', title: 'Verbindungen', sub: 'Mobile App verbinden · MCP für Claude und andere KI-Clients' },
     { href: '/system/settings', title: t('system.settings'), sub: t('system.settingsSub') },
     { href: '/system/whatsapp', title: t('system.wa'), sub: t('system.waSub') },
     { href: '/system/devices', title: t('system.devices'), sub: t('system.devicesSub') },

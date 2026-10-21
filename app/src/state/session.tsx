@@ -30,7 +30,7 @@ const Ctx = createContext<SessionValue | null>(null)
 
 /** On web the app may be served by the admin interface itself; then the same origin is the home URL. */
 function homeCandidate(s: Session | null): string | undefined {
-  if (s?.mode === 'live' && s.homeUrl) return s.homeUrl
+  if (s?.mode === 'live') return s.baseUrl
   if (Platform.OS === 'web' && typeof window !== 'undefined') return window.location.origin
   return undefined
 }
@@ -38,8 +38,8 @@ function homeCandidate(s: Session | null): string | undefined {
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
-  const [admin, setAdmin] = useState<AdminApi | null>(null)
-  const [adminChecked, setAdminChecked] = useState(false)
+  const [adminResult, setAdminResult] = useState<{ key: string; api: AdminApi | null } | null>(null)
+  const mockAdmin = useMemo(() => createMockAdmin(), [])
   const [probe, setProbe] = useState(0)
 
   useEffect(() => {
@@ -57,41 +57,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = useCallback(async () => {
+    const base = homeCandidate(session)
+    if (base) await createHttpAdmin(base).logout().catch(() => {})
     await removeItem(KEY)
     setSession(null)
-  }, [])
+  }, [session])
 
   const api = useMemo<JarvisApi>(() => {
     if (session?.mode === 'live') return createHttpApi(session.baseUrl, session.token, () => void signOut())
     return createMockApi()
   }, [session, signOut])
 
-  // The system area only appears when the admin interface answers from this device.
+  // Probe the same entry point before login as well as on mobile/remote connections.
+  const adminUrl = homeCandidate(session)
+  const adminToken = session?.mode === 'live' ? session.token : undefined
+  const adminKey = `${adminUrl}|${adminToken}|${probe}`
+  const isMock = session?.mode === 'mock'
+  const adminChecked = isMock || !adminUrl || adminResult?.key === adminKey
+  const admin = isMock ? mockAdmin : adminResult?.key === adminKey ? adminResult.api : null
   useEffect(() => {
+    if (!adminUrl || isMock) return
     let alive = true
-    setAdminChecked(false)
-    if (!session) return
-    if (session.mode === 'mock') {
-      setAdmin(createMockAdmin())
-      setAdminChecked(true)
-      return
-    }
-    const url = homeCandidate(session)
-    if (!url) {
-      setAdmin(null)
-      setAdminChecked(true)
-      return
-    }
-    const client = createHttpAdmin(url)
+    const client = createHttpAdmin(adminUrl, adminToken)
     void client.healthy().then((ok) => {
-      if (!alive) return
-      setAdmin(ok ? client : null)
-      setAdminChecked(true)
+      if (alive) setAdminResult({ key: adminKey, api: ok ? client : null })
     })
-    return () => {
-      alive = false
-    }
-  }, [session, probe])
+    return () => { alive = false }
+  }, [adminUrl, adminToken, adminKey, isMock])
 
   const value = useMemo<SessionValue>(
     () => ({

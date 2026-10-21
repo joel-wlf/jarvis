@@ -39,7 +39,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Jarvis uses the camera only to scan the pairing code shown by your Jarvis server.",
+          "cameraPermission": "Jarvis verwendet die Kamera nur zum Scannen der Server-Adresse.",
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
@@ -48,7 +48,8 @@
       "expo-font",
       "expo-localization",
       "expo-image",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "./plugins/with-local-http"
     ]
   }
 }

@@ -1,5 +1,5 @@
 // In-memory admin API for mock mode. Field labels mirror admin/src/schema.ts (server content, German).
-import type { AdminApi, AdminState, Job, SettingsField, SettingsGroup, StatusResponse, WaLink } from './admin'
+import type { SetupProgress, AdminApi, AdminState, Job, SettingsField, SettingsGroup, StatusResponse, WaLink } from './admin'
 import { JarvisError } from './http'
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -19,7 +19,7 @@ const FIELDS: SettingsField[] = [
   { key: 'OWN_NAMES', group: 'general', type: 'list', default: '', label: 'Weitere eigene Namen', help: 'Spitznamen oder Schreibweisen, mit denen andere dich ansprechen.', services: ['organizer'], placeholder: 'z.B. Alex,Lexi' },
   { key: 'MCP_PUBLIC_HOST', group: 'access', type: 'text', default: '', label: 'Öffentlicher Hostname', help: 'Der Hostname, den du im Cloudflare-Tunnel für den MCP-Server eingetragen hast.', services: [], placeholder: 'jarvis.example.com', adminOnly: true },
   { key: 'CLOUDFLARE_TUNNEL_TOKEN', group: 'access', type: 'secret', default: '', label: 'Cloudflare-Tunnel-Token', help: 'Macht Jarvis von unterwegs erreichbar, ohne Ports zu öffnen.', services: ['cloudflared'] },
-  { key: 'OPENAI_API_KEY', group: 'ai', type: 'secret', default: '', label: 'OpenAI-Schlüssel', help: 'Optional. Ohne Schlüssel läuft alles lokal und langsamer, die Themen-Sortierung ist aus.', services: ['wa-ingest', 'embedder', 'organizer'] },
+  { key: 'OPENAI_API_KEY', group: 'ai', type: 'secret', default: '', label: 'OpenAI-Schlüssel', help: 'Optional. Ohne Schlüssel bleiben Archiv und Suche lokal; Transkription und Themen-Sortierung sind aus.', services: ['wa-ingest', 'embedder', 'organizer'] },
   { key: 'REDACT_NUMBERS', group: 'privacy', type: 'bool', default: 'true', label: 'Telefonnummern schwärzen', help: 'Nummern werden ersetzt, bevor Text an die KI geht.', services: ['organizer'] },
   { key: 'ORGANIZER_EXCLUDE_NAMES', group: 'privacy', type: 'list', default: '', label: 'Nie an die KI', help: 'Chats mit diesen Namen werden nie sortiert oder zusammengefasst.', services: ['organizer'], placeholder: 'z.B. Arzt,Bank' },
   { key: 'ORGANIZER_ENABLED', group: 'organizer', type: 'bool', default: 'false', label: 'Themen-Sortierung an', help: 'Braucht einen OpenAI-Schlüssel.', services: ['organizer'] },
@@ -51,7 +51,12 @@ export function createMockAdmin(): AdminApi {
   }
   const wa: WaLink = { state: 'open', at: iso(1), user: '4917…321' }
 
+  let progress: SetupProgress = { revision: 0, step: 'name', furthest: 0, complete: false, draft: {} }
   return {
+    progress: async () => ({ ...progress }),
+    saveProgress: async (p) => { progress = { ...p, revision: p.revision + 1 }; return progress },
+    connection: async () => ({ url: 'https://jarvis.example.com', qrSvg: '' }),
+    checkRemote: async () => ({ ok: true }),
     healthy: async () => true,
     state: async () => ({ ...state }),
     async setup() {
@@ -64,6 +69,7 @@ export function createMockAdmin(): AdminApi {
       if (!password) throw new JarvisError('unauthorized', 'Passwort falsch.', 401)
       state.loggedIn = true
     },
+    async changePassword() { state.loggedIn = false },
     async logout() {
       state.loggedIn = false
     },

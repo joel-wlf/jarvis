@@ -8,8 +8,8 @@ import { CliDocker, FakeDocker } from './docker.js'
 import { EnvLinkError } from './envfile.js'
 import { detectSelf } from './hostpaths.js'
 import { JobRunner } from './jobs.js'
-import { autoClearPairing } from './ops.js'
-import { createApp } from './server.js'
+import { autoClearPairing, startApply } from './ops.js'
+import { createApp, createInternalApp } from './server.js'
 
 const FAKE = process.env.JARVIS_FAKE_DOCKER === '1'
 const PROJECT = process.env.JARVIS_PROJECT_DIR ?? '/project'
@@ -71,14 +71,21 @@ async function main() {
 
   const auth = new Auth(path.join(DATA, 'auth'))
   const app = createApp(ctx, auth)
+  createInternalApp(ctx, auth).listen(Number(process.env.ADMIN_INTERNAL_PORT ?? 8083))
   app.listen(PORT, () => {
     const hostIp = Object.values(os.networkInterfaces()).flat().find((i) => i && i.family === 'IPv4' && !i.internal)?.address
     log(`Oberfläche läuft auf Port ${PORT} (im Container ${hostIp ?? ''}).`)
     if (!auth.isConfigured()) {
       const line = '='.repeat(64)
-      console.log(`\n${line}\n  Jarvis-Einrichtung: im Browser http://<adresse-des-pi>:${process.env.ADMIN_PUBLIC_PORT ?? PORT} öffnen\n  Einrichtungscode:   ${auth.setupCode()}\n${line}\n`)
+      console.log(`\n${line}\n  Jarvis-Einrichtung: im Browser http://<adresse-des-pi>:${process.env.APP_WEB_PORT ?? 8081} öffnen\n  Öffne die Weboberfläche und lege dein Besitzer-Passwort fest.\n${line}\n`)
     }
   })
+
+  // Upgrade existing installations to the shared authentication transport.
+  const current = readCurrent(ctx)
+  if (current.env.POSTGRES_PASSWORD && (!fs.existsSync(path.join(DATA, 'setup-runtime-v1')) || !current.env.ADMIN_INTERNAL_SECRET || current.env.TRANSCRIBE_PROVIDER === 'local' || current.env.WHISPER_LANG || current.env.WHISPER_MODEL || current.env.COMPOSE_PROFILES?.split(',').includes('local-whisper')) && !ctx.jobs.current()) {
+    startApply(ctx, {}, { build: true, migrate: true })
+  }
 
   // Kopplungsnummer nach erfolgreicher Verknüpfung automatisch entfernen
   setInterval(() => autoClearPairing(ctx), 15_000).unref()

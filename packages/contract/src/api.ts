@@ -20,16 +20,18 @@ export interface ApiError {
 /** GET /api/v1/info (no auth). The app calls this first after the user enters a URL. */
 export interface ServerInfo {
   name: 'jarvis'
+  assistantName?: string
+  setupComplete?: boolean
   apiVersion: number
   version: string
   ownerName?: string
-  /** whether an owner password exists; without it only QR pairing works */
+  /** whether an owner password exists; a server address QR always requires password login */
   passwordLogin: boolean
   /** OAuth authorization server metadata URL, for MCP clients */
   oauthMetadata: string
 }
 
-/** Content of the pairing QR code shown in the web interface (JSON, prefixed "jarvis:"). */
+/** Legacy pairing payload. New connection QRs contain only a plain server URL and always require a password. */
 export interface PairingPayload {
   v: 1
   /** public URL of the API (Cloudflare tunnel), e.g. https://jarvis.example.com */

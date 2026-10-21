@@ -39,7 +39,7 @@ export const GROUPS = [
   { id: 'access', label: 'Zugang & Fernzugriff', icon: 'key', help: 'Token für Claude, Cloudflare-Tunnel und Datenbank-Passwörter.' },
   { id: 'ai', label: 'KI-Anbieter', icon: 'spark', help: 'OpenAI-Schlüssel für Transkription, Bedeutungssuche, Bilder und Themen-Sortierung.' },
   { id: 'privacy', label: 'Datenschutz', icon: 'shield', help: 'Was nie an die KI geht und was vorher geschwärzt wird.' },
-  { id: 'voice', label: 'Sprachnachrichten', icon: 'mic', help: 'Transkription per OpenAI oder lokal (whisper.cpp).' },
+  { id: 'voice', label: 'Sprachnachrichten', icon: 'mic', help: 'Transkription über den API-Anbieter oder ausschalten.' },
   { id: 'images', label: 'Bilder', icon: 'image', help: 'Automatische Bildbeschreibung, damit Bilder durchsuchbar werden.' },
   { id: 'search', label: 'Suche', icon: 'search', help: 'Embeddings für die Bedeutungssuche.' },
   { id: 'organizer', label: 'Themen-Sortierung', icon: 'layers', help: 'Organizer: bündelt Nachrichten zu Themen, Terminen und Aufgaben.' },
@@ -59,7 +59,22 @@ const LIST_HELP = 'Kommagetrennt; Buchstaben, Ziffern, Leerzeichen und . & + _ (
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace'].map((v) => ({ value: v, label: v }))
 
 export const FIELDS: Field[] = [
+  {
+    key: 'APP_WEB_PORT', group: 'admin', type: 'int', default: '8081', min: 1024, max: 65535,
+    label: 'Web-Port', help: 'Gemeinsamer Einstieg für Einrichtung, App und Verwaltung.', services: ['app-web'],
+  },
+  {
+    key: 'APP_WEB_BIND', group: 'admin', type: 'text', default: '0.0.0.0',
+    label: 'Web-Adresse', help: '0.0.0.0 = im Heimnetz erreichbar, 127.0.0.1 = nur auf diesem Rechner.', services: ['app-web'],
+    pattern: '^(0\\.0\\.0\\.0|127\\.0\\.0\\.1)$', patternHelp: '0.0.0.0 oder 127.0.0.1',
+  },
   // Allgemein
+  {
+    key: 'ASSISTANT_NAME', group: 'general', type: 'text', default: 'Jarvis', label: 'Name des Assistenten',
+    help: 'So heißt dein persönlicher Assistent. Unabhängig von deinem eigenen Namen.',
+    maxLength: 40, pattern: '^[\\p{L}\\p{N} .-]+$', patternHelp: 'Buchstaben, Ziffern, Leerzeichen, Punkt und Bindestrich',
+    services: ['mcp-server'],
+  },
   {
     key: 'OWNER_NAME', group: 'general', type: 'text', default: '', label: 'Dein Name',
     help: 'So spricht Jarvis in Anweisungen, Zusammenfassungen und Profilen von dir. Leer = „dich".',
@@ -73,6 +88,11 @@ export const FIELDS: Field[] = [
   },
 
   // Zugang
+  {
+    key: 'APP_HOME_URL', group: 'access', type: 'url', default: '', label: 'Adresse im Heimnetz',
+    help: 'Adresse für andere Geräte im gleichen Netz, z.B. http://192.168.1.20:8081. Nicht localhost.',
+    adminOnly: true, services: [], placeholder: 'http://192.168.1.20:8081',
+  },
   {
     key: 'MCP_TOKEN', group: 'access', type: 'secret', default: '', required: true, label: 'MCP-Token',
     help: 'Geheimer Schlüssel in der Connector-URL für Claude. Wer ihn hat, kann deine Chats lesen und in deinem Namen schreiben. Wechseln macht die alte URL sofort ungültig.',
@@ -97,7 +117,7 @@ export const FIELDS: Field[] = [
   },
   {
     key: 'ADMIN_INTERNAL_SECRET', group: 'access', type: 'secret', default: '', label: 'Interner Schlüssel',
-    help: 'Damit erzeugt diese Oberfläche Kopplungscodes und setzt das App-Passwort. Nur im Docker-Netz gültig, nie über den Tunnel erreichbar.',
+    help: 'Sichert die interne Prüfung des gemeinsamen Passworts und der Gerätesitzungen ab. Nur im Docker-Netz gültig, nie über den Tunnel erreichbar.',
     pattern: '^[A-Za-z0-9]{16,128}$', patternHelp: 'Mindestens 16 Zeichen, nur Buchstaben und Ziffern',
     generate: 'hex24', services: ['mcp-server'],
   },
@@ -122,7 +142,7 @@ export const FIELDS: Field[] = [
   // KI
   {
     key: 'OPENAI_API_KEY', group: 'ai', type: 'secret', default: '', label: 'OpenAI-API-Schlüssel',
-    help: 'Optional. Ohne Schlüssel läuft alles lokal (langsam, heizt den Pi) und es gibt keine Themen-Sortierung und keine Bildbeschreibung.',
+    help: 'Optional. Ohne Schlüssel bleiben Suche und Archiv lokal; Transkription, Themen-Sortierung und Bildbeschreibung sind ausgeschaltet.',
     pattern: '^sk-[A-Za-z0-9_-]{20,300}$', patternHelp: 'Beginnt mit sk-', services: ['embedder', 'wa-ingest', 'organizer', 'mcp-server'],
   },
   {
@@ -156,10 +176,10 @@ export const FIELDS: Field[] = [
   // Sprachnachrichten
   {
     key: 'TRANSCRIBE_PROVIDER', group: 'voice', type: 'enum', default: '', label: 'Transkription',
-    help: 'Automatisch = OpenAI, wenn ein Schlüssel gesetzt ist, sonst lokal. Lokal startet whisper.cpp (langsam, ~1,5 GB RAM).',
+    help: 'Automatisch = API-Anbieter, wenn ein Schlüssel gesetzt ist, sonst aus. Audio wird zur Transkription an den Anbieter übertragen.',
     options: [
       { value: '', label: 'Automatisch' }, { value: 'openai', label: 'OpenAI' },
-      { value: 'local', label: 'Lokal (whisper.cpp)' }, { value: 'off', label: 'Aus' },
+      { value: 'off', label: 'Aus' },
     ],
     services: ['wa-ingest'],
   },
@@ -168,19 +188,13 @@ export const FIELDS: Field[] = [
     help: 'Modell für die Transkription bei OpenAI.', pattern: MODEL, patternHelp: MODEL_HELP, services: ['wa-ingest'],
   },
   {
-    key: 'WHISPER_MODEL', group: 'voice', type: 'enum', default: 'small', label: 'Lokales Modell',
-    help: 'Größer = genauer, aber langsamer und mehr Speicher. Wird beim Bauen geladen (Änderung baut whisper neu).',
-    options: [{ value: 'base', label: 'base (schnell)' }, { value: 'small', label: 'small' }, { value: 'medium', label: 'medium (genau, langsam)' }],
-    services: ['whisper'],
-  },
-  {
-    key: 'WHISPER_LANG', group: 'voice', type: 'text', default: 'de', label: 'Sprache',
+    key: 'TRANSCRIBE_LANG', group: 'voice', type: 'text', default: 'de', label: 'Sprache',
     help: 'Sprachcode wie de oder en, oder auto.', pattern: '^(auto|[a-z]{2})$', patternHelp: 'Zwei Buchstaben (de, en …) oder auto',
     services: ['wa-ingest'],
   },
   {
     key: 'TRANSCRIBE_MAX_AGE_DAYS', group: 'voice', type: 'int', default: '', min: 1, max: 36500, unit: 'Tage', label: 'Ältere Sprachnachrichten',
-    help: 'Nur Sprachnachrichten bis zu diesem Alter transkribieren. Leer = automatisch (OpenAI: alle, lokal: 14 Tage).',
+    help: 'Nur Sprachnachrichten bis zu diesem Alter transkribieren. Leer = gesamter noch verfügbarer Verlauf (bis zu 10 Jahre).',
     services: ['wa-ingest'],
   },
   {
@@ -347,11 +361,11 @@ export const FIELDS: Field[] = [
 
   // Oberfläche
   {
-    key: 'ADMIN_PORT', group: 'admin', type: 'int', default: '8080', min: 1024, max: 65535, label: 'Port',
+    key: 'ADMIN_PORT', managed: true, group: 'admin', type: 'int', default: '8082', min: 1024, max: 65535, label: 'Port',
     help: 'Port dieser Seite auf dem Pi.', services: ['admin'],
   },
   {
-    key: 'ADMIN_BIND', group: 'admin', type: 'text', default: '0.0.0.0', label: 'Erreichbar über',
+    key: 'ADMIN_BIND', managed: true, group: 'admin', type: 'text', default: '127.0.0.1', label: 'Erreichbar über',
     help: '0.0.0.0 = im ganzen Heimnetz, 127.0.0.1 = nur auf dem Pi selbst (Zugriff per SSH-Tunnel).',
     pattern: '^(\\d{1,3}\\.){3}\\d{1,3}$', patternHelp: 'IPv4-Adresse, z.B. 0.0.0.0 oder 127.0.0.1', services: ['admin'],
   },

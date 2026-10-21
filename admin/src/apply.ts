@@ -30,6 +30,10 @@ export class ApplyError extends Error {}
 export function prepare(current: Env, changes: Record<string, string | null>, opts: { initial?: boolean } = {}): Prepared {
   const next: Env = { ...current }
   const errors: Record<string, string> = {}
+  // Retire old local-transcription settings without enabling external processing.
+  if (next.TRANSCRIBE_PROVIDER === 'local') next.TRANSCRIBE_PROVIDER = 'off'
+  if (!next.TRANSCRIBE_LANG && next.WHISPER_LANG) next.TRANSCRIBE_LANG = next.WHISPER_LANG
+  for (const key of ['WHISPER_MODEL', 'WHISPER_LANG', 'WHISPER_URL']) delete next[key]
   for (const [key, raw] of Object.entries(changes)) {
     const f = FIELD.get(key)
     if (!f || f.managed) {
@@ -43,7 +47,7 @@ export function prepare(current: Env, changes: Record<string, string | null>, op
     if (raw === null || raw === '') delete next[key]
     else next[key] = normalizeInput(key, String(raw))
   }
-  if (opts.initial) for (const f of FIELDS) if (f.generate && !next[f.key]) next[f.key] = randomSecret(f.generate)
+  for (const f of FIELDS) if (f.generate && !next[f.key]) next[f.key] = randomSecret(f.generate)
   const profiles = deriveProfiles(next)
   if (profiles) next.COMPOSE_PROFILES = profiles
   else delete next.COMPOSE_PROFILES
@@ -55,6 +59,7 @@ export function prepare(current: Env, changes: Record<string, string | null>, op
 
 export interface ApplyOptions {
   title?: string
+  verifyAll?: boolean
   initial?: boolean
   build?: boolean
   /** Wird nach einem Rollback aufgerufen (z.B. Datenbank-Passwort zurücksetzen) */
@@ -105,7 +110,7 @@ export async function applyEnv(ctx: Ctx, log: JobLog, next: Env, opts: ApplyOpti
   }
 
   // 5) Starten und prüfen
-  const outcome = await deployAndVerify(ctx, log, next, { build: opts.build, initial: opts.initial, brokenBefore })
+  const outcome = await deployAndVerify(ctx, log, next, { build: opts.build, initial: opts.initial, verifyAll: opts.verifyAll, brokenBefore })
   if (outcome === null) {
     const selfChanged = SELF_KEYS.some((k) => (cur.env[k] ?? '') !== (next[k] ?? ''))
     if (selfChanged) await recreateSelf(ctx, log)
@@ -134,9 +139,17 @@ async function deployAndVerify(
   ctx: Ctx,
   log: JobLog,
   env: Env,
-  o: { build?: boolean; initial?: boolean; brokenBefore: Set<string>; rollback?: boolean },
+  o: { build?: boolean; initial?: boolean; verifyAll?: boolean; brokenBefore: Set<string>; rollback?: boolean },
 ): Promise<string | null> {
   const profiles = env.COMPOSE_PROFILES ?? ''
+  const retired = await ctx.docker.docker(['ps', '-aq', '--filter', 'label=com.docker.compose.project=jarvis', '--filter', 'label=com.docker.compose.service=whisper'], { timeoutMs: 15000 })
+  const retiredIds = retired.out.trim().split(/\s+/).filter((id) => /^[a-f0-9]{12,64}$/.test(id))
+  if (retired.code !== 0) return 'Die bisherige lokale Transkription konnte nicht geprüft werden.'
+  if (retiredIds.length) {
+    log('info', 'Entferne den stillgelegten lokalen Transkriptionsdienst …')
+    const removed = await ctx.docker.docker(['rm', '--force', ...retiredIds], { timeoutMs: 30000 })
+    if (removed.code !== 0) return 'Der alte lokale Transkriptionsdienst konnte nicht gestoppt werden.'
+  }
   let active: string[]
   try {
     active = await activeServices(ctx.docker, undefined, profiles)
@@ -158,11 +171,13 @@ async function deployAndVerify(
   const targets = active.filter((s) => s !== SELF)
   log('info', `${o.rollback ? 'Starte vorherigen Stand' : 'Starte Dienste'}: ${targets.join(', ')}${o.build ? ' (mit Neubau)' : ''}`)
   if (o.initial) log('info', 'Beim ersten Mal werden die Container gebaut. Auf einem Raspberry Pi kann das 10 bis 30 Minuten dauern.')
-  const args = ['up', '-d', ...(o.build ? ['--build'] : []), ...targets]
+  // app-web depends on admin. Revisiting dependencies here can recreate this
+  // very process after .env is created and interrupt the setup job.
+  const args = ['up', '-d', '--no-deps', ...(o.build ? ['--build'] : []), ...targets]
   const up = await ctx.docker.compose(args, { profiles, timeoutMs: o.initial || o.build ? 90 * 60_000 : 20 * 60_000, onLine: (l) => log('out', l) })
   if (up.code !== 0) return `docker compose up fehlgeschlagen (Code ${up.code}).`
 
-  const skip = new Set(o.brokenBefore)
+  const skip = new Set(o.verifyAll ? [] : o.brokenBefore)
   if (readLinkStatus(ctx.waStatusFile)?.state === 'logged_out') {
     skip.add('wa-ingest')
     log('warn', 'WhatsApp ist abgemeldet; wa-ingest wird bei der Prüfung nicht berücksichtigt (unter WhatsApp neu verknüpfen).')

@@ -1,5 +1,6 @@
 // App authentication: server info, QR pairing, password login, device list and revoke,
 // plus the internal endpoints for the admin service (pairing codes, owner password).
+import { ownerState, unifiedAuth } from './owner-auth.js'
 import { readFileSync } from 'node:fs'
 import express, { type NextFunction, type Request, type Response } from 'express'
 import { API_VERSION, type AuthResponse, type DevicesResponse, type PairingPayload, type ServerInfo } from '@jarvis/contract'
@@ -65,12 +66,15 @@ export function authRoutes(deps: AuthDeps) {
   const auth = requireAppAuth(deps)
 
   r.get('/info', async (_req, res) => {
+    const owner = unifiedAuth() ? await ownerState() : null
     const info: ServerInfo = {
       name: 'jarvis',
+      assistantName: owner?.assistantName || process.env.ASSISTANT_NAME || 'Jarvis',
+      setupComplete: owner?.setupComplete ?? true,
       apiVersion: API_VERSION,
       version: VERSION,
       ...(OWNER_NAME ? { ownerName: OWNER_NAME } : {}),
-      passwordLogin: await hasOwnerPassword(),
+      passwordLogin: owner?.configured ?? await hasOwnerPassword(),
       oauthMetadata: new URL('/.well-known/oauth-authorization-server', deps.publicUrl).href,
     }
     res.json(info)
@@ -85,6 +89,7 @@ export function authRoutes(deps: AuthDeps) {
   }
 
   r.post('/pair', async (req, res) => {
+    if (unifiedAuth()) return sendError(res, 'forbidden', 'Scan the server address and sign in with your password')
     guard(req)
     const code = str(req.body?.code, 'code', { max: 20 })
     const deviceName = str(req.body?.deviceName, 'deviceName', { max: 80 })
@@ -101,7 +106,7 @@ export function authRoutes(deps: AuthDeps) {
     const password = str(req.body?.password, 'password', { max: 200 })
     const deviceName = str(req.body?.deviceName, 'deviceName', { max: 80 })
     const plat = platform(req.body?.platform)
-    if (!(await checkOwnerPassword(password))) throw failed(req, 'Wrong password')
+    if (!(await checkOwnerPassword(password, clientIp(req)))) throw failed(req, 'Wrong password')
     deps.loginLimiter.reset(clientIp(req))
     const dev = await createDevice(deviceName, plat)
     const out: AuthResponse = { token: dev.token, deviceId: dev.id, ...(OWNER_NAME ? { ownerName: OWNER_NAME } : {}) }
@@ -135,8 +140,15 @@ export function internalRoutes(opts: { secret?: string; publicUrl: URL }) {
   })
   r.use(express.json({ limit: '16kb' }))
 
+  r.post('/internal/device-auth', async (req, res) => {
+    const token = String(req.body?.token ?? '')
+    const valid = token.startsWith('jd_') && !!(await deviceByToken(token))
+    res.json({ valid })
+  })
+
   /** -> { code, expiresAt, payload: PairingPayload }; the admin renders "jarvis:" + JSON(payload) as QR. */
   r.post('/internal/pairing-codes', async (req, res) => {
+    if (unifiedAuth()) return sendError(res, 'forbidden', 'Use the server URL QR code')
     const homeUrl = typeof req.body?.homeUrl === 'string' && /^https?:\/\//.test(req.body.homeUrl) ? req.body.homeUrl : undefined
     const { code, expiresAt } = await createPairingCode()
     const payload: PairingPayload = { v: 1, url: opts.publicUrl.origin, ...(homeUrl ? { homeUrl } : {}), code }
@@ -144,6 +156,7 @@ export function internalRoutes(opts: { secret?: string; publicUrl: URL }) {
   })
 
   r.put('/internal/owner-password', async (req, res) => {
+    if (unifiedAuth()) return sendError(res, 'forbidden', 'Use the shared admin password')
     const pw = typeof req.body?.password === 'string' ? req.body.password : ''
     if (pw.length < 10 || pw.length > 200) return sendError(res, 'invalid', 'Password must have 10 to 200 characters', { password: '10-200 characters' })
     await setOwnerPassword(pw)

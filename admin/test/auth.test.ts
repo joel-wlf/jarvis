@@ -13,33 +13,31 @@ import { createApp } from '../src/server.js'
 
 const dir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-auth-'))
 
-test('Einrichtungscode gilt nur einmal, danach Passwort', () => {
-  const a = new Auth(dir())
-  const code = a.setupCode()
-  assert.match(code, /^[A-Z0-9]{4}-[A-Z0-9]{4}$/)
-  assert.equal(a.setupCode(), code, 'Code bleibt bis zur Benutzung gleich')
-  assert.match(a.setup('1.1.1.1', 'FALSCH00', 'langes-passwort').error!, /stimmt nicht/)
-  assert.match(a.setup('1.1.1.1', code, 'kurz').error!, /10 Zeichen/)
-  const ok = a.setup('1.1.1.1', code.toLowerCase().replace('-', ' '), 'langes-passwort')
+test('first owner sets a password without a setup code; later claims cannot replace it', () => {
+  const folder = dir()
+  const a = new Auth(folder)
+  assert.match(a.setup('1.1.1.1', '', 'kurz').error!, /15 Zeichen/)
+  const ok = a.setup('1.1.1.1', '', 'mein-langes-passwort')
   assert.ok(ok.session)
   assert.ok(a.check(ok.session))
-  assert.match(a.setup('1.1.1.1', code, 'langes-passwort').error!, /schon eingerichtet/)
-  assert.ok(a.login('1.1.1.1', 'langes-passwort').session)
-  assert.ok(a.login('1.1.1.1', 'falsch').error)
+  const other = new Auth(folder)
+  assert.match(other.setup('2.2.2.2', '', 'anderes-langes-passwort').error!, /schon eingerichtet/)
+  assert.ok(a.login('1.1.1.1', 'mein-langes-passwort').session)
+  assert.ok(a.login('1.1.1.1', 'anderes-langes-passwort').error)
 })
 
 test('Sperre nach zu vielen Fehlversuchen', () => {
   const a = new Auth(dir())
-  a.setup('2.2.2.2', a.setupCode(), 'langes-passwort')
+  a.setup('2.2.2.2', '', 'mein-langes-passwort')
   for (let i = 0; i < 10; i++) a.login('2.2.2.2', 'falsch')
-  assert.match(a.login('2.2.2.2', 'langes-passwort').error!, /Fehlversuche/)
-  assert.ok(a.login('3.3.3.3', 'langes-passwort').session, 'andere Adressen sind nicht betroffen')
+  assert.match(a.login('2.2.2.2', 'mein-langes-passwort').error!, /Fehlversuche/)
+  assert.ok(a.login('3.3.3.3', 'mein-langes-passwort').session, 'andere Adressen sind nicht betroffen')
 })
 
 test('Passwort zurücksetzen macht Sitzungen ungültig', () => {
   const d = dir()
   const a = new Auth(d)
-  const s = a.setup('1.1.1.1', a.setupCode(), 'langes-passwort').session
+  const s = a.setup('1.1.1.1', '', 'mein-langes-passwort').session
   new Auth(d).resetPassword() // wie die CLI in einem anderen Prozess
   assert.equal(a.check(s), false)
 })
@@ -65,7 +63,7 @@ test('HTTP: ohne Anmeldung kein Zugriff, ohne X-Jarvis keine schreibende Anfrage
     assert.equal(foreign.status, 403)
 
     const h = { 'content-type': 'application/json', 'x-jarvis': '1' }
-    const setup = await fetch(`${base}/api/auth/setup`, { method: 'POST', headers: h, body: JSON.stringify({ code: auth.setupCode(), password: 'langes-passwort' }) })
+    const setup = await fetch(`${base}/api/auth/setup`, { method: 'POST', headers: h, body: JSON.stringify({ code: '', password: 'mein-langes-passwort' }) })
     assert.equal(setup.status, 200)
     const cookie = setup.headers.get('set-cookie')!.split(';')[0]
     assert.match(setup.headers.get('set-cookie')!, /HttpOnly; SameSite=Strict/)
@@ -78,7 +76,7 @@ test('HTTP: ohne Anmeldung kein Zugriff, ohne X-Jarvis keine schreibende Anfrage
 
     const reveal = await fetch(`${base}/api/reveal`, { method: 'POST', headers: { ...h, cookie }, body: JSON.stringify({ key: 'MCP_TOKEN', password: 'falsch' }) })
     assert.equal(reveal.status, 403)
-    const reveal2 = await (await fetch(`${base}/api/reveal`, { method: 'POST', headers: { ...h, cookie }, body: JSON.stringify({ key: 'MCP_TOKEN', password: 'langes-passwort' }) })).json()
+    const reveal2 = await (await fetch(`${base}/api/reveal`, { method: 'POST', headers: { ...h, cookie }, body: JSON.stringify({ key: 'MCP_TOKEN', password: 'mein-langes-passwort' }) })).json()
     assert.equal(reveal2.value, 'c'.repeat(64))
 
     const logs = await (await fetch(`${base}/api/logs/mcp-server`, { headers: { cookie } })).json()

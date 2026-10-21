@@ -60,7 +60,7 @@ export function quote(v: string): string {
  */
 export function serializeEnv(env: Env): string {
   const lines: string[] = [
-    '# Jarvis-Einstellungen. Verwaltet über die Admin-Oberfläche (docker compose up -d admin, dann http://<pi>:8080).',
+    '# Jarvis-Einstellungen. Verwaltet über die Admin-Oberfläche (docker compose up -d admin app-web, dann http://<server>:8081).',
     '# Von Hand ändern geht auch; die Oberfläche übernimmt alles, was hier steht. Leere Werte = Standard.',
   ]
   const known = new Set(FIELDS.map((f) => f.key))

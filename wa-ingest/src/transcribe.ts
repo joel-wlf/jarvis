@@ -6,13 +6,14 @@ import { pool, prepareMediaForDownload } from './store.js'
 const log = pino({ level: process.env.LOG_LEVEL ?? 'info' }).child({ module: 'transcribe' })
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY
-const PROVIDER = process.env.TRANSCRIBE_PROVIDER || (OPENAI_KEY ? 'openai' : 'local')
+const REQUESTED_PROVIDER = process.env.TRANSCRIBE_PROVIDER
+// Unknown/retired values fail closed; they never opt an old local installation into an API.
+const PROVIDER = (!REQUESTED_PROVIDER || REQUESTED_PROVIDER === 'openai') && OPENAI_KEY ? 'openai' : 'off'
 const OPENAI_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || 'gpt-4o-mini-transcribe'
-const WHISPER_URL = process.env.WHISPER_URL
-const LANG = process.env.WHISPER_LANG ?? 'de'
+const LANG = process.env.TRANSCRIBE_LANG ?? 'de'
 const MAX_SECONDS = Number(process.env.MAX_AUDIO_SECONDS ?? 600)
-// Auf einem Pi 4 läuft Whisper nur ~1x-0,07x Echtzeit: ältere Sprachnachrichten werden nicht transkribiert
-const MAX_AGE_DAYS = Number(process.env.TRANSCRIBE_MAX_AGE_DAYS || (PROVIDER === 'openai' ? 3650 : 14))
+// Ohne eigene Altersgrenze wird der noch verfügbare Verlauf transkribiert.
+const MAX_AGE_DAYS = Number(process.env.TRANSCRIBE_MAX_AGE_DAYS || 3650)
 const MAX_ATTEMPTS = 3
 const IDLE_MS = 5000
 
@@ -35,8 +36,8 @@ let running = false
 /** Wird bei jeder (Wieder-)Verbindung aufgerufen; die Schleife läuft nur einmal. */
 export function setTranscriberSocket(s: WASocket | null) {
   sock = s
-  // PROVIDER "off": Sprachnachrichten nicht transkribieren (z.B. ohne Schlüssel und ohne lokalen Whisper)
-  if (s && !running && PROVIDER !== 'off' && (PROVIDER === 'openai' ? !!OPENAI_KEY : !!WHISPER_URL)) {
+  // Ohne aktivierten API-Anbieter werden keine Audios heruntergeladen oder versendet.
+  if (s && !running && PROVIDER === 'openai') {
     running = true
     loop().catch((e) => {
       running = false
@@ -48,7 +49,7 @@ export function setTranscriberSocket(s: WASocket | null) {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 async function loop() {
-  log.info({ lang: LANG, provider: PROVIDER, model: PROVIDER === 'openai' ? OPENAI_MODEL : 'whisper.cpp' }, 'Transkription aktiv')
+  log.info({ lang: LANG, provider: PROVIDER, model: OPENAI_MODEL }, 'Transkription aktiv')
   for (;;) {
     if (!sock) {
       await sleep(IDLE_MS)
@@ -111,54 +112,37 @@ async function transcribeOne(job: { chat_jid: string; id: string; raw: unknown; 
     sleep(45_000).then(() => Promise.reject(new Error('Download-Timeout (Handy hat die Datei nicht neu hochgeladen)'))),
   ])
 
-  let text: string | undefined
-  if (PROVIDER === 'openai') {
-    const send = async (data: Buffer, type: string, name: string): Promise<Response> => {
-      const fd = new FormData()
-      fd.append('file', new Blob([new Uint8Array(data)], { type }), name)
-      fd.append('model', OPENAI_MODEL)
-      fd.append('response_format', 'json')
-      if (LANG !== 'auto') fd.append('language', LANG)
-      try {
-        return await fetch('https://api.openai.com/v1/audio/transcriptions', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${OPENAI_KEY}` },
-          body: fd,
-          signal: AbortSignal.timeout(120_000),
-        })
-      } catch (e) {
-        throw Object.assign(new Error(`OpenAI nicht erreichbar: ${(e as Error).message}`), { transient: true })
-      }
-    }
-    let res = await send(buf, 'audio/ogg', 'voice.ogg')
-    if (res.status === 400) {
-      // Original abgelehnt: einmal mit ffmpeg neu kodieren (ungewöhnliche Container, abgeschnittene Dateien)
-      try {
-        res = await send(await toMp3(buf), 'audio/mpeg', 'voice.mp3')
-      } catch {
-        /* bleibt beim ursprünglichen 400 */
-      }
-    }
-    if (!res.ok) {
-      const detail = (await res.text()).slice(0, 200)
-      throw Object.assign(new Error(`OpenAI HTTP ${res.status}: ${detail}`), { transient: res.status === 429 || res.status >= 500 || res.status === 401 || res.status === 403 })
-    }
-    text = ((await res.json()) as { text?: string }).text
-  } else {
+  const send = async (data: Buffer, type: string, name: string): Promise<Response> => {
     const fd = new FormData()
-    fd.append('file', new Blob([new Uint8Array(buf)], { type: 'audio/ogg' }), 'voice.ogg')
+    fd.append('file', new Blob([new Uint8Array(data)], { type }), name)
+    fd.append('model', OPENAI_MODEL)
     fd.append('response_format', 'json')
-    fd.append('language', LANG)
-    fd.append('temperature', '0')
-    let res: Response
+    if (LANG !== 'auto') fd.append('language', LANG)
     try {
-      res = await fetch(`${WHISPER_URL}/inference`, { method: 'POST', body: fd, signal: AbortSignal.timeout(20 * 60_000) })
+      return await fetch(`${(process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1').replace(/\/+$/, '')}/audio/transcriptions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${OPENAI_KEY}` },
+        body: fd,
+        signal: AbortSignal.timeout(120_000),
+      })
     } catch (e) {
-      throw Object.assign(new Error(`lokaler Whisper nicht erreichbar: ${(e as Error).message}`), { transient: true })
+      throw Object.assign(new Error(`OpenAI nicht erreichbar: ${(e as Error).message}`), { transient: true })
     }
-    if (!res.ok) throw new Error(`whisper HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
-    text = ((await res.json()) as { text?: string }).text
   }
+  let res = await send(buf, 'audio/ogg', 'voice.ogg')
+  if (res.status === 400) {
+    // Original abgelehnt: einmal mit ffmpeg neu kodieren (ungewöhnliche Container, abgeschnittene Dateien)
+    try {
+      res = await send(await toMp3(buf), 'audio/mpeg', 'voice.mp3')
+    } catch {
+      /* bleibt beim ursprünglichen 400 */
+    }
+  }
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 200)
+    throw Object.assign(new Error(`OpenAI HTTP ${res.status}: ${detail}`), { transient: res.status === 429 || res.status >= 500 || res.status === 401 || res.status === 403 })
+  }
+  const text = ((await res.json()) as { text?: string }).text
   const clean = (text ?? '').replace(/\[[A-Z_ ]+\]/g, '').replace(/\s+/g, ' ').trim()
 
   // Rohdaten (Schlüssel für den Download) werden nach Erfolg nicht mehr gebraucht

@@ -49,19 +49,6 @@ services:
       retries: 20
     networks: [internal]
 
-  # Lokale Transkription (nur Fallback ohne OPENAI_API_KEY; auf einem Pi 4 sehr langsam). Start mit COMPOSE_PROFILES=local-whisper
-  whisper:
-    profiles: ["local-whisper"]
-    build:
-      context: ./whisper
-      args:
-        MODEL: ${WHISPER_MODEL:-small}
-    restart: unless-stopped
-    logging: *logging
-    mem_limit: 1500m
-    cpus: 1.5   # Pi 4 ohne Lüfter wird bei Volllast >80 °C heiß und drosselt; lieber langsamer und kühl
-    networks: [internal]
-
   # Berechnet Embeddings (multilingual-e5-small) für die Bedeutungssuche; füllt fehlende Vektoren im Hintergrund auf
   embedder:
     build: ./embedder
@@ -101,7 +88,6 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://jarvis:${POSTGRES_PASSWORD:-}@postgres:5432/jarvis
-      WHISPER_URL: http://whisper:8080
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       TRANSCRIBE_PROVIDER: ${TRANSCRIBE_PROVIDER:-}
       OPENAI_TRANSCRIBE_MODEL: ${OPENAI_TRANSCRIBE_MODEL:-gpt-4o-mini-transcribe}
@@ -113,7 +99,7 @@ services:
       MAX_AUDIO_SECONDS: ${MAX_AUDIO_SECONDS:-600}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       BAILEYS_LOG_LEVEL: ${BAILEYS_LOG_LEVEL:-warn}
-      WHISPER_LANG: ${WHISPER_LANG:-de}
+      TRANSCRIBE_LANG: ${TRANSCRIBE_LANG:-de}
       TRANSCRIBE_MAX_AGE_DAYS: ${TRANSCRIBE_MAX_AGE_DAYS:-}
       AUTH_DIR: /data/auth
       WA_PAIRING_PHONE: ${WA_PAIRING_PHONE:-}
@@ -140,10 +126,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # Nur auf dem Pi selbst erreichbar (Loopback), nicht im Heimnetz. Der Cloudflare-Tunnel des Pi greift hier zu: http://localhost:3000
-    ports:
-      - "127.0.0.1:3000:3000"
+    # Nur im Docker-Netz. Der gemeinsame Web-Einstieg vermittelt API und MCP.
     environment:
+      ASSISTANT_NAME: ${ASSISTANT_NAME:-Jarvis}
+      ADMIN_AUTH_URL: http://admin:8083
       OWNER_NAME: ${OWNER_NAME:-}
       DATABASE_URL: postgres://mcp_ro:${MCP_RO_PASSWORD:-}@postgres:5432/jarvis
       # nur INSERT/SELECT auf die outbox (gleiches Passwort wie mcp_ro, siehe db/init/002_roles.sh)
@@ -236,21 +222,18 @@ services:
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
     depends_on:
-      - mcp-server
+      - app-web
     networks: [internal]
 
-  # Weboberfläche für Einrichtung und Einstellungen. Start: docker compose up -d admin, dann http://<adresse-des-pi>:8080
-  # Steuert Docker über den Socket (entspricht Root auf dem Pi): nur im Heimnetz, nie über den Tunnel veröffentlichen.
+  # Verwaltung mit Docker-Zugriff. Kein eigener Host-Port; geschützt über app-web erreichbar.
   admin:
     build: ./admin
     restart: unless-stopped
     logging: *logging
     mem_limit: 192m
     security_opt: ["no-new-privileges:true"]
-    ports:
-      - "${ADMIN_BIND:-0.0.0.0}:${ADMIN_PORT:-8080}:8080"
     environment:
-      ADMIN_PUBLIC_PORT: ${ADMIN_PORT:-8080}
+      APP_WEB_PORT: ${APP_WEB_PORT:-8081}
       TZ: Europe/Berlin
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -264,6 +247,19 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    networks: [internal]
+
+  # Expo web app. Same-origin proxy keeps the app API and home-network admin API reachable.
+  app-web:
+    build:
+      context: .
+      dockerfile: app/Dockerfile.web
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "${APP_WEB_BIND:-0.0.0.0}:${APP_WEB_PORT:-8081}:8080"
+    depends_on:
+      - admin
     networks: [internal]
 
 volumes:

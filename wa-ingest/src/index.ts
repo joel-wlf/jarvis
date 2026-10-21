@@ -35,6 +35,7 @@ const log = pino({ level: process.env.LOG_LEVEL ?? 'info' })
 
 let groupTimer: NodeJS.Timeout | undefined
 let beatTimer: NodeJS.Timeout | undefined
+let loggedOutTimer: NodeJS.Timeout | undefined
 
 // Verknüpfungsstatus für die Admin-Oberfläche (QR/Kopplungscode im Browser). Atomar geschrieben, Fehler sind egal.
 const STATUS_FILE = process.env.WA_STATUS_FILE ?? '/data/status/link.json'
@@ -80,6 +81,7 @@ async function syncGroups(sock: ReturnType<typeof makeWASocket>) {
 }
 
 async function start() {
+  clearInterval(loggedOutTimer)
   writeLinkStatus({ state: 'starting' })
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
   const { version } = await fetchLatestBaileysVersion()
@@ -101,6 +103,7 @@ async function start() {
   })
 
   let pairingRequested = false
+  let closed = false
   sock.ev.on('creds.update', saveCreds)
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
@@ -137,16 +140,23 @@ async function start() {
       groupTimer = setInterval(() => void syncGroups(sock), 6 * 3_600_000)
     }
     if (connection === 'close') {
-      const code = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode
-      if (code === DisconnectReason.loggedOut) {
-        writeLinkStatus({ state: 'logged_out' })
-        log.error('Abgemeldet. Volume wa-auth löschen (docker compose down; docker volume rm jarvis_wa-auth) und neu verknüpfen.')
-        process.exit(1)
-      }
+      if (closed) return
+      closed = true
+      clearInterval(groupTimer)
       setTranscriberSocket(null)
       setActionSocket(null)
       setImageSocket(null)
       await setWaStatus(false)
+      const code = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode
+      if (code === DisconnectReason.loggedOut) {
+        const status: LinkState = { state: 'logged_out', error: 'WhatsApp hat die Verknüpfung aufgehoben. Bitte verbinde dein Handy erneut unter Verbindungen → WhatsApp.' }
+        writeLinkStatus(status)
+        log.warn('WhatsApp hat die Verknüpfung aufgehoben. Warte auf erneute Verknüpfung über die Oberfläche.')
+        // Stay available with an explicit actionable state. Exiting here causes
+        // restart: unless-stopped to retry the same revoked credentials forever.
+        loggedOutTimer = setInterval(() => writeLinkStatus(status), 30_000)
+        return
+      }
       writeLinkStatus({ state: 'closed', error: (lastDisconnect?.error as Error | undefined)?.message })
       log.warn({ code, reason: (lastDisconnect?.error as Error | undefined)?.message }, 'Verbindung getrennt, starte neu ...')
       setTimeout(() => start().catch(fatal), 3000)

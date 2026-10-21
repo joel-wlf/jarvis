@@ -48,6 +48,7 @@ test('Ersteinrichtung: .env wird angelegt, Dienste starten', async () => {
   assert.match(env.MCP_TOKEN, /^[0-9a-f]{64}$/)
   assert.equal(docker.svcs.get('mcp-server')?.state, 'running')
   assert.ok(!docker.calls.some((c) => c.includes('admin') && c[1] === 'up'), 'admin darf sich nicht selbst neu starten')
+  assert.ok(docker.calls.filter((c) => c[0] === 'compose' && c[1] === 'up').every((c) => c.includes('--no-deps')), 'app-web darf admin auch nicht als Abhängigkeit neu starten')
 })
 
 test('ungültige Änderung: nichts wird geschrieben, kein Vorgang', async () => {
@@ -145,4 +146,13 @@ test('Neu verknüpfen löscht nur die WhatsApp-Sitzung', async () => {
   assert.ok(!docker.volumes.has('jarvis_wa-auth'))
   assert.ok(docker.volumes.has('jarvis_pgdata'))
   assert.equal(readCurrent(ctx).env.WA_PAIRING_PHONE, '4915112345678')
+})
+
+test('setup retry cannot report success while a previously broken service is still broken', async () => {
+  const { ctx, docker } = setup({ ...base })
+  docker.svcs.get('mcp-server')!.state = 'restarting'
+  docker.failWith = () => ['mcp-server']
+  const job = await run(ctx, startApply(ctx, {}, { verifyAll: true }))
+  assert.notEqual(job.status, 'ok')
+  assert.ok(job.lines.some((line) => line.level === 'error' && line.msg.includes('mcp-server')))
 })

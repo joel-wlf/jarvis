@@ -12,10 +12,10 @@ export interface Check {
 export const MANAGED_PROFILES = ['tunnel', 'organizer', 'local-whisper'] as const
 
 /** Wie Sprachnachrichten tatsächlich transkribiert werden (gleiche Logik wie wa-ingest/src/transcribe.ts). */
-export function transcribeMode(env: Env): 'openai' | 'local' | 'off' {
+export function transcribeMode(env: Env): 'openai' | 'off' {
   const p = effective(env, 'TRANSCRIBE_PROVIDER')
-  if (p === 'openai' || p === 'local' || p === 'off') return p
-  return env.OPENAI_API_KEY ? 'openai' : 'local'
+  if (p && p !== 'openai') return 'off'
+  return env.OPENAI_API_KEY ? 'openai' : 'off'
 }
 
 /** Leitet COMPOSE_PROFILES aus den Einstellungen ab, damit Profil und Schalter nie auseinanderlaufen. */
@@ -27,7 +27,6 @@ export function deriveProfiles(env: Env): string {
   const p: string[] = []
   if (env.CLOUDFLARE_TUNNEL_TOKEN) p.push('tunnel')
   if (effective(env, 'ORGANIZER_ENABLED') === 'true') p.push('organizer')
-  if (transcribeMode(env) === 'local') p.push('local-whisper')
   return [...new Set([...p, ...keep])].join(',')
 }
 
@@ -67,8 +66,6 @@ export function crossChecks(env: Env, prev?: Env): Check[] {
     c.push({ level: 'warn', message: 'Schwärzen ist aus: Telefonnummern, IBANs und E-Mails gehen im Klartext an die KI.', keys: ['ORGANIZER_REDACT'] })
   if (on('IMAGE_DESCRIBE') && !key)
     c.push({ level: 'info', message: 'Bildbeschreibung ist an, wirkt aber erst mit OpenAI-Schlüssel.', keys: ['IMAGE_DESCRIBE'] })
-  if (transcribeMode(env) === 'local')
-    c.push({ level: 'info', message: 'Sprachnachrichten werden lokal transkribiert: whisper läuft mit (langsam, ~1,5 GB RAM).', keys: ['TRANSCRIBE_PROVIDER'] })
   if (Number(effective(env, 'MAX_ACTIONS_PER_HOUR')) > 60)
     c.push({ level: 'warn', message: 'Mehr als 60 Aktionen pro Stunde erhöhen das Risiko einer WhatsApp-Sperre.', keys: ['MAX_ACTIONS_PER_HOUR'] })
   if (on('ENABLE_ACTIONS') && !on('REQUIRE_CONFIRM'))
@@ -84,8 +81,6 @@ export function crossChecks(env: Env, prev?: Env): Check[] {
       (effectiveEmbed(env) === 'openai' && effective(prev, 'OPENAI_EMBED_MODEL') !== effective(env, 'OPENAI_EMBED_MODEL'))
     if (embedChanged)
       c.push({ level: 'warn', message: 'Embedding-Anbieter oder -Modell ändert sich: alle Vektoren werden neu berechnet (dauert, kostet bei OpenAI).', keys: ['EMBED_PROVIDER', 'OPENAI_EMBED_MODEL'] })
-    if (prev.WHISPER_MODEL !== env.WHISPER_MODEL && transcribeMode(env) === 'local')
-      c.push({ level: 'info', message: 'Anderes Whisper-Modell: whisper wird neu gebaut (kann auf dem Pi lange dauern).', keys: ['WHISPER_MODEL'] })
     if (prev.MCP_TOKEN && prev.MCP_TOKEN !== env.MCP_TOKEN)
       c.push({ level: 'warn', message: 'Neuer MCP-Token: Den Connector in Claude mit der neuen URL neu einrichten.', keys: ['MCP_TOKEN'] })
   }

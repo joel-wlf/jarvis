@@ -1,12 +1,14 @@
 // Connect: pair with a Jarvis server by scanning its QR code, or by address and owner password.
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
+import { useRouter } from 'expo-router'
+import { createHttpAdmin } from '@/api/admin'
 import * as Device from 'expo-device'
 import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { API_VERSION, type ServerInfo } from '@jarvis/contract'
-import { fetchInfo, login, pair } from '@/api/client'
+import { fetchInfo, login } from '@/api/client'
 import { JarvisError, normalizeUrl } from '@/api/http'
 import { parsePairing } from '@/api/pairing'
 import { JarvisFigure } from '@/components/jarvis/JarvisFigure'
@@ -21,10 +23,12 @@ const deviceName = () => Device.deviceName ?? Device.modelName ?? (platform === 
 
 export default function Connect() {
   const { t } = useTranslation()
+  const router = useRouter()
+  const webOrigin = platform === 'web' && typeof window !== 'undefined' ? window.location.origin : undefined
   const { signIn } = useSession()
   const insets = useSafeAreaInsets()
   const [mode, setMode] = useState<'scan' | 'manual'>(platform === 'web' ? 'manual' : 'scan')
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState(webOrigin ?? '')
   const [password, setPassword] = useState('')
   const [info, setInfo] = useState<ServerInfo | null>(null)
   const [busy, setBusy] = useState<'check' | 'connect' | 'pair' | null>(null)
@@ -33,6 +37,7 @@ export default function Connect() {
   const scanned = useRef(false)
 
   const checkServer = async (base: string): Promise<ServerInfo> => {
+    if (!parsePairing(base)) throw new Error('Bitte gib eine Server-Adresse ohne Pfad ein. Öffentliche Adressen benötigen HTTPS.')
     let i: ServerInfo
     try {
       i = await fetchInfo(base)
@@ -70,6 +75,7 @@ export default function Connect() {
     try {
       const base = normalizeUrl(url)
       const r = await login(base, { password, deviceName: deviceName(), platform })
+      setPassword('')
       await signIn({ mode: 'live', baseUrl: base, token: r.token, deviceId: r.deviceId, ownerName: r.ownerName ?? info.ownerName })
     } catch (e) {
       fail(e)
@@ -89,14 +95,37 @@ export default function Connect() {
     setError(null)
     try {
       const i = await checkServer(p.url)
-      const r = await pair(p.url, { code: p.code, deviceName: deviceName(), platform })
-      await signIn({ mode: 'live', baseUrl: p.url, token: r.token, deviceId: r.deviceId, homeUrl: p.homeUrl, ownerName: r.ownerName ?? i.ownerName })
+      setUrl(p.url)
+      setInfo(i)
+      setMode('manual')
+      setBusy(null)
+      scanned.current = false
     } catch (e) {
       fail(e)
       scanned.current = false
       setBusy(null)
     }
   }
+
+  useEffect(() => {
+    if (!webOrigin) return
+    let alive = true
+    const load = async () => {
+      setBusy('check')
+      try {
+        const state = await createHttpAdmin(webOrigin).state()
+        if (!alive) return
+        if (!state.initialized || state.setupComplete === false) { router.replace('/setup'); return }
+        const i = await checkServer(webOrigin)
+        if (alive) setInfo(i)
+      } catch (e) { if (alive) fail(e) }
+      finally { if (alive) setBusy(null) }
+    }
+    void load()
+    return () => { alive = false }
+    // The browser's origin is the server; never ask its owner to type it again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webOrigin])
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -107,17 +136,17 @@ export default function Connect() {
           </View>
           <View style={{ gap: 8 }}>
             <Text style={type.h1} accessibilityRole="header">
-              {t('connect.title')}
+              {webOrigin ? (info?.assistantName || 'Jarvis') : t('connect.title')}
             </Text>
-            <Text style={[type.body, { fontSize: 15.5, lineHeight: 22 }]}>{t('connect.lead')}</Text>
+            <Text style={[type.body, { fontSize: 15.5, lineHeight: 22 }]}>{webOrigin ? 'Melde dich mit deinem Passwort an.' : 'Server-Adresse eingeben oder QR-Code scannen. Danach meldest du dich mit deinem Passwort an.'}</Text>
           </View>
 
-          <Seg
+          {!webOrigin ? <Seg
             items={[
               { key: 'scan', label: t('connect.scan'), on: mode === 'scan', onPress: () => setMode('scan') },
               { key: 'manual', label: t('connect.manual'), on: mode === 'manual', onPress: () => setMode('manual') },
             ]}
-          />
+          /> : null}
 
           {mode === 'scan' ? (
             <View style={{ gap: 14 }}>
@@ -137,7 +166,7 @@ export default function Connect() {
             </View>
           ) : (
             <View style={{ gap: 16 }}>
-              <Field
+              {!webOrigin ? <Field
                 label={t('connect.url')}
                 help={t('connect.urlHelp')}
                 value={url}
@@ -152,11 +181,11 @@ export default function Connect() {
                 inputMode="url"
                 onSubmitEditing={() => void check()}
                 returnKeyType="next"
-              />
-              {!info ? <BlockButton label={busy === 'check' ? t('connect.checking') : t('connect.check')} busy={busy === 'check'} disabled={!url.trim()} onPress={() => void check()} /> : null}
+              /> : null}
+              {!info ? <BlockButton label={busy === 'check' ? t('connect.checking') : webOrigin ? 'Erneut verbinden' : t('connect.check')} busy={busy === 'check'} disabled={!url.trim()} onPress={() => void check()} /> : null}
               {info ? (
                 <View style={{ gap: 16 }}>
-                  <Notice level="ok" text={info.ownerName ? t('connect.foundOwner', { name: info.ownerName, version: info.version }) : t('connect.found', { version: info.version })} />
+                  <Notice level="ok" text={info.assistantName ? `${info.assistantName} ist erreichbar.` : t('connect.found', { version: info.version })} />
                   {info.passwordLogin ? (
                     <>
                       <Field
@@ -183,10 +212,10 @@ export default function Connect() {
 
           {error ? <Notice level="error" text={error} /> : null}
 
-          <View style={st.demo}>
+          {process.env.EXPO_PUBLIC_JARVIS_MOCK === '1' ? <View style={st.demo}>
             <BlockButton label={t('connect.demo')} variant="line" onPress={() => void signIn({ mode: 'mock' })} />
             <Text style={type.small}>{t('connect.demoHelp')}</Text>
-          </View>
+          </View> : null}
           <View style={{ gap: 6 }}>
             <Micro>{t('connect.privateLabel')}</Micro>
             <Text style={type.small}>{t('connect.private')}</Text>

@@ -1,6 +1,7 @@
 // OAuth 2.1 authorization server for MCP clients (Claude connectors) and the app, backed by Postgres.
 // The MCP SDK (mcpAuthRouter) handles discovery, registration, PKCE checks and request validation;
 // this provider stores clients, codes and tokens (hashed) and renders the owner's consent page.
+import { ownerState, unifiedAuth } from './owner-auth.js'
 import { randomUUID } from 'node:crypto'
 import express, { type Response } from 'express'
 import type { OAuthRegisteredClientsStore } from '@modelcontextprotocol/sdk/server/auth/clients.js'
@@ -107,7 +108,7 @@ export class PgOAuthProvider implements OAuthServerProvider {
       const page = (error: 'password' | 'blocked') =>
         res.status(error === 'blocked' ? 429 : 401).type('html').send(renderAuthorizePage({ lang: l, requestId: String(req.body.request_id), clientName: p.clientName, hasPassword: true, error }))
       if (this.limiter.isBlocked(ip)) return void page('blocked')
-      if (!(await checkOwnerPassword(String(req.body?.password ?? '')))) {
+      if (!(await checkOwnerPassword(String(req.body?.password ?? ''), clientIp(req)))) {
         this.limiter.recordFail(ip)
         return void page(this.limiter.isBlocked(ip) ? 'blocked' : 'password')
       }
@@ -125,6 +126,7 @@ export class PgOAuthProvider implements OAuthServerProvider {
   }
 
   async challengeForAuthorizationCode(client: OAuthClientInformationFull, code: string): Promise<string> {
+    if (unifiedAuth() && !(await ownerState()).configured) throw new InvalidTokenError('Owner access was reset')
     const r = await memDb.query<{ code_challenge: string }>(
       `SELECT code_challenge FROM oauth_codes WHERE code_hash = $1 AND client_id = $2 AND used_at IS NULL AND expires_at > now()`,
       [sha256(code), client.client_id],
@@ -134,6 +136,7 @@ export class PgOAuthProvider implements OAuthServerProvider {
   }
 
   async exchangeAuthorizationCode(client: OAuthClientInformationFull, code: string, _verifier?: string, redirectUri?: string, resource?: URL): Promise<OAuthTokens> {
+    if (unifiedAuth() && !(await ownerState()).configured) throw new InvalidTokenError('Owner access was reset')
     this.checkResource(resource)
     const r = await memDb.query<{ redirect_uri: string; scopes: string[]; resource: string | null }>(
       `UPDATE oauth_codes SET used_at = now() WHERE code_hash = $1 AND client_id = $2 AND used_at IS NULL AND expires_at > now()
@@ -166,6 +169,7 @@ export class PgOAuthProvider implements OAuthServerProvider {
   }
 
   async exchangeRefreshToken(client: OAuthClientInformationFull, refreshToken: string, scopes?: string[], resource?: URL): Promise<OAuthTokens> {
+    if (unifiedAuth() && !(await ownerState()).configured) throw new InvalidTokenError('Owner access was reset')
     this.checkResource(resource)
     const r = await memDb.query<TokenRow>(
       `SELECT t.id, t.client_id, t.scopes, t.resource, t.access_expires_at, t.refresh_expires_at FROM oauth_tokens t
@@ -182,6 +186,7 @@ export class PgOAuthProvider implements OAuthServerProvider {
   }
 
   async verifyAccessToken(token: string): Promise<AuthInfo> {
+    if (unifiedAuth() && !(await ownerState()).configured) throw new InvalidTokenError('Owner access was reset')
     const r = await memDb.query<TokenRow>(
       `SELECT t.id, t.client_id, t.scopes, t.resource, t.access_expires_at FROM oauth_tokens t
        JOIN oauth_clients c ON c.client_id = t.client_id AND c.revoked_at IS NULL

@@ -8,7 +8,7 @@ Jarvis ist als persönlicher Kontext-Manager gedacht: ein privates System, das �
 - **Auswertung** (`embedder`, `organizer`) ist quellenunabhängig: Vektoren, Threads, Topics, Personenprofile.
 - **Zugriff** (`mcp-server`, Watch, Zentrale-Seite) arbeitet auf dem gemeinsamen Datenmodell, nicht auf einer Quelle.
 
-Alle Daten bleiben auf deinem Gerät (Raspberry Pi). Nur die KI-Schritte (Embeddings, Transkription, Bildbeschreibung, Sortierung) gehen an die OpenAI-API.
+Dein Archiv liegt auf deinem eigenen Linux-Rechner (auch Raspberry Pi). Externe KI-Aufrufe bleiben bei der Einrichtung zunächst ausgeschaltet. Aktivierst du sie, werden je nach Funktion Texte, Audios oder Bilder an den gewählten Anbieter übertragen.
 
 ## Überblick (aktueller Stand mit WhatsApp)
 
@@ -22,61 +22,82 @@ WhatsApp ──QR──> wa-ingest ──> postgres (pgvector) <── mcp-serve
 | `wa-ingest` | Baileys-Client. Verknüpfung per QR, importiert Verlauf, speichert neue Nachrichten live, transkribiert Sprachnachrichten und führt Aktionen (senden, abstimmen, reagieren) aus der Tabelle `outbox` aus. |
 | `embedder` | Berechnet Embeddings (multilingual-e5-small, 384 Dimensionen) für die Bedeutungssuche. Füllt fehlende Vektoren im Hintergrund auf (neueste Nachrichten zuerst). |
 | `organizer` | Optional (Profil `organizer`). Sortiert Nachrichten per OpenAI-API zu Themen („Threads“) mit Zusammenfassung, Termin- und Aufgaben-Vorschlägen. Standardmäßig aus. |
-| `whisper` | whisper.cpp (CPU) für die Transkription von Sprachnachrichten. Das Audio wird nicht gespeichert. |
 | `mcp-server` | MCP (Streamable HTTP) mit Read-only-DB-Zugang und Suchtools. |
 | `cloudflared` | Cloudflare Tunnel, macht den MCP-Server von außen erreichbar. |
-| `admin` | Weboberfläche für Einrichtung, Einstellungen, Status, Logs und Wartung (Port 8080, nur Heimnetz). |
+| `admin` | Passwortinstanz, Einrichtung, Einstellungen, Status, Logs und Wartung; nur intern erreichbar. |
+| `app-web` | Gemeinsamer Einstieg auf Port 8081: Expo-Weboberfläche, App-API, Verwaltung und MCP. |
 
-## Einrichtung auf dem Pi
+## Installation auf Linux
 
-Voraussetzung: Docker + Docker Compose auf dem Pi (64-bit OS), idealerweise Daten auf SSD.
-
-### Mit der Weboberfläche (empfohlen)
+### Mit dem GitHub-Installationsskript
 
 ```bash
-git clone https://github.com/joel-wlf/jarvis.git ~/jarvis && cd ~/jarvis
-docker compose up -d admin
-docker compose logs admin        # zeigt den Einrichtungscode
+curl -fsSL https://raw.githubusercontent.com/joel-wlf/jarvis/main/install.sh -o install-jarvis.sh
+bash install-jarvis.sh
 ```
 
-Dann im Browser `http://<adresse-des-pi>:8080` öffnen, den Einrichtungscode eingeben und ein Admin-Passwort festlegen. Der Assistent fragt Name, OpenAI-Schlüssel (optional, mit Live-Test), Datenschutz-Ausschlüsse, Funktionen und Cloudflare-Tunnel ab, erzeugt alle Passwörter und den MCP-Token selbst, baut und startet die Dienste und zeigt danach den **WhatsApp-QR-Code direkt im Browser** (oder einen Kopplungscode per Telefonnummer). Am Ende steht die Connector-URL zum Kopieren bereit.
+Das Skript prüft Docker und Compose. Auf Debian/Ubuntu bietet es die Installation von Docker nach ausdrücklicher Auswahl an. Es löst die gewählte GitHub-Version auf einen festen Commit auf, lädt die Quellen einschließlich Compose-YAML und startet den Browser-Assistenten. Ohne Desktop zeigt es die Adresse für einen anderen Rechner im Heimnetz. Optionen: `--version <Tag-oder-Commit>`, `--dir <Ordner>`, `--port <Port>`; Standard: `~/jarvis` und Port `8081`. Vorhandene Installationen werden fortgesetzt und nicht überschrieben.
 
-Danach ist die Oberfläche die Zentrale für alles Weitere:
+### Direkt mit Docker Compose
 
-| Bereich | Was geht |
-|---|---|
-| Übersicht | Zustand aller Dienste, WhatsApp-Verbindung, Archiv-Kennzahlen, freier Speicher, Warnungen, Connector-URL |
-| Einstellungen | Alle Einstellungen aus `.env` in Gruppen, mit Suche, Experten-Modus, Prüfung während der Eingabe, Vorschau der Unterschiede und betroffenen Dienste |
-| WhatsApp | QR-Code/Kopplungscode live, neu verknüpfen (das Archiv bleibt erhalten) |
-| Logs | Logs je Dienst, live, mit geschwärzten Geheimnissen |
-| Wartung | Dienste neu starten, nach `git pull` neu bauen, Kostenschätzung der Themen-Sortierung, MCP-Token und Datenbank-Passwörter wechseln, Admin-Passwort ändern, Protokolle früherer Vorgänge |
-| Versionen | Jede frühere `.env` (die letzten 30), Unterschiede ansehen und wiederherstellen |
+Voraussetzung: Git, Docker Engine und das Compose-Plugin; 64-bit Linux, vorzugsweise mit SSD.
 
-**So schützt die Oberfläche vor Fehlern:** Jede Änderung wird erst geprüft (Format, Grenzen, Abhängigkeiten wie „Themen-Sortierung braucht einen Schlüssel"), dann von Docker Compose gegengeprüft, bevor irgendetwas geschrieben wird. Die alte `.env` wird gesichert, die neue atomar geschrieben (ein Stromausfall hinterlässt nie eine halbe Datei). Danach startet Compose nur die betroffenen Dienste neu, und die Oberfläche wartet, bis alle stabil laufen und sich an der Datenbank anmelden können. Klappt das nicht, stellt sie den vorherigen Stand automatisch wieder her. Docker-Profile (`tunnel`, `organizer`, `local-whisper`) setzt sie passend zu den Schaltern; Datenbank-Passwörter lassen sich nur über „Wechseln" ändern, das die Datenbank mit umstellt. Es läuft immer nur ein Vorgang gleichzeitig; schließt du den Browser, läuft er weiter.
-
-**Sicherheit der Oberfläche:** Sie steuert Docker über den Docker-Socket und hat damit Root-Rechte auf dem Pi. Deshalb: nur im Heimnetz erreichbar (nie über den Cloudflare-Tunnel veröffentlichen), Erstzugang nur mit dem Einrichtungscode aus dem Log, danach Passwort (scrypt), Sperre nach 10 Fehlversuchen, Geheimnisse gehen nie im Klartext an den Browser (Anzeigen nur mit erneuter Passwort-Eingabe). Nur auf dem Pi selbst: unter Einstellungen → Oberfläche „Erreichbar über" auf `127.0.0.1` setzen und per `ssh -L 8080:localhost:8080 <pi>` zugreifen. Passwort vergessen: `docker compose exec admin node dist/src/cli.js reset-password`. Wer die Oberfläche nicht braucht: `docker compose stop admin`.
-
-Mit verschlüsseltem Tresor (siehe unten) zeigt `.env` auf `/srv/vault/secrets/.env`; dafür muss `JARVIS_SECRETS_DIR=/srv/vault/secrets` in `.env` stehen (das Tresor-Skript trägt es ein, die Oberfläche nennt sonst den genauen Befehl).
-
-### Von Hand
-
-1. `cp .env.example .env`, Pflichtwerte eintragen (Zufallswerte mit `openssl rand -hex 24`) und `OWNER_NAME` setzen. Alle Einstellungen sind in `.env.example` beschrieben.
-2. **Cloudflare Tunnel** anlegen: Zero Trust → Networks → Tunnels → *Create* (Cloudflared). Token in `.env` als `CLOUDFLARE_TUNNEL_TOKEN`, dazu `COMPOSE_PROFILES=tunnel`. Public Hostname z.B. `jarvis.deine-domain.de` → Service `http://mcp-server:3000`.
-3. Starten: `docker compose up -d --build`
-4. **WhatsApp verknüpfen**: `docker compose logs -f wa-ingest` → QR-Code erscheint im Log. Am Handy: WhatsApp → Einstellungen → Verknüpfte Geräte → Gerät hinzufügen → scannen.
-   Danach schickt das Handy den Verlauf in Batches (Log: „History-Batch importiert"). Das kann einige Minuten dauern; das Handy sollte dabei online und die App geöffnet sein.
-5. Prüfen: `docker compose exec postgres psql -U jarvis -c "select count(*) from messages"`
-
-## MCP in Claude eintragen
-
-URL des Connectors (Token steckt im Pfad, weil Connector-Oberflächen oft keine Header erlauben):
-
-```
-https://jarvis.deine-domain.de/t/<MCP_TOKEN>/mcp
+```bash
+git clone https://github.com/joel-wlf/jarvis.git ~/jarvis
+cd ~/jarvis
+docker compose up -d --build admin app-web
+docker compose logs admin
 ```
 
-Clients mit Header-Support können stattdessen `https://jarvis.deine-domain.de/mcp` mit `Authorization: Bearer <MCP_TOKEN>` nutzen.
-Diese URL ist geheim – wer sie hat, kann alle Chats lesen. Empfehlung: in Cloudflare Access zusätzlich absichern, falls dein Client das unterstützt.
+Öffne `http://<server-ip>:8081` (am Server selbst `http://localhost:8081`). Das ist derselbe Assistent wie beim Installationsskript. Du brauchst weder eine vorbereitete `.env` noch laufende Datenbankdienste.
+
+### Der gemeinsame Assistent
+
+**Benennen → Passwort → Quelle → WhatsApp → Einstellungen → Fernzugriff → Fertig**
+
+- Gib dem Assistenten einen Namen (Standard: Jarvis). Dein eigener Name ist eine separate Einstellung.
+- Lege beim ersten Öffnen dein eigenes Passwort mit 15–200 Zeichen fest. Ein Einrichtungscode ist nicht nötig. Wer das Passwort zuerst festlegt, wird Besitzer. Es gilt für Web, Mobile, Verwaltung und die MCP-Anmeldung. Es gibt genau einen Besitzer, ohne Benutzername oder E-Mail.
+- Wähle WhatsApp oder „Später verbinden“. Vor der Kopplung erscheinen Hinweise zur inoffiziellen Anbindung und Archivierung.
+- Jarvis erzeugt die technischen Geheimnisse und startet die Basisdienste. Der WhatsApp-QR erscheint im Browser. Am Handy: WhatsApp → Verknüpfte Geräte → Gerät hinzufügen. Alternativ steht die Kopplung per Telefonnummer bereit.
+- Externe KI ist optional. Konfiguriere vor dem Aktivieren Datenschutz-Ausschlüsse und die Verarbeitung von Sprache, Bildern, Suche und Themen. Hinweise erklären Datenübertragung und API-Kosten. Ausschlüsse für Suche/Themen gelten nicht automatisch für Sprache und Bilder.
+- Fernzugriff ist optional: Heimnetz, Cloudflare-Walkthrough oder vorhandene HTTPS-Adresse. Für einen Tunnel lautet das Dienstziel **`http://app-web:8084`**. Dieser Listener ist nur im Docker-Netz erreichbar. Die öffentliche Adresse muss auf diesen Jarvis-Server zeigen; das wird geprüft.
+- Zum Schluss erscheinen die Server-Adresse und ein **QR-Code nur mit dieser Adresse** sowie der MCP-Anschluss für Claude und andere KI-Clients.
+
+Bestätigte Schritte und nicht geheime Eingaben bleiben nach Browser-Schließen oder Neustart gespeichert. Gleichzeitige Änderungen aus mehreren Fenstern werden abgewiesen. Technische Änderungen nutzen weiterhin die Compose-Prüfung, Sicherungen und automatischen Rollback. Ein fehlgeschlagener Erststart kann mit denselben generierten Datenbank-Passwörtern wiederholt werden.
+
+### Web und Mobile
+
+Im Browser kennt die Anwendung ihren Server bereits und fragt bei einer eingerichteten Installation direkt nach dem Passwort. Die Mobile App nimmt zuerst die Server-Adresse entgegen, per Eingabe oder Scan, und fragt danach dasselbe Passwort ab. Der QR-Code enthält kein Passwort und keinen Anmeldetoken; auch alte Kopplungs-QRs ersetzen die Passwortanmeldung nicht mehr.
+
+Unter **System → Verbindungen** findest du dauerhaft die Mobile-Verbindung und den MCP-Anschluss. Unter Geräte lassen sich Gerätesitzungen und OAuth-Clients widerrufen.
+
+### Fernzugriff und Verwaltung
+
+Über den gemeinsamen HTTPS-Einstieg ist auch die passwortgeschützte Verwaltung unterwegs erreichbar. Der Admin-Dienst steuert Docker und besitzt damit weitreichende Rechte auf dem Server. Verwende ein eigenes langes Passwort. Geheimnisse sind in Einstellungsantworten maskiert; Anzeigen und Rotation verlangen das Passwort erneut. Anmeldeversuche werden begrenzt. Datenbank, Admin- und MCP-Dienst sowie interne Authentifizierungsports besitzen keinen eigenen veröffentlichten Host-Port.
+
+Im Heimnetz nutzt die Standardadresse HTTP. Verwende Fernzugriff ausschließlich über HTTPS. Für eigenen Reverse-Proxy-Betrieb leitet der Proxy auf den Web-Port 8081 weiter; Cloudflare innerhalb dieses Compose-Projekts verwendet den internen Listener 8084.
+
+Passwort vergessen: `docker compose exec admin node dist/src/cli.js reset-password`. Danach das Passwort im Browser erneut einrichten; wer dies zuerst tut, wird Besitzer. Passwortwechsel oder Zurücksetzen widerruft bisherige App- und OAuth-Sitzungen. Der Admin-Dienst muss für Anmeldung und Verwaltung laufen. Frühere lokale Transkriptionskonfigurationen werden beim Upgrade ausgeschaltet, der alte Container wird entfernt; ein vorhandener API-Schlüssel aktiviert dabei keine Transkription.
+
+### Bestehende Installation umstellen
+
+Quellen aktualisieren und `docker compose up -d --build admin app-web` ausführen. Fehlende interne Authentifizierungsgeheimnisse werden ergänzt und betroffene Dienste gestartet. Bestehendes Admin-Passwort bleibt gültig und wird maßgeblich; ein früher separat gesetztes App-Passwort entfällt. Geräte müssen sich einmal neu anmelden. Archiv und WhatsApp-Verknüpfung bleiben erhalten. Bestehende Cloudflare-Routen auf **`http://app-web:8084`** umstellen; lokale Reverse-Proxys verwenden Port 8081. Bei älteren Datenbanken müssen die idempotenten App-Tabellen aus `db/init/014_app.sql` bereits eingespielt sein.
+
+## MCP mit Claude und anderen KI-Clients verbinden
+
+Jarvis stellt einen **MCP-Server** bereit. Damit kann ein KI-Client Nachrichten und Themen suchen, Kontext abrufen, Erinnerungen speichern und freigegebene WhatsApp-Aktionen ausführen.
+
+Trage in einem Client mit MCP-OAuth-Unterstützung diese Connector-Adresse ein:
+
+```text
+https://jarvis.deine-domain.de/mcp
+```
+
+Melde dich auf der Jarvis-Seite mit deinem gemeinsamen Passwort an und bestätige die Verbindung. Cloudbasierte Clients benötigen eine öffentliche HTTPS-Adresse. Den Anschluss erklärt der Assistent; später steht er unter **System → Verbindungen**.
+
+Bestehende Token-Clients können weiterhin `/t/<MCP_TOKEN>/mcp` oder `/mcp` mit `Authorization: Bearer <MCP_TOKEN>` verwenden, solange `MCP_LEGACY_TOKEN=true` ist. Diese Token sind geheim: Sie erlauben den Zugriff auf Chats und freigegebene Aktionen, **keine Server-Verwaltung**. Die Mobile-App-QR-Codes enthalten solche Token nicht.
+
+Werkzeuge und Grenzen erklärt `read_me` (auch als Ressource `jarvis://readme`). Zu den Funktionen zählen Suche, Themen, Gedächtnis und Korrekturen sowie WhatsApp-Aktionen über die `outbox`. Bei neuen Installationen ist die Vorschau vor Aktionen aktiviert (`REQUIRE_CONFIRM=true`). Abschalten von Aktionen: `ENABLE_ACTIONS=false`.
 
 Anleitung: `read_me` (Abschnitte overview, search, data, topics, memory, actions, limits, status live; auch als Ressource `jarvis://readme`).
 
@@ -96,7 +117,7 @@ Schreiben (alles, was in WhatsApp selbst geht und über Baileys erreichbar ist):
 | Kontakte/Profil | `check_on_whatsapp`, `get_profile`, `manage_blocklist`, `update_my_profile`, `privacy_settings` |
 | Medien ansehen | `get_media` (Bilder, Sticker, PDFs) |
 
-Alles, was nach außen wirkt oder etwas löscht, zeigt zuerst eine Vorschau und läuft erst mit `confirm=true`. Dateien zum Verschicken: URL (nur öffentliche Adressen), base64 oder eine Datei im Ordner `outgoing/` neben `docker-compose.yml`.
+Mit `REQUIRE_CONFIRM=true` zeigen Aktionen zuerst eine Vorschau und laufen erst mit `confirm=true`. Der neue Assistent aktiviert diese Einstellung. Dateien zum Verschicken: URL (nur öffentliche Adressen), base64 oder eine Datei im Ordner `outgoing/` neben `docker-compose.yml`.
 
 Der MCP-Server schreibt dafür nur Aufträge in die Tabelle `outbox` (eigener DB-Benutzer `mcp_act`), `wa-ingest` führt sie aus. `outbox` ist zugleich das Protokoll: `select * from outbox order by id desc`. Abschalten mit `ENABLE_ACTIONS=false` in `.env`.
 
@@ -117,7 +138,7 @@ Der MCP-Server schreibt dafür nur Aufträge in die Tabelle `outbox` (eigener DB
 In Gruppenchats gehören oft viele kurze Nachrichten verschiedener Personen zu einem Thema. Der `organizer` bündelt sie per OpenAI-API (Standard: `gpt-4.1-mini`, einstellbar mit `ORGANIZER_MODEL`, strukturierte Ausgabe) zu **Themen** mit Titel, Zusammenfassung, Stand (offen/erledigt/Info), Beteiligten, Terminen, Aufgaben und offenen Fragen. Neue Nachrichten werden bestehenden Themen zugeordnet, auch über mehrere Tage. Die Zusammenfassungen werden eingebettet und fließen in `semantic_search` ein, der Themen-Titel steht zusätzlich im Vektor jeder Einzelnachricht. Termine und Aufgaben, die den Nutzer betreffen, landen in `suggested_actions`.
 
 **Alles läuft über einen Schlüssel, `OPENAI_API_KEY` in `~/jarvis/.env`:**
-- Sprachnachrichten: `gpt-4o-mini-transcribe` (alle, nicht nur neue). Ohne Schlüssel läuft nur der langsame lokale Whisper (`COMPOSE_PROFILES=local-whisper`).
+- Sprachnachrichten: `gpt-4o-mini-transcribe` (alle, nicht nur neue). Ohne Schlüssel werden Sprachnachrichten nicht transkribiert. Transkription lässt sich mit `TRANSCRIBE_PROVIDER=off` ausschalten; lokale Transkription wird nicht unterstützt.
 - Embeddings für `semantic_search`: `text-embedding-3-small` auf 384 Dimensionen gekürzt (passt zur Spalte). Beim Wechsel des Anbieters werden alle Vektoren automatisch neu berechnet.
 - Themen-Sortierung (`organizer`): zusätzlich `ORGANIZER_ENABLED=true` und `COMPOSE_PROFILES=organizer`.
 
@@ -143,14 +164,14 @@ Der `organizer` bündelt nicht nur Nachrichten je Chat zu Threads, sondern verkn
 
 ## Hinweise zum Raspberry Pi 4 (4 GB)
 
-- **Speicherlimits werden vom Pi-Kernel nicht durchgesetzt** („No memory limit support"). Die `mem_limit`-Werte in `docker-compose.yml` greifen erst, wenn du in `/boot/firmware/cmdline.txt` am Zeilenende `cgroup_enable=memory cgroup_memory=1` ergänzt und neu startest. Bis dahin: `docker stats` im Auge behalten; ist der Speicher knapp, `WHISPER_MODEL=base` in `.env` setzen.
+- **Speicherlimits werden vom Pi-Kernel nicht durchgesetzt** („No memory limit support"). Die `mem_limit`-Werte in `docker-compose.yml` greifen erst, wenn du in `/boot/firmware/cmdline.txt` am Zeilenende `cgroup_enable=memory cgroup_memory=1` ergänzt und neu startest. Bis dahin: `docker stats` im Auge behalten.
 - Postgres liegt auf der SD-Karte. Das ist mit den schonenden Einstellungen okay, eine SSD wäre aber robuster.
 - WhatsApp lehnt den vollen Verlaufs-Sync mit den Browser-Profilen „macOS/Windows Desktop" derzeit ab (Fehler 428, getestet). Verwendet wird deshalb „Ubuntu Chrome". Wie viel Verlauf dein Handy liefert, entscheidet WhatsApp.
 - Die Embedding-Bibliothek ist bewusst `@xenova/transformers` 2.17.2: neuere ONNX-Binärdateien stürzen auf dem Pi 4 mit „illegale Instruktion" ab. Fortschritt der Indexierung: `select count(*) filter (where embedding is not null) as fertig, count(*) filter (where embedding is null and body is not null) as offen from messages`.
 
 ## Sicherheit
 
-- Von außen erreichbar ist nur der MCP-Server. Postgres, Whisper und wa-ingest haben keine Ports.
+- Von außen erreichbar ist der gemeinsame Web-Einstieg, optional über Cloudflare: App, authentifizierte Verwaltung und MCP. Die einzelnen Dienste haben keine veröffentlichten Ports.
 - **Wer die URL/den Token hat, kann Chats lesen und in deinem Namen schreiben.** Behandle ihn wie ein Passwort: nicht teilen, nicht in Screenshots, bei Verdacht `MCP_TOKEN` ändern und `docker compose up -d mcp-server`.
 - Token mindestens 32 Zeichen (`openssl rand -hex 24`). Nach 10 ungültigen Versuchen pro IP und 15 Minuten antwortet der Server nur noch mit 429. Zusätzlich in Cloudflare eine Rate-Limit-Regel für den Hostnamen anlegen.
 - Schutz vor Fehlsendungen: Empfänger müssen eindeutig sein (bei mehreren Treffern wird nichts gesendet), `send_message` zeigt erst eine Vorschau, maximal `MAX_ACTIONS_PER_HOUR` (30) Aktionen pro Stunde (Abfragen und harmlose Einstellungen zählen nicht mit). Medien-URLs auf private Adressen (Router, Pi, Heimnetz) werden blockiert.
@@ -166,7 +187,7 @@ Der `organizer` bündelt nicht nur Nachrichten je Chat zu Threads, sondern verkn
 ## Hinweise
 
 - Baileys ist eine inoffizielle Bibliothek; WhatsApp-AGB erlauben das nicht ausdrücklich. Das Risiko einer Sperre ist bei reinem Mitlesen gering, aber nicht null. Nimm im Zweifel nicht deine Hauptnummer, bevor du es getestet hast.
-- Es werden nur Texte und Metadaten gespeichert, keine Medien-Dateien. Bilder erscheinen als `[image]` (Bildunterschriften sind durchsuchbar). Sprachnachrichten werden lokal transkribiert (`whisper`, Modell/Sprache über `WHISPER_MODEL`/`WHISPER_LANG`); ältere Nachrichten aus dem Verlauf lassen sich nur transkribieren, solange WhatsApp die Audiodatei noch vorhält. Fortschritt: `select transcript_status, count(*) from messages where type='audio' group by 1`.
+- Es werden nur Texte und Metadaten gespeichert, keine Medien-Dateien. Bilder erscheinen als `[image]` (Bildunterschriften sind durchsuchbar). Sprachnachrichten werden nur mit aktiviertem API-Anbieter transkribiert (Modell/Sprache über `OPENAI_TRANSCRIBE_MODEL`/`TRANSCRIBE_LANG`); ältere Nachrichten aus dem Verlauf lassen sich nur transkribieren, solange WhatsApp die Audiodatei noch vorhält. Fortschritt: `select transcript_status, count(*) from messages where type='audio' group by 1`.
 - Automatisches Senden erhöht das Sperrrisiko bei WhatsApp stärker als reines Lesen. Deshalb Abstand zwischen Aktionen, „schreibt ..."-Anzeige und das Stundenlimit.
 - **Abstimmen ist ungetestet gegen echtes WhatsApp**: Baileys hat dafür keine API, das Verfahren ist aus der Entschlüsselung nachgebaut (Verschlüsselung geprüft, die Annahme der Stimme durch WhatsApp noch nicht). Bitte zuerst in einer Testgruppe ausprobieren und in `outbox` sowie am Handy prüfen.
 - Umfrage-Stimmen werden live ab Einrichtung erfasst. Für ältere Umfragen aus dem Verlauf ist nicht sicher bekannt, wie du abgestimmt hast.

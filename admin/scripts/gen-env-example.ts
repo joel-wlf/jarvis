@@ -7,7 +7,7 @@ import { FIELDS, GROUPS } from '../src/schema.js'
 export function renderEnvExample(): string {
   const out: string[] = [
     '# Jarvis-Einstellungen. Am einfachsten über die Admin-Oberfläche einrichten:',
-    '#   docker compose up -d admin   und dann http://<adresse-des-pi>:8080 öffnen',
+    '#   docker compose up -d --build admin app-web   und dann http://<server>:8081 öffnen',
     '# Von Hand: nach .env kopieren und mindestens die Pflichtwerte setzen. Zufallswerte: openssl rand -hex 24',
     '# Diese Datei wird erzeugt (cd admin && npm run gen-env-example), bitte admin/src/schema.ts ändern.',
   ]
@@ -21,7 +21,7 @@ export function renderEnvExample(): string {
       out.push(f.required ? `${f.key}=` : `#${f.key}=${f.default}`)
     }
   }
-  out.push('', '# Docker-Profile (tunnel, organizer, local-whisper). Die Oberfläche setzt sie automatisch passend.', '#COMPOSE_PROFILES=')
+  out.push('', '# Docker-Profile (tunnel, organizer). Die Oberfläche setzt sie automatisch passend.', '#COMPOSE_PROFILES=')
   return out.join('\n') + '\n'
 }
 

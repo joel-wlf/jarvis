@@ -7,16 +7,16 @@ const base = { POSTGRES_PASSWORD: 'a'.repeat(48), MCP_RO_PASSWORD: 'b'.repeat(48
 
 test('Profile werden aus den Schaltern abgeleitet, fremde Profile bleiben', () => {
   assert.equal(deriveProfiles({ ...base, OPENAI_API_KEY: 'sk-x' }), '')
-  assert.equal(deriveProfiles({ ...base }), 'local-whisper')
+  assert.equal(deriveProfiles({ ...base }), '')
   assert.equal(deriveProfiles({ ...base, TRANSCRIBE_PROVIDER: 'off' }), '')
   assert.equal(deriveProfiles({ ...base, OPENAI_API_KEY: 'sk-x', ORGANIZER_ENABLED: 'true', CLOUDFLARE_TUNNEL_TOKEN: 'eyJ…', COMPOSE_PROFILES: 'organizer,eigenes' }), 'tunnel,organizer,eigenes')
   assert.equal(deriveProfiles({ ...base, OPENAI_API_KEY: 'sk-x', COMPOSE_PROFILES: 'tunnel,organizer' }), '')
 })
 
 test('Transkriptionsmodus wie in wa-ingest', () => {
-  assert.equal(transcribeMode({}), 'local')
+  assert.equal(transcribeMode({}), 'off')
   assert.equal(transcribeMode({ OPENAI_API_KEY: 'sk-1' }), 'openai')
-  assert.equal(transcribeMode({ OPENAI_API_KEY: 'sk-1', TRANSCRIBE_PROVIDER: 'local' }), 'local')
+  assert.equal(transcribeMode({ OPENAI_API_KEY: 'sk-1', TRANSCRIBE_PROVIDER: 'local' }), 'off')
 })
 
 test('blockierende Prüfungen', () => {
@@ -59,4 +59,16 @@ test('prepare: Eingaben werden bereinigt und geprüft', () => {
   assert.equal(p.next.WA_PAIRING_PHONE, '4915112345678')
   assert.ok(p.errors.MAX_ACTIONS_PER_HOUR)
   assert.deepEqual(p.services.sort(), ['mcp-server', 'wa-ingest'])
+})
+
+
+test('retired local transcription never opts an existing installation into the API', () => {
+  const p = prepare({ ...base, OPENAI_API_KEY: 'sk-' + 'x'.repeat(30), TRANSCRIBE_PROVIDER: 'local', WHISPER_LANG: 'en', WHISPER_MODEL: 'small', COMPOSE_PROFILES: 'local-whisper,eigenes' }, {})
+  assert.equal(p.next.TRANSCRIBE_PROVIDER, 'off')
+  assert.equal(p.next.TRANSCRIBE_LANG, 'en')
+  assert.equal(p.next.WHISPER_LANG, undefined)
+  assert.equal(p.next.WHISPER_MODEL, undefined)
+  assert.equal(p.next.COMPOSE_PROFILES, 'eigenes')
+  assert.equal(transcribeMode(p.next), 'off')
+  assert.ok(prepare(base, { TRANSCRIBE_PROVIDER: 'local' }).errors.TRANSCRIBE_PROVIDER)
 })

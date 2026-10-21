@@ -1,4 +1,8 @@
 import fs from 'node:fs'
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import QRCode from 'qrcode'
+import { connectionAddress } from './connection.js'
+import { SetupStore } from './setup.js'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express, { type NextFunction, type Request, type Response } from 'express'
@@ -41,7 +45,8 @@ function jobView(j: Job | undefined | null) {
 export function createApp(ctx: Ctx, auth: Auth) {
   const app = express()
   app.disable('x-powered-by')
-  app.set('trust proxy', false)
+  app.set('trust proxy', 'loopback, uniquelocal')
+  const setup = new SetupStore(ctx.dataDir)
   const redact = makeRedactor(() => secretValues(ctx))
 
   app.use((_req, res, next) => {
@@ -57,12 +62,35 @@ export function createApp(ctx: Ctx, auth: Auth) {
   app.use(express.static(PUBLIC, { index: 'index.html', maxAge: 0 }))
   app.use('/api', express.json({ limit: '256kb' }), csrfGuard)
 
-  const ip = (req: Request) => req.socket.remoteAddress ?? 'unknown'
-  const secure = (req: Request) => req.secure
+  const ip = (req: Request) => req.ip ?? req.socket.remoteAddress ?? 'unknown'
+  const secure = (req: Request) => {
+    if (req.secure) return true
+    const publicUrl = readCurrent(ctx).env.APP_PUBLIC_URL
+    if (!publicUrl) return false
+    try { const u = new URL(publicUrl); return u.protocol === 'https:' && u.host === req.get('host') }
+    catch { return false }
+  }
   const session = (req: Request) => readCookie(req, COOKIE)
-  const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-    if (auth.check(session(req))) return next()
-    res.status(401).json({ error: 'Bitte anmelden.' })
+  // Only app device tokens may authorize administration. OAuth and static MCP tokens never do.
+  const loggedIn = async (req: Request) => {
+    if (auth.check(session(req))) return true
+    const token = /^Bearer (jd_[A-Za-z0-9_-]+)$/.exec(req.headers.authorization ?? '')?.[1]
+    if (!token || !auth.isConfigured()) return false
+    const secret = readCurrent(ctx).env.ADMIN_INTERNAL_SECRET
+    if (!secret) return false
+    try {
+      const r = await fetch(`${process.env.MCP_INTERNAL_URL ?? 'http://mcp-server:3001'}/internal/device-auth`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Jarvis-Internal-Secret': secret },
+        body: JSON.stringify({ token }), signal: AbortSignal.timeout(5000),
+      })
+      return r.ok && (await r.json() as { valid: boolean }).valid === true
+    } catch { return false }
+  }
+  const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (await loggedIn(req)) return next()
+      res.status(401).json({ error: 'Bitte anmelden.' })
+    } catch (e) { next(e) }
   }
   /** Für heikle Aktionen: Passwort erneut eingeben. */
   const confirmPassword = (req: Request, res: Response) => {
@@ -85,25 +113,31 @@ export function createApp(ctx: Ctx, auth: Auth) {
   }
 
   // --- Zustand und Anmeldung -------------------------------------------------------------------
-  app.get('/api/state', wrap((req, res) => {
+  app.get('/api/state', wrap(async (req, res) => {
     let envExists = false
     let envProblem: string | null = null
     let initialized = false
+    let assistantName = 'Jarvis'
     try {
       const cur = readCurrent(ctx)
+      assistantName = cur.env.ASSISTANT_NAME || 'Jarvis'
       envExists = cur.exists
       initialized = !!(cur.env.POSTGRES_PASSWORD && cur.env.MCP_RO_PASSWORD && cur.env.MCP_TOKEN)
     } catch (e) {
       envProblem = (e as Error).message
     }
+    const authenticated = await loggedIn(req)
+    const pendingJobId = authenticated ? setup.read(initialized).draft.pendingJobId : undefined
     res.json({
       configured: auth.isConfigured(),
-      loggedIn: auth.check(session(req)),
+      loggedIn: authenticated,
+      assistantName,
+      setupComplete: auth.isConfigured() && setup.read(initialized).complete,
       envExists,
       initialized,
       envProblem,
       fake: ctx.fake,
-      job: jobView(ctx.jobs.current()),
+      job: jobView(ctx.jobs.current() ?? (pendingJobId ? ctx.jobs.get(pendingJobId) ?? null : null)),
     })
   }))
 
@@ -142,6 +176,46 @@ export function createApp(ctx: Ctx, auth: Auth) {
     res.json({ pgdataExists: pgdata, waAuthExists: waAuth })
   }))
 
+  app.get('/api/setup/progress', requireAuth, wrap((_req, res) => {
+    const env = readCurrent(ctx).env
+    res.json(setup.read(!!env.POSTGRES_PASSWORD))
+  }))
+  app.post('/api/setup/progress', requireAuth, wrap(async (req, res) => {
+    if (ctx.jobs.current()) throw new BusyError(ctx.jobs.current()!)
+    const env = readCurrent(ctx).env
+    if (req.body?.complete) {
+      const services = await composePs(ctx.docker)
+      const required = ['postgres', 'mcp-server', 'embedder']
+      if (required.some((name) => !services.some((s) => s.service === name && s.state === 'running' && (!s.health || s.health === 'healthy'))))
+        throw new ApplyError('Die Basisdienste sind noch nicht bereit. Bitte zuerst die Einrichtung der Dienste wiederholen.')
+    }
+    const saved = setup.save(req.body, !!env.POSTGRES_PASSWORD)
+    if (!saved) return void res.status(409).json({ error: 'Die Einrichtung wurde in einem anderen Fenster geändert. Bitte neu laden.' })
+    res.json(saved)
+  }))
+  app.get('/api/setup/connection', requireAuth, wrap(async (req, res) => {
+    const { url, localOnly } = await connectionAddress(ctx, `${req.protocol}://${req.get('host')}`)
+    res.json({ url, localOnly, qrSvg: await QRCode.toString(url, { type: 'svg', margin: 2 }) })
+  }))
+  app.post('/api/setup/check-remote', requireAuth, wrap(async (req, res) => {
+    const env = readCurrent(ctx).env
+    const base = env.APP_PUBLIC_URL
+    if (!base || !base.startsWith('https://')) throw new ApplyError('Bitte zuerst eine öffentliche HTTPS-Adresse speichern.')
+    // The health probe must reach this installation, not another Jarvis server.
+    const challenge = randomBytes(32).toString('hex')
+    const expected = createHmac('sha256', env.ADMIN_INTERNAL_SECRET).update(challenge).digest('hex')
+    const r = await fetch(new URL('/api/setup/identity', base), { headers: { 'X-Jarvis-Probe': challenge }, redirect: 'error', signal: AbortSignal.timeout(10000) })
+    const data = r.ok ? await r.json() as { identity?: string } : null
+    if (!data?.identity || !constantEqual(data.identity, expected)) throw new ApplyError('Unter dieser Adresse ist dieser Jarvis-Server noch nicht erreichbar. Tunnel und Ziel prüfen.')
+    res.json({ ok: true })
+  }))
+  app.get('/api/setup/identity', (req, res) => {
+    const probe = String(req.headers['x-jarvis-probe'] ?? '')
+    const secret = readCurrent(ctx).env.ADMIN_INTERNAL_SECRET
+    if (!secret || !auth.isConfigured() || !/^[a-f0-9]{64}$/.test(probe)) return void res.sendStatus(404)
+    res.json({ identity: createHmac('sha256', secret).update(probe).digest('hex') })
+  })
+
   // --- Einstellungen ---------------------------------------------------------------------------
   app.get('/api/settings', requireAuth, wrap((_req, res) => {
     const cur = readCurrent(ctx)
@@ -174,8 +248,10 @@ export function createApp(ctx: Ctx, auth: Auth) {
       const cur = readCurrent(ctx)
       if (cur.exists && cur.env.POSTGRES_PASSWORD) throw new ApplyError('Jarvis ist schon eingerichtet. Änderungen bitte unter Einstellungen.')
     }
-    const r = startApply(ctx, req.body?.changes ?? {}, { initial })
+    const wizard = setup.read(!!readCurrent(ctx).env.POSTGRES_PASSWORD)
+    const r = startApply(ctx, req.body?.changes ?? {}, { initial, verifyAll: !wizard.complete })
     if (!r.job) return void res.status(422).json({ error: 'Bitte die markierten Einstellungen korrigieren.', errors: r.prepared.errors, checks: r.prepared.checks })
+    if (!wizard.complete) setup.save({ ...wizard, draft: { ...wizard.draft, pendingJobId: r.job.id } }, !!readCurrent(ctx).env.POSTGRES_PASSWORD)
     res.json({ job: jobView(r.job) })
   }))
 
@@ -221,7 +297,7 @@ export function createApp(ctx: Ctx, auth: Auth) {
     if (![...SERVICES, 'admin'].includes(svc)) return void res.status(400).json({ error: 'Unbekannter Dienst.' })
     const tail = Math.min(Math.max(Number(req.query.tail ?? 300) || 300, 10), 2000)
     const cur = readCurrent(ctx)
-    const profiles = [...new Set([...(cur.env.COMPOSE_PROFILES ?? '').split(','), 'organizer', 'tunnel', 'local-whisper'])].filter(Boolean).join(',')
+    const profiles = [...new Set([...(cur.env.COMPOSE_PROFILES ?? '').split(','), 'organizer', 'tunnel'])].filter(Boolean).join(',')
     const r = await ctx.docker.compose(['logs', '--no-color', '--timestamps', '--tail', String(tail), svc], { profiles, timeoutMs: 20_000 })
     res.json({ service: svc, text: redact(r.out) })
   }))
@@ -302,5 +378,30 @@ export function createApp(ctx: Ctx, auth: Auth) {
   app.use('/api', (_req, res) => void res.status(404).json({ error: 'Unbekannter Endpunkt.' }))
   // Single-Page-App: alle anderen Pfade liefern die Oberfläche
   app.get('*', (_req, res) => res.sendFile(path.join(PUBLIC, 'index.html')))
+  return app
+}
+
+function constantEqual(a: string, b: string): boolean {
+  const x = Buffer.from(a), y = Buffer.from(b)
+  return !!a && x.length === y.length && timingSafeEqual(x, y)
+}
+
+/** Separate Docker-only listener; never mounted on the public web server. */
+export function createInternalApp(ctx: Ctx, auth: Auth) {
+  const app = express()
+  app.use(express.json({ limit: '16kb' }))
+  app.use((req, res, next) => {
+    const secret = readCurrent(ctx).env.ADMIN_INTERNAL_SECRET
+    if (!secret || !constantEqual(String(req.headers['x-jarvis-internal-secret'] ?? ''), secret)) return void res.sendStatus(401)
+    next()
+  })
+  const state = () => ({ configured: auth.isConfigured(), revision: auth.revision(), setupComplete: new SetupStore(ctx.dataDir).read(!!readCurrent(ctx).env.POSTGRES_PASSWORD).complete, assistantName: readCurrent(ctx).env.ASSISTANT_NAME || 'Jarvis' })
+  app.get('/internal/auth', (_req, res) => res.json(state()))
+  app.post('/internal/auth/verify', (req, res) => {
+    const source = String(req.body?.ip ?? 'internal').slice(0, 100)
+    if (auth.locked(source)) return void res.status(429).json({ error: 'Zu viele Fehlversuche.' })
+    const valid = auth.verifyPassword(source, String(req.body?.password ?? ''))
+    res.json({ ...state(), valid })
+  })
   return app
 }

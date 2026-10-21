@@ -37,7 +37,7 @@ export const readCurrent = (ctx: Ctx) => readEnvFile(ctx.envPath)
 export function secretValues(ctx: Ctx): string[] {
   try {
     const { env } = readCurrent(ctx)
-    return ['POSTGRES_PASSWORD', 'MCP_RO_PASSWORD', 'MCP_TOKEN', 'OPENAI_API_KEY', 'CLOUDFLARE_TUNNEL_TOKEN']
+    return ['POSTGRES_PASSWORD', 'MCP_RO_PASSWORD', 'MCP_TOKEN', 'OPENAI_API_KEY', 'CLOUDFLARE_TUNNEL_TOKEN', 'ADMIN_INTERNAL_SECRET']
       .map((k) => env[k])
       .filter((v): v is string => !!v && v.length >= 8)
   } catch {

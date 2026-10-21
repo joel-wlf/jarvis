@@ -9,8 +9,17 @@ import { Icon, type IconName } from './Icon'
 
 type PressState = { pressed: boolean; hovered?: boolean }
 /** Pressable whose style callback also receives the web hover state. */
-export function Press({ style, ...rest }: Omit<PressableProps, 'style'> & { style?: (s: PressState) => StyleProp<ViewStyle> }) {
-  return <Pressable {...rest} style={style as PressableProps['style']} />
+export function Press({ style, accessibilityState, ...rest }: Omit<PressableProps, 'style'> & { style?: (s: PressState) => StyleProp<ViewStyle> }) {
+  return <Pressable
+    {...rest}
+    accessibilityState={accessibilityState}
+    aria-busy={rest['aria-busy'] ?? accessibilityState?.busy}
+    aria-checked={rest['aria-checked'] ?? accessibilityState?.checked}
+    aria-disabled={rest['aria-disabled'] ?? accessibilityState?.disabled}
+    aria-expanded={rest['aria-expanded'] ?? accessibilityState?.expanded}
+    aria-selected={rest['aria-selected'] ?? accessibilityState?.selected}
+    style={style as PressableProps['style']}
+  />
 }
 
 export function Micro({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {

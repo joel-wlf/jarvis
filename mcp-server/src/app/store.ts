@@ -1,4 +1,5 @@
 // Owner password, paired devices and pairing codes (tables from db/init/014_app.sql, role mcp_mem).
+import { ownerState, unifiedAuth, verifyOwner } from './owner-auth.js'
 import type { Device } from '@jarvis/contract'
 import { memDb } from '../db.js'
 import { hashPassword, normalizePairingCode, pairingCode, randomToken, sha256, verifyPassword } from './crypto.js'
@@ -9,11 +10,13 @@ const MIN_PASSWORD = 10
 // --- owner ---------------------------------------------------------------------------------------
 
 export async function hasOwnerPassword(): Promise<boolean> {
+  if (unifiedAuth()) return (await ownerState()).configured
   const r = await memDb.query(`SELECT 1 FROM app_owner WHERE id = 1`).catch(() => ({ rows: [] }))
   return r.rows.length > 0
 }
 
 export async function setOwnerPassword(pw: string) {
+  if (unifiedAuth()) throw new Error('Change the owner password in the admin service')
   if (pw.length < MIN_PASSWORD) throw new Error(`Password must have at least ${MIN_PASSWORD} characters`)
   await memDb.query(
     `INSERT INTO app_owner (id, password_hash) VALUES (1, $1) ON CONFLICT (id) DO UPDATE SET password_hash = excluded.password_hash, updated_at = now()`,
@@ -21,7 +24,8 @@ export async function setOwnerPassword(pw: string) {
   )
 }
 
-export async function checkOwnerPassword(pw: string): Promise<boolean> {
+export async function checkOwnerPassword(pw: string, ip?: string): Promise<boolean> {
+  if (unifiedAuth()) return verifyOwner(pw, ip)
   const r = await memDb.query<{ password_hash: string }>(`SELECT password_hash FROM app_owner WHERE id = 1`)
   if (!r.rows[0]) return false
   return verifyPassword(pw, r.rows[0].password_hash)
@@ -44,6 +48,7 @@ export async function createDevice(name: string, platform: DeviceRow['platform']
 }
 
 export async function deviceByToken(token: string): Promise<DeviceRow | null> {
+  if (unifiedAuth() && !(await ownerState()).configured) return null
   const r = await memDb.query<DeviceRow>(
     `SELECT id, name, platform, created_at, last_seen_at FROM devices WHERE token_hash = $1 AND revoked_at IS NULL`,
     [sha256(token)],

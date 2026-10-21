@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { applyEnv, ApplyError, prepare, waitHealthy } from './apply.js'
 import { backupDir, readCurrent, type Ctx } from './context.js'
 import { activeServices } from './docker.js'
@@ -5,7 +7,7 @@ import { parseEnv, randomSecret, readBackup, type Env } from './envfile.js'
 import type { JobLog } from './jobs.js'
 import { readLinkStatus } from './wa.js'
 
-export const SERVICES = ['postgres', 'embedder', 'wa-ingest', 'mcp-server', 'organizer', 'whisper', 'cloudflared'] as const
+export const SERVICES = ['postgres', 'embedder', 'wa-ingest', 'mcp-server', 'organizer', 'cloudflared'] as const
 export const ROTATABLE = ['MCP_TOKEN', 'POSTGRES_PASSWORD', 'MCP_RO_PASSWORD'] as const
 export type Rotatable = (typeof ROTATABLE)[number]
 
@@ -16,7 +18,7 @@ function needEnv(ctx: Ctx): Env {
 }
 
 /** Änderungen aus der Oberfläche anwenden. */
-export function startApply(ctx: Ctx, changes: Record<string, string | null>, opts: { initial?: boolean } = {}) {
+export function startApply(ctx: Ctx, changes: Record<string, string | null>, opts: { initial?: boolean; build?: boolean; migrate?: boolean; verifyAll?: boolean } = {}) {
   const cur = readCurrent(ctx)
   const p = prepare(cur.env, changes, { initial: opts.initial })
   const errs = Object.entries(p.errors)
@@ -24,9 +26,9 @@ export function startApply(ctx: Ctx, changes: Record<string, string | null>, opt
   if (errs.length || blocking.length) return { prepared: p }
   const job = ctx.jobs.start(opts.initial ? 'setup' : 'apply', opts.initial ? 'Jarvis einrichten und starten' : 'Einstellungen anwenden', async (log) => {
     if (p.changed.length) log('info', `Geändert: ${p.changed.join(', ')}`)
-    // Das Whisper-Modell ist ein Build-Argument: ohne Neubau bliebe das alte Modell im Image
-    const build = p.changed.includes('WHISPER_MODEL')
-    return applyEnv(ctx, log, p.next, { initial: opts.initial || !cur.exists, build })
+    const result = await applyEnv(ctx, log, p.next, { initial: opts.initial || !cur.exists, build: opts.build, verifyAll: opts.verifyAll })
+    if (result.status === 'ok' && (opts.initial || opts.migrate)) fs.writeFileSync(path.join(ctx.dataDir, 'setup-runtime-v1'), 'ready\n', { mode: 0o600 })
+    return result
   })
   return { job, prepared: p }
 }

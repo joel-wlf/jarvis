@@ -16,6 +16,8 @@ export interface Job {
 }
 
 export interface AdminState {
+  assistantName?: string
+  setupComplete?: boolean
   configured: boolean
   loggedIn: boolean
   envExists: boolean
@@ -100,15 +102,30 @@ export interface StatusResponse {
 }
 export interface Backup { name: string; at: string; changed: string[] }
 
-export const SERVICES = ['postgres', 'embedder', 'wa-ingest', 'mcp-server', 'organizer', 'whisper', 'cloudflared', 'admin'] as const
+export const SERVICES = ['postgres', 'embedder', 'wa-ingest', 'mcp-server', 'organizer', 'cloudflared', 'admin'] as const
 export const RELINK_WORD = 'NEU VERKNÜPFEN'
 
+export interface SetupProgress {
+  revision: number
+  step: 'name' | 'account' | 'source' | 'whatsapp' | 'settings' | 'remote' | 'done'
+  furthest: number
+  complete: boolean
+  draft: Record<string, string>
+}
+export interface ConnectionInfo { url: string; qrSvg: string; localOnly?: boolean }
+
 export interface AdminApi {
+  progress(): Promise<SetupProgress>
+  saveProgress(progress: SetupProgress): Promise<SetupProgress>
+  connection(): Promise<ConnectionInfo>
+  checkRemote(): Promise<{ ok: boolean }>
+
   healthy(): Promise<boolean>
   state(): Promise<AdminState>
   setup(code: string, password: string): Promise<void>
   login(password: string): Promise<void>
   logout(): Promise<void>
+  changePassword(oldPassword: string, newPassword: string): Promise<void>
   setupInfo(): Promise<{ pgdataExists: boolean; waAuthExists: boolean }>
   settings(): Promise<SettingsResponse>
   preview(changes: Record<string, string>, initial?: boolean): Promise<PreviewResponse>
@@ -126,16 +143,20 @@ export interface AdminApi {
   estimate(): Promise<Job>
 }
 
-export function createHttpAdmin(homeUrl: string): AdminApi {
+export function createHttpAdmin(homeUrl: string, token?: string): AdminApi {
   const call = <T>(path: string, method: 'GET' | 'POST' = 'GET', body?: unknown, timeoutMs?: number) =>
-    requestJson<T>(`${homeUrl}${path}`, { method, body: method === 'POST' ? (body ?? {}) : undefined, headers: { 'X-Jarvis': '1' }, credentials: 'include', timeoutMs })
+    requestJson<T>(`${homeUrl}${path}`, { method, body: method === 'POST' ? (body ?? {}) : undefined, headers: { 'X-Jarvis': '1', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, credentials: 'include', timeoutMs })
   const job = async (p: Promise<{ job: Job }>) => (await p).job
   return {
+    progress: () => call('/api/setup/progress'),
+    saveProgress: (p) => call('/api/setup/progress', 'POST', p),
+    connection: () => call('/api/setup/connection', 'GET', undefined, 15000),
+    checkRemote: () => call('/api/setup/check-remote', 'POST', {}, 15000),
     healthy: async () => {
       try {
         const ctrl = new AbortController()
         const t = setTimeout(() => ctrl.abort(), 2_500)
-        const r = await fetch(`${homeUrl}/healthz`, { signal: ctrl.signal })
+        const r = await fetch(`${homeUrl}/api/state`, { signal: ctrl.signal })
         clearTimeout(t)
         return r.ok
       } catch {
@@ -145,6 +166,7 @@ export function createHttpAdmin(homeUrl: string): AdminApi {
     state: () => call('/api/state'),
     setup: async (code, password) => void (await call('/api/auth/setup', 'POST', { code, password })),
     login: async (password) => void (await call('/api/auth/login', 'POST', { password })),
+    changePassword: async (oldPassword, newPassword) => void (await call('/api/auth/password', 'POST', { old: oldPassword, new: newPassword })),
     logout: async () => void (await call('/api/auth/logout', 'POST')),
     setupInfo: () => call('/api/setup/info'),
     settings: () => call('/api/settings'),

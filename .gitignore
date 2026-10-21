@@ -10,3 +10,5 @@ outgoing/*
 *.img
 .DS_Store
 backups/
+
+.jarvis-install-version

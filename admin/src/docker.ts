@@ -160,8 +160,8 @@ export class FakeDocker implements DockerApi {
   /** wie bei CliDocker: ohne envFile gilt die .env des Projekts */
   defaultEnvFile?: string
 
-  static ALL = ['postgres', 'embedder', 'wa-ingest', 'mcp-server', 'admin']
-  static PROFILED: Record<string, string> = { whisper: 'local-whisper', organizer: 'organizer', cloudflared: 'tunnel' }
+  static ALL = ['postgres', 'embedder', 'wa-ingest', 'mcp-server', 'admin', 'app-web']
+  static PROFILED: Record<string, string> = { organizer: 'organizer', cloudflared: 'tunnel' }
 
   constructor(running = true) {
     if (running) for (const s of FakeDocker.ALL) this.svcs.set(s, { state: 'running', health: s === 'wa-ingest' || s === 'admin' ? '' : 'healthy', config: '' })

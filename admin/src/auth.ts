@@ -1,4 +1,4 @@
-import { randomBytes, randomInt, scryptSync, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { NextFunction, Request, Response } from 'express'
@@ -14,9 +14,9 @@ interface AuthFile {
   createdAt: string
 }
 
-/** Admin-Zugang: Einrichtungscode (einmalig, aus dem Log), danach Passwort (scrypt). Sitzungen nur im Speicher. */
+/** The first owner chooses a password; subsequent access requires that password. */
 export class Auth {
-  private sessions = new Map<string, number>()
+  private sessions = new Map<string, { expires: number; revision: string }>()
   private fails = new Map<string, { n: number; first: number }>()
   private authFile: string
   private codeFile: string
@@ -32,26 +32,16 @@ export class Auth {
     return fs.existsSync(this.authFile)
   }
 
-  /** Einrichtungscode lesen oder erzeugen (bleibt über Neustarts gleich, bis er benutzt wurde). */
-  setupCode(): string {
-    try {
-      const c = fs.readFileSync(this.codeFile, 'utf8').trim()
-      if (/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(c)) return c
-    } catch {
-      // neu erzeugen
-    }
-    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // ohne 0/O und 1/I
-    const pick = () => Array.from({ length: 4 }, () => alphabet[randomInt(alphabet.length)]).join('')
-    const code = `${pick()}-${pick()}`
-    writeAtomic(this.codeFile, code)
-    return code
+  /** Credential generation changes on password replacement and CLI reset. Never exposes a hash. */
+  revision(): string {
+    try { return createHash('sha256').update(fs.readFileSync(this.authFile)).digest('hex') }
+    catch { return 'unconfigured' }
   }
 
   resetPassword() {
     fs.rmSync(this.authFile, { force: true })
     fs.rmSync(this.codeFile, { force: true })
     this.sessions.clear()
-    return this.setupCode()
   }
 
   /** Prüft Fehlversuche. true = gesperrt. */
@@ -68,21 +58,25 @@ export class Auth {
     this.fails.set(ip, f)
   }
 
-  /** Ersteinrichtung des Zugangs mit Einrichtungscode. Gibt eine Sitzungs-ID zurück oder einen Fehlertext. */
-  setup(ip: string, code: string, password: string): { session?: string; error?: string } {
+  /** Claim an unconfigured installation. The legacy code argument is ignored. */
+  setup(ip: string, _code: string, password: string): { session?: string; error?: string } {
     if (this.isConfigured()) return { error: 'Der Zugang ist schon eingerichtet. Bitte anmelden.' }
     if (this.locked(ip)) return { error: 'Zu viele Fehlversuche. Bitte 15 Minuten warten.' }
-    const expected = this.setupCode()
-    const given = String(code ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
-    if (!safeEqual(given, expected.replace('-', ''))) {
-      this.fail(ip)
-      return { error: 'Einrichtungscode stimmt nicht. Du findest ihn mit: docker compose logs admin' }
-    }
     const pwErr = passwordProblem(password)
     if (pwErr) return { error: pwErr }
     const salt = randomBytes(16).toString('hex')
     const data: AuthFile = { salt, hash: hash(password, salt), createdAt: new Date().toISOString() }
-    writeAtomic(this.authFile, JSON.stringify(data))
+    // Publish the complete credential file without replacing an existing owner.
+    // This also protects simultaneous first setup in separate admin processes.
+    const candidate = `${this.authFile}.claim-${randomBytes(8).toString('hex')}`
+    try {
+      fs.writeFileSync(candidate, JSON.stringify(data), { mode: 0o600, flag: 'wx' })
+      try { fs.linkSync(candidate, this.authFile) }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') return { error: 'Der Zugang ist schon eingerichtet. Bitte anmelden.' }
+        throw error
+      }
+    } finally { fs.rmSync(candidate, { force: true }) }
     fs.rmSync(this.codeFile, { force: true })
     return { session: this.newSession() }
   }
@@ -123,7 +117,7 @@ export class Auth {
 
   private newSession() {
     const id = randomBytes(32).toString('base64url')
-    this.sessions.set(id, Date.now() + SESSION_MS)
+    this.sessions.set(id, { expires: Date.now() + SESSION_MS, revision: this.revision() })
     return id
   }
 
@@ -132,24 +126,24 @@ export class Auth {
     // Passwort per CLI zurückgesetzt: alle Sitzungen ungültig
     if (!id || !this.isConfigured()) return false
     const exp = this.sessions.get(id)
-    if (!exp || exp < Date.now()) {
+    if (!exp || exp.expires < Date.now() || exp.revision !== this.revision()) {
       this.sessions.delete(id ?? '')
       return false
     }
-    this.sessions.set(id, Date.now() + SESSION_MS)
+    this.sessions.set(id, { expires: Date.now() + SESSION_MS, revision: this.revision() })
     return true
   }
 
   private cleanup() {
     const now = Date.now()
-    for (const [id, exp] of this.sessions) if (exp < now) this.sessions.delete(id)
+    for (const [id, exp] of this.sessions) if (exp.expires < now || exp.revision !== this.revision()) this.sessions.delete(id)
     for (const [ip, f] of this.fails) if (now - f.first > WINDOW_MS) this.fails.delete(ip)
   }
 }
 
 export function passwordProblem(pw: unknown): string | null {
   const s = String(pw ?? '')
-  if (s.length < 10) return 'Das Passwort muss mindestens 10 Zeichen lang sein.'
+  if (s.length < 15) return 'Das Passwort muss mindestens 15 Zeichen lang sein.'
   if (s.length > 200) return 'Das Passwort ist zu lang.'
   return null
 }

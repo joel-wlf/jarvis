@@ -1,7 +1,7 @@
 import '@/i18n'
 import { useEffect } from 'react'
-import { Platform, View } from 'react-native'
-import { Stack } from 'expo-router'
+import { Platform, Text, View } from 'react-native'
+import { Stack, type ErrorBoundaryProps } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useFonts } from 'expo-font'
 import { StatusBar } from 'expo-status-bar'
@@ -11,6 +11,16 @@ import { ToastProvider } from '@/state/toast'
 import { colors, fonts } from '@/theme/tokens'
 
 void SplashScreen.preventAutoHideAsync().catch(() => {})
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', padding: 28, gap: 14, backgroundColor: colors.ground }}>
+      <Text style={{ color: colors.ink, fontSize: 22 }}>Jarvis konnte diese Ansicht nicht laden.</Text>
+      <Text selectable style={{ color: colors.ink2 }}>{error.message}</Text>
+      <Text accessibilityRole="button" onPress={retry} style={{ color: colors.blue }}>Erneut versuchen</Text>
+    </View>
+  )
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -49,10 +59,10 @@ function Routes() {
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.ground }} />
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
+      <Stack.Screen name="setup" options={{ animation: 'fade' }} />
       <Stack.Protected guard={!!session} redirectTo="/connect">
         <Stack.Screen name="(main)" />
         <Stack.Screen name="ask" options={{ animation: 'fade_from_bottom' }} />
-        <Stack.Screen name="setup" options={{ animation: 'fade' }} />
       </Stack.Protected>
       <Stack.Protected guard={!session} redirectTo="/">
         <Stack.Screen name="connect" />

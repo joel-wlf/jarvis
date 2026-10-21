@@ -23,7 +23,7 @@ docker compose up -d cloudflared 2>&1 | grep -E "Started|Created|Recreate|rror" 
 for i in $(seq 1 15); do
   if docker compose logs --since 1m cloudflared 2>&1 | grep -q "Registered tunnel connection"; then
     echo "Tunnel verbunden. Er leitet an: $(docker compose logs --since 1m cloudflared 2>&1 | grep -o 'service":"[^"]*' | head -1 || true)"
-    echo "Jetzt in Cloudflare unter Public Hostname eintragen: Dienst  http://mcp-server:3000"
+    echo "Jetzt in Cloudflare unter Public Hostname eintragen: Dienst  http://app-web:8084"
     exit 0
   fi
   sleep 2

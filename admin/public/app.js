@@ -244,8 +244,7 @@ function renderEnvProblem(msg) {
 }
 
 function renderAccessSetup() {
-  const code = h('input', { class: 'input mono', placeholder: 'XXXX-XXXX', autocomplete: 'one-time-code', autocapitalize: 'characters', spellcheck: 'false' })
-  const pw = h('input', { class: 'input', type: 'password', autocomplete: 'new-password', placeholder: 'mindestens 10 Zeichen' })
+  const pw = h('input', { class: 'input', type: 'password', autocomplete: 'new-password', placeholder: 'mindestens 15 Zeichen' })
   const pw2 = h('input', { class: 'input', type: 'password', autocomplete: 'new-password', placeholder: 'wiederholen' })
   const err = h('div')
   const btn = h('button', { class: 'btn primary l', type: 'submit' }, 'Zugang einrichten')
@@ -259,7 +258,7 @@ function renderAccessSetup() {
         if (pw.value !== pw2.value) return err.append(alertBox('error', 'Die Passwörter stimmen nicht überein.'))
         btn.disabled = true
         try {
-          await api('POST', '/auth/setup', { code: code.value, password: pw.value })
+          await api('POST', '/auth/setup', { password: pw.value })
           boot()
         } catch (ex) {
           err.append(alertBox('error', ex.message))
@@ -267,7 +266,6 @@ function renderAccessSetup() {
         }
       },
     },
-    h('label', { class: 'stack tight' }, h('b', { class: 'small' }, 'Einrichtungscode'), code, h('span', { class: 'small muted' }, 'Steht im Log der Oberfläche: ', h('code', {}, 'docker compose logs admin'))),
     h('label', { class: 'stack tight' }, h('b', { class: 'small' }, 'Neues Admin-Passwort'), pw),
     h('label', { class: 'stack tight' }, pw2),
     err,
@@ -281,12 +279,12 @@ function renderAccessSetup() {
         'div',
         { class: 'card auth-card stack' },
         brand(),
-        h('div', { class: 'stack tight' }, h('h1', {}, 'Willkommen'), h('p', { class: 'muted' }, 'Lege zuerst ein Passwort für diese Einstellungsseite fest. Der Einrichtungscode beweist, dass du Zugriff auf den Pi hast.')),
+        h('div', { class: 'stack tight' }, h('h1', {}, 'Willkommen'), h('p', { class: 'muted' }, 'Lege dein Besitzer-Passwort fest. Wer hier zuerst ein Passwort festlegt, wird Besitzer dieser Installation.')),
         form,
       ),
     ),
   )
-  code.focus()
+  pw.focus()
 }
 
 function renderLogin() {
@@ -651,7 +649,7 @@ async function renderWizard() {
       : []),
     {
       title: 'KI-Anbieter (optional)',
-      lead: 'Mit einem OpenAI-Schlüssel werden Sprachnachrichten schnell transkribiert, Bilder beschrieben und Themen sortiert. Ohne Schlüssel läuft alles lokal und langsamer.',
+      lead: 'Mit einem OpenAI-Schlüssel werden Sprachnachrichten schnell transkribiert, Bilder beschrieben und Themen sortiert. Ohne Schlüssel bleiben Archiv und Suche lokal; Sprachnachrichten werden nicht transkribiert.',
       keys: ['OPENAI_API_KEY'],
     },
     {
@@ -723,7 +721,7 @@ async function renderWizard() {
     const list = h('dl', { class: 'kv' })
     const show = (k, v) => list.append(h('dt', {}, F[k]?.label ?? k), h('dd', {}, v))
     show('OWNER_NAME', w.values.OWNER_NAME || '–')
-    show('OPENAI_API_KEY', w.values.OPENAI_API_KEY ? 'gesetzt' : 'keiner (alles lokal)')
+    show('OPENAI_API_KEY', w.values.OPENAI_API_KEY ? 'gesetzt' : 'keiner (Transkription aus)')
     show('ORGANIZER_EXCLUDE_NAMES', w.values.ORGANIZER_EXCLUDE_NAMES || '–')
     show('CLOUDFLARE_TUNNEL_TOKEN', w.values.CLOUDFLARE_TUNNEL_TOKEN ? 'gesetzt' : 'später')
     show('WA_PAIRING_PHONE', w.values.WA_PAIRING_PHONE ? `Kopplungscode für ${w.values.WA_PAIRING_PHONE}` : 'QR-Code')
@@ -929,7 +927,7 @@ async function logout() {
 
 // --- Übersicht -------------------------------------------------------------------------------
 
-const SVC_LABEL = { postgres: 'Datenbank', embedder: 'Embeddings', 'wa-ingest': 'WhatsApp', 'mcp-server': 'MCP-Server', organizer: 'Themen-Sortierung', whisper: 'Lokale Transkription', cloudflared: 'Cloudflare-Tunnel', admin: 'Diese Oberfläche' }
+const SVC_LABEL = { postgres: 'Datenbank', embedder: 'Embeddings', 'wa-ingest': 'WhatsApp', 'mcp-server': 'MCP-Server', organizer: 'Themen-Sortierung', cloudflared: 'Cloudflare-Tunnel', admin: 'Diese Oberfläche' }
 
 function svcDot(s) {
   if (s.state === 'running' && (!s.health || s.health === 'healthy')) return ['ok', s.health === 'healthy' ? 'gesund' : 'läuft']
@@ -1193,7 +1191,7 @@ async function whatsapp() {
 // --- Logs ------------------------------------------------------------------------------------
 
 async function logs() {
-  const svcs = ['wa-ingest', 'mcp-server', 'embedder', 'organizer', 'postgres', 'whisper', 'cloudflared', 'admin']
+  const svcs = ['wa-ingest', 'mcp-server', 'embedder', 'organizer', 'postgres', 'cloudflared', 'admin']
   const sel = h('select', { class: 'input', 'aria-label': 'Dienst' }, svcs.map((s) => h('option', { value: s, selected: s === store.get('logsvc', 'wa-ingest') }, `${SVC_LABEL[s]} (${s})`)))
   const tail = h('select', { class: 'input', 'aria-label': 'Zeilen' }, [100, 300, 1000, 2000].map((n) => h('option', { value: n, selected: n === 300 }, `${n} Zeilen`)))
   const auto = h('button', { class: 'switch', role: 'switch', 'aria-checked': 'true', 'aria-label': 'Automatisch aktualisieren' })
@@ -1244,7 +1242,7 @@ async function maintenance() {
     svcList.append(h('div', { class: 'item' }, h('span', { class: `dot ${cls}` }), h('div', { class: 'grow' }, h('b', {}, SVC_LABEL[s.service] ?? s.service), h('span', { class: 'small faint' }, ` · ${txt}`)), h('button', { class: 'btn s', onclick: () => start('/maintenance/restart', { service: s.service }) }, icon('refresh', 14), 'Neu starten')))
   }
   const oldPw = h('input', { class: 'input', type: 'password', autocomplete: 'current-password', placeholder: 'Aktuelles Passwort' })
-  const newPw = h('input', { class: 'input', type: 'password', autocomplete: 'new-password', placeholder: 'Neues Passwort (mind. 10 Zeichen)' })
+  const newPw = h('input', { class: 'input', type: 'password', autocomplete: 'new-password', placeholder: 'Neues Passwort (mind. 15 Zeichen)' })
   const changePw = async () => {
     try {
       await api('POST', '/auth/password', { old: oldPw.value, new: newPw.value })
