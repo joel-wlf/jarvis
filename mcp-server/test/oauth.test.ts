@@ -101,7 +101,7 @@ test('denying on the consent page redirects with access_denied', async () => {
   const client = await (await fetch(`${s.url}/register`, json({ redirect_uris: [REDIRECT], token_endpoint_auth_method: 'none' }))).json()
   const q = new URLSearchParams({ response_type: 'code', client_id: client.client_id, redirect_uri: REDIRECT, code_challenge: pkce().challenge, code_challenge_method: 'S256', state: 's' })
   const html = await (await fetch(`${s.url}/authorize?${q}`)).text()
-  assert.match(html, /Zugriff erlauben/) // German by default
+  assert.match(html, /Allow access/) // English by default
   const id = html.match(/name="request_id" value="([^"]+)"/)![1]
   const r = await fetch(`${s.url}/oauth/decision`, form({ request_id: id, decision: 'deny' }))
   assert.equal(r.status, 302)

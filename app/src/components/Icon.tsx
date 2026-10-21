@@ -4,7 +4,7 @@ import { colors } from '@/theme/tokens'
 
 export type IconName =
   | 'home' | 'people' | 'memory' | 'system' | 'x' | 'chat' | 'play' | 'check' | 'pin' | 'clock' | 'cal' | 'arrow' | 'link'
-  | 'mic' | 'search' | 'plus' | 'back' | 'chevron' | 'lock' | 'camera' | 'train' | 'stop'
+  | 'mic' | 'search' | 'plus' | 'back' | 'chevron' | 'lock' | 'camera' | 'train' | 'stop' | 'pause'
 
 const P = ({ d }: { d: string }) => <Path d={d} />
 
@@ -31,6 +31,7 @@ const ICONS: Record<IconName, React.ReactNode> = {
   camera: <><Rect x={3} y={7} width={18} height={13} /><Circle cx={12} cy={13.5} r={3.5} /><P d="M8.5 7 10 4h4l1.5 3" /></>,
   train: <><Rect x={6} y={3.5} width={12} height={13} /><P d="M6 11h12M9 20l-2 1.5M15 20l2 1.5M9 14h.01M15 14h.01" /></>,
   stop: <Rect x={7} y={7} width={10} height={10} fill={colors.blockInk} stroke="none" />,
+  pause: <><Rect x={7} y={5.5} width={3.5} height={13} fill={colors.ink} stroke="none" /><Rect x={13.5} y={5.5} width={3.5} height={13} fill={colors.ink} stroke="none" /></>,
 }
 
 export function Icon({ name, size = 20, color = colors.ink, strokeWidth = 1.5 }: { name: IconName; size?: number; color?: string; strokeWidth?: number }) {

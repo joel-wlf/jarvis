@@ -62,8 +62,8 @@ test('PUT priority overrides the card urgency, reorders the list and can be rese
 
   assert.deepEqual(await (await put(question.key, { priority: null })).json(), { ok: true, priority: null })
   assert.equal((await cards()).find((c) => c.key === question.key)!.urgency, 2)
-  // nothing but the poll's priority stays in watch_state
-  assert.deepEqual((await pg.query<any>(`SELECT key FROM watch_state`)).rows.map((r) => r.key), ['umfrage:p1'])
+  // nothing but the poll's priority stays in watch_state, besides what Jarvis counted for learning (prefs.ts)
+  assert.deepEqual((await pg.query<any>(`SELECT key FROM watch_state WHERE key NOT LIKE 'learn:%'`)).rows.map((r) => r.key), ['umfrage:p1'])
 })
 
 test('PUT priority validates the value and the card', async () => {

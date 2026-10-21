@@ -1,6 +1,7 @@
 // Typed client for the admin interface on the home network (admin/src/server.ts).
 // The admin API uses a session cookie and requires the "X-Jarvis: 1" header on every write.
 import { requestJson } from './http'
+import i18n from '@/i18n'
 
 export type JobStatus = 'running' | 'ok' | 'failed' | 'rolled_back' | 'interrupted'
 export type LogLevel = 'info' | 'ok' | 'warn' | 'error' | 'out'
@@ -49,6 +50,9 @@ export interface SettingsField {
   services: string[]
   placeholder?: string
   adminOnly?: boolean
+  unit?: string
+  /** common values offered as choices; other valid values can still be typed */
+  presets?: { value: string; label: string }[]
 }
 export interface Check { level: 'error' | 'warn' | 'info'; message: string; keys: string[] }
 export interface SettingsResponse {
@@ -155,7 +159,7 @@ export interface AdminApi {
 
 export function createHttpAdmin(homeUrl: string, token?: string): AdminApi {
   const call = <T>(path: string, method: 'GET' | 'POST' = 'GET', body?: unknown, timeoutMs?: number) =>
-    requestJson<T>(`${homeUrl}${path}`, { method, body: method === 'POST' ? (body ?? {}) : undefined, headers: { 'X-Jarvis': '1', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, credentials: 'include', timeoutMs })
+    requestJson<T>(`${homeUrl}${path}`, { method, body: method === 'POST' ? (body ?? {}) : undefined, headers: { 'X-Jarvis': '1', 'Accept-Language': i18n.language, ...(token ? { Authorization: `Bearer ${token}` } : {}) }, credentials: 'include', timeoutMs })
   const job = async (p: Promise<{ job: Job }>) => (await p).job
   return {
     progress: () => call('/api/setup/progress'),

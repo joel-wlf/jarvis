@@ -1,7 +1,7 @@
 // Mock mode: serves the contract fixtures from memory so the whole app runs without a server.
 // Turned on with EXPO_PUBLIC_JARVIS_MOCK=1 or the "try without a server" button on the connect screen.
 import { FIXTURE_CARDS, FIXTURE_HOME, FIXTURE_MEMORIES, FIXTURE_PEOPLE } from '@jarvis/contract/fixtures'
-import type { Card, CardGroup, Device, HomeResponse, Memory, PersonDetail, PersonSummary } from '@jarvis/contract'
+import type { Card, CardGroup, Device, HomeResponse, LearnedRule, Memory, PersonDetail, PersonSummary, PreferencesResponse } from '@jarvis/contract'
 import i18n from '@/i18n'
 import type { JarvisApi } from './client'
 import { JarvisError } from './http'
@@ -19,6 +19,12 @@ export function createMockApi(): JarvisApi {
   let messages = 214
   const people: PersonSummary[] = clone(FIXTURE_PEOPLE)
   const details = new Map<string, PersonDetail>()
+  let learning = true
+  let rules: LearnedRule[] = [
+    { key: 'rule:chat:handball@g.us', kind: 'chat', target: 'handball@g.us', label: 'Handball Herren 2', priority: 1, hidden: false, source: 'learned', updatedAt: iso(30) },
+  ]
+  const prefs = (): PreferencesResponse => clone({ learning, rules })
+  const started = Date.now()
   let devices: Device[] = [
     { id: 'd1', name: 'iPhone', platform: 'ios', kind: 'device', createdAt: iso(400), lastSeenAt: iso(0), current: true },
     { id: 'd2', name: 'Laptop', platform: 'web', kind: 'device', createdAt: iso(900), lastSeenAt: iso(30) },
@@ -106,6 +112,64 @@ export function createMockApi(): JarvisApi {
     async suggest(key) {
       await wait(600)
       return { suggestions: cards.find((c) => c.key === key)?.suggestions ?? [], cached: true }
+    },
+    async context(key) {
+      await wait(250)
+      const card = cards.find((c) => c.key === key)
+      return {
+        chat: card?.source.chat,
+        summary: i18n.t('mock.contextSummary'),
+        messages: [
+          { who: 'Lena', fromMe: false, at: iso(30), text: 'Wer hilft Sonntag beim Umzug?' },
+          { who: i18n.t('card.you'), fromMe: true, at: iso(29), text: 'Ich kann ab 14 Uhr.' },
+          { who: 'Lena', fromMe: false, at: iso(4), text: card?.title ?? '', highlight: true },
+        ],
+      }
+    },
+    async media() {
+      await wait(300)
+      throw new JarvisError('unavailable', i18n.t('card.playUnavailable'), 503)
+    },
+    async preferences() {
+      await wait(120)
+      return prefs()
+    },
+    async setRule(r) {
+      await wait(150)
+      const key = `rule:${r.kind}:${r.target}`
+      rules = rules.filter((x) => x.key !== key)
+      if (r.priority !== null || r.hidden) rules.unshift({ key, kind: r.kind, target: r.target, label: r.target, ...(r.priority ? { priority: r.priority } : {}), hidden: r.hidden, source: 'user', updatedAt: iso(0) })
+      return prefs()
+    },
+    async removeRule(key) {
+      await wait(150)
+      rules = rules.filter((x) => x.key !== key)
+      return prefs()
+    },
+    async setLearning(enabled) {
+      await wait(120)
+      learning = enabled
+      return prefs()
+    },
+    async forgetLearned() {
+      await wait(150)
+      rules = rules.filter((x) => x.source !== 'learned')
+      return prefs()
+    },
+    async status() {
+      await wait(150)
+      // a simulated first hour after setup: every step catches up within two minutes
+      const f = Math.min(1, (Date.now() - started) / 120_000)
+      const step = (id: 'import' | 'transcripts' | 'images' | 'search' | 'organizer' | 'people', total: number, lag = 0) => {
+        const done = Math.round(total * Math.max(0, Math.min(1, f * (1 + lag) - lag)))
+        return { id, total, done, state: done >= total ? ('done' as const) : ('running' as const) }
+      }
+      const steps = [step('import', 100), step('transcripts', 48, 0.1), step('images', 120, 0.2), step('search', 4200, 0.3), step('organizer', 4200, 0.5), step('people', 60, 0.6)]
+      return { busy: f < 1, messages: Math.round(4200 * Math.min(1, f * 1.5)), chats: 86, contacts: 140, named: Math.round(140 * Math.min(1, 0.4 + f)), steps, searchReady: true }
+    },
+    async resyncContacts() {
+      await wait(1500)
+      return { before: 96, after: 131 }
     },
     async people(q) {
       await wait(160)

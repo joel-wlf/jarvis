@@ -90,3 +90,17 @@ test('jedes Image in docker-compose.yml nutzt die Standard-Registry aus dem Sche
   const services = ['admin', 'mcp-server', 'wa-ingest', 'embedder', 'organizer', 'app-web']
   assert.deepEqual(refs.map((m) => m[2]).sort(), services.sort())
 })
+
+test('every visible setting and group has English texts, presets pass validation', async () => {
+  const { FIELDS_EN, GROUPS_EN, localizeField, langOf } = await import('../src/schema.en.js')
+  for (const f of FIELDS.filter((x) => !x.managed)) {
+    assert.ok(FIELDS_EN[f.key], `English text missing for ${f.key}`)
+    for (const p of f.presets ?? []) assert.equal(validateField(f, p.value), null, `${f.key} preset ${p.value}`)
+  }
+  for (const g of GROUPS) assert.ok(GROUPS_EN[g.id], `English group missing for ${g.id}`)
+  const lang = FIELDS.find((f) => f.key === 'TRANSCRIBE_LANG')!
+  assert.equal(localizeField(lang, 'en').presets!.find((p) => p.value === 'auto')!.label, 'Automatic')
+  assert.equal(localizeField(lang, 'de').label, lang.label)
+  assert.equal(langOf('de-DE,de;q=0.9'), 'de')
+  assert.equal(langOf(undefined), 'en')
+})

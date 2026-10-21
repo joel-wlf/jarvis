@@ -170,7 +170,7 @@ async function deployAndVerify(
   }
   const targets = active.filter((s) => s !== SELF)
   log('info', `${o.rollback ? 'Starte vorherigen Stand' : 'Starte Dienste'}: ${targets.join(', ')}${o.build ? ' (mit Neubau)' : ''}`)
-  if (o.initial) log('info', 'Beim ersten Mal werden die Container gebaut. Auf einem Raspberry Pi kann das 10 bis 30 Minuten dauern.')
+  if (o.initial) log('info', 'Beim ersten Mal lädt Jarvis seine Dienste herunter. Wie lange das dauert, hängt von der Internetverbindung ab.')
   // app-web depends on admin. Revisiting dependencies here can recreate this
   // very process after .env is created and interrupt the setup job.
   const args = ['up', '-d', '--no-deps', ...(o.build ? ['--build'] : []), ...targets]

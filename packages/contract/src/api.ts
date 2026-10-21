@@ -92,7 +92,7 @@ export interface ActResponse { ok: true; message: string; removed: boolean }
  * 2 normal, 1 later (never reported actively), null = back to Jarvis' guess. The card list then returns it as `urgency`.
  */
 export interface PriorityRequest { priority: Urgency | null }
-export interface PriorityResponse { ok: true; priority: Urgency | null }
+export interface PriorityResponse { ok: true; priority: Urgency | null; /** set when Jarvis learned a rule from this choice */ message?: string }
 
 /** POST /api/v1/cards/:key/suggest -> fresh reply suggestions (OpenAI, cached per card) */
 export interface SuggestResponse { suggestions: Suggestion[]; cached: boolean }
@@ -172,3 +172,70 @@ export type LiveEvent =
   | { type: 'message'; source: string; at: string; todayCount: number }
   | { type: 'cards'; counts: HomeResponse['counts'] }
   | { type: 'health'; ok: boolean; whatsapp: string }
+
+// --- learning and the owner's rules --------------------------------------------------------------
+
+/**
+ * A rule for all cards of one chat or one card type. `priority` sets their importance, `hidden` keeps them off the feed.
+ * `learned` rules come from the owner's choices (unimportant, later, important); the owner can change or remove each one.
+ */
+export interface LearnedRule {
+  /** "rule:chat:<jid>" or "rule:type:<type>" */
+  key: string
+  kind: 'chat' | 'type'
+  target: string
+  label: string
+  priority?: Urgency
+  hidden: boolean
+  source: 'learned' | 'user'
+  updatedAt: string
+}
+/** GET /api/v1/preferences */
+export interface PreferencesResponse { learning: boolean; rules: LearnedRule[] }
+/** PUT /api/v1/preferences/rules -> PreferencesResponse; priority null and hidden false removes the rule */
+export interface RuleRequest { kind: 'chat' | 'type'; target: string; priority: Urgency | null; hidden: boolean }
+// DELETE /api/v1/preferences/rules/:key -> PreferencesResponse
+/** PUT /api/v1/preferences/learning -> PreferencesResponse */
+export interface LearningRequest { enabled: boolean }
+// POST /api/v1/preferences/forget -> PreferencesResponse (removes learned rules and counters, keeps the owner's own rules)
+
+// --- processing status ---------------------------------------------------------------------------
+
+/** One step of what Jarvis does with the archive. `done` of `total`; `state` says whether it is moving. */
+export interface PipelineStep {
+  id: 'import' | 'transcripts' | 'images' | 'search' | 'organizer' | 'people'
+  state: 'done' | 'running' | 'waiting' | 'off'
+  done: number
+  total: number
+}
+/** GET /api/v1/status: how far the import and the background work are, for the first hours after setup. */
+export interface StatusResponse {
+  /** true while anything is still running or waiting */
+  busy: boolean
+  messages: number
+  chats: number
+  contacts: number
+  /** contacts that have a readable name */
+  named: number
+  oldest?: string
+  steps: PipelineStep[]
+  /** whether the meaning search (embeddings) answers right now */
+  searchReady: boolean
+}
+
+// GET /api/v1/media/:chatJid/:messageId -> the file itself (voice messages as audio/mpeg), for the app's player.
+
+// --- background of a card ------------------------------------------------------------------------
+
+/** GET /api/v1/cards/:key/context: where a card comes from, so the owner understands it without opening WhatsApp. */
+export interface CardContextResponse {
+  chat?: string
+  /** the conversation's summary (thread), and the bigger picture across chats (topic) when there is one */
+  summary?: string
+  topic?: { title: string; summary?: string }
+  /** the original messages, oldest first; `highlight` marks the one the card is about */
+  messages: { who: string; fromMe: boolean; at: string; text: string; highlight?: boolean }[]
+}
+
+/** POST /api/v1/contacts/resync: fetch the address book names from WhatsApp again. Contacts with a name before and after. */
+export interface ResyncResponse { before: number; after: number }

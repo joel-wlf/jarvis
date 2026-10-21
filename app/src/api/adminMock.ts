@@ -24,6 +24,7 @@ const FIELDS: SettingsField[] = [
   { key: 'ORGANIZER_EXCLUDE_NAMES', group: 'privacy', type: 'list', default: '', label: 'Nie an die KI', help: 'Chats mit diesen Namen werden nie sortiert oder zusammengefasst.', services: ['organizer'], placeholder: 'z.B. Arzt,Bank' },
   { key: 'ORGANIZER_ENABLED', group: 'organizer', type: 'bool', default: 'false', label: 'Themen-Sortierung an', help: 'Braucht einen OpenAI-Schlüssel.', services: ['organizer'] },
   { key: 'ORGANIZER_INTERVAL_MIN', group: 'organizer', type: 'int', default: '15', min: 5, max: 240, label: 'Intervall in Minuten', help: 'Wie oft neue Nachrichten sortiert werden.', services: ['organizer'] },
+  { key: 'ORGANIZER_MODEL', group: 'organizer', type: 'text', default: 'gpt-4.1-mini', label: 'Modell', help: 'Günstiges Modell mit strukturierter Ausgabe.', services: ['organizer'], presets: [{ value: 'gpt-4.1-mini', label: 'gpt-4.1-mini' }, { value: 'gpt-4.1-nano', label: 'gpt-4.1-nano' }, { value: 'gpt-4.1', label: 'gpt-4.1' }] },
   { key: 'REQUIRE_CONFIRM', group: 'actions', type: 'bool', default: 'true', label: 'Senden bestätigen', help: 'Claude fragt vor jedem Senden nach.', services: ['mcp-server'] },
   { key: 'ACTIONS_PER_HOUR', group: 'actions', type: 'int', default: '20', min: 1, max: 200, label: 'Aktionen pro Stunde', help: 'Obergrenze für gesendete Nachrichten, Reaktionen und Abstimmungen.', services: ['wa-ingest'] },
 ]

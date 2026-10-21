@@ -12,6 +12,7 @@ import {
   createReminder, loadWatchState, POLL_RENOTIFY_MS, priorityOf, resolveState, setReminderStatus, setWatchFeedback, snoozeReminder,
 } from '../watch.js'
 import { berlinParts, initials, tomorrowMorning, when } from './fmt.js'
+import { learnFrom, ruleFor, rulesOf } from './prefs.js'
 import { fail, type Lang } from './http.js'
 
 /** Where a card points to, for act and suggest. Not sent to the app. */
@@ -21,6 +22,10 @@ export interface CardRef {
   reminderId?: number
   actionId?: number
   storedId?: number
+  /** topic of an event card, to avoid a second card for the same event */
+  topicId?: number
+  /** organizer thread the card comes from, for its background */
+  threadId?: number
   /** watch_state renotify window (polls) */
   renotifyMs?: number
 }
@@ -34,6 +39,9 @@ export interface Built {
 const S = {
   de: {
     later: 'Später', unimportant: 'Unwichtig', done: 'Erledigt', remindMe: 'Erinnere mich', in1h: 'In 1 Std.', in3h: 'In 3 Std.', tomorrow: 'Morgen früh',
+    showIn3h: 'In 3 Std. wieder zeigen', showTomorrow: 'Morgen früh wieder zeigen', showDayBefore: 'Am Vortag wieder zeigen', showMorning: 'Am Morgen wieder zeigen',
+    noted: 'Notiert', seen: 'Gesehen', dateOpen: 'Datum offen', event: 'Termin',
+    eventFromChat: (t: string, w: string) => `${t}: ${w}.`, eventUndated: (t: string) => `${t}. Der genaue Termin steht noch nicht fest.`,
     waiting: 'Wartet seit', relation: 'Beziehung', closeness: 'Nähe', voice: 'Sprachnachricht', asks: (n: string) => `${n} fragt etwas.`,
     voiceSay: (n: string, s: number) => `${n} hat dir ${s ? `${Math.round(s)} Sekunden` : 'etwas'} aufgesprochen.`,
     pollSay: (c: string) => `In ${c} läuft eine Umfrage, du hast noch nicht abgestimmt.`,
@@ -44,6 +52,9 @@ const S = {
   },
   en: {
     later: 'Later', unimportant: 'Not important', done: 'Done', remindMe: 'Remind me', in1h: 'In 1 h', in3h: 'In 3 h', tomorrow: 'Tomorrow morning',
+    showIn3h: 'Show again in 3 h', showTomorrow: 'Show again tomorrow', showDayBefore: 'Show again the day before', showMorning: 'Show again that morning',
+    noted: 'Noted', seen: 'Seen', dateOpen: 'Date open', event: 'Event',
+    eventFromChat: (t: string, w: string) => `${t}: ${w}.`, eventUndated: (t: string) => `${t}. The exact date is not fixed yet.`,
     waiting: 'Waiting since', relation: 'Relationship', closeness: 'Closeness', voice: 'Voice message', asks: (n: string) => `${n} is asking something.`,
     voiceSay: (n: string, s: number) => `${n} sent you ${s ? `${Math.round(s)} seconds of audio` : 'a voice message'}.`,
     pollSay: (c: string) => `There is a poll in ${c} and you have not voted yet.`,
@@ -65,22 +76,62 @@ const cut = (s: string | null | undefined, n: number) => {
   const t = String(s ?? '').replace(/\s+/g, ' ').trim()
   return t.length > n ? `${t.slice(0, n - 1)}…` : t
 }
-const person = (name: string, jid?: string): Person => ({ name, initials: initials(name), ...(jid ? { jid } : {}) })
+const person = (raw: string, jid?: string, l: Lang = 'en'): Person => { const name = niceName(raw, l); return { name, initials: /^\+/.test(name) ? '#' : initials(name), ...(jid ? { jid } : {}) } }
 const iso = (d: Date) => d.toISOString()
 
 function laterSuggestions(l: Lang, now: Date): Suggestion[] {
   const t = S[l]
   return [
-    { id: 'snooze-3h', label: t.in3h, action: { kind: 'snooze', until: iso(new Date(now.getTime() + 3 * 3600_000)) } },
-    { id: 'snooze-tomorrow', label: t.tomorrow, action: { kind: 'snooze', until: iso(tomorrowMorning(now)) } },
+    { id: 'snooze-3h', label: t.showIn3h, action: { kind: 'snooze', until: iso(new Date(now.getTime() + 3 * 3600_000)) } },
+    { id: 'snooze-tomorrow', label: t.showTomorrow, action: { kind: 'snooze', until: iso(tomorrowMorning(now)) } },
     { id: 'dismiss', label: t.unimportant, action: { kind: 'dismiss' } },
   ]
+}
+
+/** Next steps for a fixed date: the owner cannot move it, only take note or see it again closer to the day. */
+function eventSuggestions(at: Date | null, l: Lang, now: Date): Suggestion[] {
+  const t = S[l]
+  const out: Suggestion[] = [{ id: 'noted', label: t.noted, action: { kind: 'done' }, primary: true }]
+  if (at) {
+    const h = (at.getTime() - now.getTime()) / 3600_000
+    const p = berlinParts(at, 'en')
+    // the evening before at 18:00 local, or the morning of the day at 08:00
+    const evening = new Date(at.getTime() - (p.hour + p.minute / 60 + 6) * 3600_000)
+    const morning = new Date(at.getTime() - (p.hour + p.minute / 60 - 8) * 3600_000)
+    if (evening.getTime() > now.getTime() + 3600_000) out.push({ id: 'snooze-daybefore', label: t.showDayBefore, action: { kind: 'snooze', until: iso(evening) } })
+    if (morning.getTime() > now.getTime() + 3600_000 && morning < at) out.push({ id: 'snooze-morning', label: t.showMorning, action: { kind: 'snooze', until: iso(morning) } })
+    else if (h > 4) out.push({ id: 'snooze-3h', label: t.showIn3h, action: { kind: 'snooze', until: iso(new Date(now.getTime() + 3 * 3600_000)) } })
+  }
+  out.push({ id: 'dismiss', label: t.unimportant, action: { kind: 'dismiss' } })
+  return out
+}
+
+/** Organizer suggestions are stored as "Termin: …" or "Aufgabe: …"; the prefix decides the card type. */
+export function actionKind(title: string): { kind: 'event' | 'task'; title: string } {
+  const m = /^\s*(termin|event|appointment|aufgabe|task|to-?do)\s*:\s*/i.exec(title)
+  if (!m) return { kind: 'task', title: title.trim() }
+  return { kind: /^(termin|event|appointment)$/i.test(m[1]) ? 'event' : 'task', title: title.slice(m[0].length).trim() || title.trim() }
+}
+
+/** A readable name instead of a raw WhatsApp address ("4915112345678@s.whatsapp.net" -> "+49 151 12345678"). */
+export function niceName(name: string | null | undefined, l: Lang = 'en'): string {
+  const n = String(name ?? '').trim()
+  const phone = /^(\d{6,15})(?::\d+)?@s\.whatsapp\.net$/.exec(n)
+  if (phone) return formatPhone(phone[1])
+  if (/@lid$/.test(n)) return l === 'de' ? 'Unbekannter Kontakt' : 'Unknown contact'
+  if (/@g\.us$/.test(n)) return l === 'de' ? 'Gruppe' : 'Group'
+  return n || (l === 'de' ? 'Unbekannt' : 'Unknown')
+}
+export function formatPhone(digits: string): string {
+  const cc = /^(1|7|2[07]|3[0-469]|4[013-9]|5[1-8]|6[0-6]|8[1246]|9[0-58])/.exec(digits)?.[1] ?? digits.slice(0, 2)
+  const rest = digits.slice(cc.length)
+  return `+${cc} ${rest.slice(0, 3)} ${rest.slice(3)}`.trim()
 }
 
 function base<T extends CardType>(type: T, key: string, o: { urgency: Urgency; state: CardState; title: string; chat: string; chatJid?: string; at?: Date; dueAt?: Date; whenText?: string; say: string; context?: string; suggestions: Suggestion[]; group?: CardGroup }, l: Lang, now: Date) {
   return {
     key, type, group: o.group ?? CARD_GROUP[type], urgency: o.urgency, ...(o.dueAt ? { dueAt: iso(o.dueAt) } : {}), state: o.state, title: o.title,
-    source: { chat: o.chat, ...(o.chatJid ? { chatJid: o.chatJid } : {}), when: o.whenText ?? (o.at ? when(o.at, l, now) : ''), ...(o.at ? { at: iso(o.at) } : {}) },
+    source: { chat: niceName(o.chat, l), ...(o.chatJid ? { chatJid: o.chatJid } : {}), when: o.whenText ?? (o.at ? when(o.at, l, now) : ''), ...(o.at ? { at: iso(o.at) } : {}) },
     say: o.say, ...(o.context ? { context: o.context } : {}), suggestions: o.suggestions,
   }
 }
@@ -119,7 +170,8 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
     const key = `frage:${x.chat_jid}:${Math.floor(ts.getTime() / 1000)}`
     const state = visible(key)
     if (!state) continue
-    const p = person(x.chat_name, x.chat_jid)
+    const name = niceName(x.chat_name, l)
+    const p = person(x.chat_name, x.chat_jid, l)
     const ageH = (now.getTime() - ts.getTime()) / 3600_000
     const urgency: Urgency = (x.closeness ?? 0) >= 4 && ageH > 6 ? 3 : 2
     const stats: Stat[] = [{ label: t.waiting, value: when(ts, l, now) }]
@@ -129,9 +181,9 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
     const ref = { chatJid: x.chat_jid, messageId: x.id }
     if (x.type === 'audio') {
       const sec = Number(x.seconds ?? 0)
-      out.push({ at: ts.getTime(), ref, card: { ...base('voice', key, { ...common, title: t.voice, say: t.voiceSay(x.chat_name, sec) }, l, now), data: { person: p, durationSec: sec, summary: cut(x.body, 160), ...(x.body ? { transcript: x.body } : {}), stats } } })
+      out.push({ at: ts.getTime(), ref, card: { ...base('voice', key, { ...common, title: t.voice, say: t.voiceSay(name, sec) }, l, now), data: { person: p, durationSec: sec, summary: cut(x.body, 160), ...(x.body ? { transcript: x.body } : {}), messageId: x.id, stats } } })
     } else {
-      out.push({ at: ts.getTime(), ref, card: { ...base('question', key, { ...common, title: cut(x.body, 80), say: t.asks(x.chat_name) }, l, now), data: { person: p, quote: cut(x.body, 400), waitingSince: iso(ts), stats } } })
+      out.push({ at: ts.getTime(), ref, card: { ...base('question', key, { ...common, title: cut(x.body, 80), say: t.asks(name) }, l, now), data: { person: p, quote: cut(x.body, 400), waitingSince: iso(ts), stats } } })
     }
   }
 
@@ -159,10 +211,10 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
     const suggestions: Suggestion[] = options.slice(0, 4).map((o, i) => ({ id: `vote-${i}`, label: o.label, action: { kind: 'vote', option: o.label, pollId: x.id }, ...(o.recommended ? { primary: true } : {}) }))
     suggestions.push(laterSuggestions(l, now)[2])
     const ageD = (now.getTime() - ts.getTime()) / 86400_000
-    out.push({ at: ts.getTime(), ref: { chatJid: x.chat_jid, messageId: x.id, renotifyMs: POLL_RENOTIFY_MS }, card: { ...base('poll', key, { urgency: ageD < 1 ? 2 : 1, state, title: cut(x.question, 120), chat: x.chat_name, chatJid: x.chat_jid, at: ts, say: t.pollSay(x.chat_name), suggestions }, l, now), data: { pollId: x.id, voted: String(res?.voted ?? 0), options } } })
+    out.push({ at: ts.getTime(), ref: { chatJid: x.chat_jid, messageId: x.id, renotifyMs: POLL_RENOTIFY_MS }, card: { ...base('poll', key, { urgency: ageD < 1 ? 2 : 1, state, title: cut(x.question, 120), chat: x.chat_name, chatJid: x.chat_jid, at: ts, say: t.pollSay(niceName(x.chat_name, l)), suggestions }, l, now), data: { pollId: x.id, voted: String(res?.voted ?? 0), options } } })
   }
 
-  // --- events (next 3 days, same stages as the watch service) and conflicts (next 7 days) ---
+  // --- events (next 7 days, same stages as the watch service) and conflicts ---
   const evs = await q<{ id: number; title: string; summary: string | null; event_at: Date; facts: any; chat_count: number }>(
     `SELECT id, title, summary, event_at, facts, chat_count FROM topics
      WHERE status = 'open' AND event_at BETWEEN now() - interval '2 hours' AND now() + interval '7 days' ORDER BY event_at LIMIT 30`,
@@ -170,7 +222,6 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
   for (const x of evs) {
     const at = new Date(x.event_at)
     const h = (at.getTime() - now.getTime()) / 3600_000
-    if (h > 72) continue
     const stage = h <= 3.5 ? 'kurz' : h >= 12 && h <= 30 ? 'vortag' : 'info'
     const key = `event:${x.id}:${stage}`
     const state = visible(key)
@@ -179,14 +230,13 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
     const yes = ppl.filter((p) => p.state === 'yes')
     const p = berlinParts(at, l)
     const stats: Stat[] = [{ label: t.people, value: String(ppl.length) }, { label: t.chats, value: String(x.chat_count ?? 1) }]
-    const remindAt = new Date(Math.max(now.getTime() + 5 * 60_000, at.getTime() - 2 * 3600_000))
     out.push({
-      at: at.getTime(), ref: {},
+      at: at.getTime(), ref: { topicId: Number(x.id) },
       card: {
         ...base('event', key, {
           urgency: h <= 3.5 ? 3 : h <= 30 ? 2 : 1, dueAt: at, state, title: x.title, chat: x.chat_count > 1 ? `${x.chat_count} ${t.chats}` : 'WhatsApp', at, whenText: when(at, l, now),
           say: t.eventSay(x.title, when(at, l, now)), context: cut(x.summary, 220) || undefined,
-          suggestions: [{ id: 'remind', label: t.remindMe, action: { kind: 'remind', at: iso(remindAt), text: x.title }, primary: true }, laterSuggestions(l, now)[2]],
+          suggestions: eventSuggestions(at, l, now),
         }, l, now),
         data: { day: p.day, weekday: p.weekday, month: p.month, time: p.time, ...(x.facts?.place ? { place: String(x.facts.place) } : {}), attendees: yes.slice(0, 8).map((y) => person(y.name)), yes: yes.length, stats },
       },
@@ -233,23 +283,52 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
     })
   }
 
-  // --- suggested actions (organizer) ---
-  const acts = await q<{ id: number; title: string; detail: string | null; due_at: Date | null; created_at: Date }>(
-    `SELECT id, title, detail, due_at, created_at FROM suggested_actions
-     WHERE status = 'open' AND (due_at BETWEEN now() - interval '1 day' AND now() + interval '7 days' OR (due_at IS NULL AND created_at > now() - interval '7 days'))
-     ORDER BY due_at NULLS LAST, created_at DESC LIMIT 15`,
+  // --- suggested actions (organizer): "Termin: …" become event cards, "Aufgabe: …" tasks ---
+  const shownTopics = new Set(out.filter((b) => b.ref.topicId != null).map((b) => b.ref.topicId))
+  const acts = await q<{ id: number; title: string; detail: string | null; due_at: Date | null; created_at: Date; thread_id: number | null; chat_jid: string | null; chat_name: string | null; topic_id: number | null }>(
+    `SELECT a.id, a.title, a.detail, a.due_at, a.created_at, a.thread_id, th.chat_jid, c.name AS chat_name, th.topic_id
+     FROM suggested_actions a LEFT JOIN threads th ON th.id = a.thread_id LEFT JOIN v_chats c ON c.jid = th.chat_jid
+     WHERE a.status = 'open' AND (a.due_at BETWEEN now() - interval '1 day' AND now() + interval '14 days' OR (a.due_at IS NULL AND a.created_at > now() - interval '7 days'))
+     ORDER BY a.due_at NULLS LAST, a.created_at DESC LIMIT 20`,
   )
   for (const x of acts) {
     const key = `aktion:${x.id}`
     const state = visible(key)
     if (!state) continue
     const due = x.due_at ? new Date(x.due_at) : null
+    const kind = actionKind(x.title)
+    const chat = x.chat_name ? niceName(x.chat_name, l) : kind.kind === 'event' ? t.event : t.task
+    const ref: CardRef = { actionId: Number(x.id), ...(x.chat_jid ? { chatJid: x.chat_jid } : {}), ...(x.thread_id != null ? { threadId: Number(x.thread_id) } : {}), ...(x.topic_id != null ? { topicId: Number(x.topic_id) } : {}) }
+    const created = new Date(x.created_at)
+    if (kind.kind === 'event') {
+      // the topic's own event card already covers it
+      if (x.topic_id != null && shownTopics.has(Number(x.topic_id))) continue
+      if (due && due.getTime() < now.getTime() - 2 * 3600_000) continue
+      const h = due ? (due.getTime() - now.getTime()) / 3600_000 : Infinity
+      const p = due ? berlinParts(due, l) : null
+      const place = /(?:^|·\s*)(?:Ort|Place|Where):\s*([^·]+)/i.exec(x.detail ?? '')?.[1]?.trim()
+      const note = (x.detail ?? '').split('·').map((v) => v.trim()).filter((v) => v && !/^(Ort|Place|Where):/i.test(v)).join(' · ')
+      out.push({
+        at: (due ?? created).getTime(), ref,
+        card: {
+          ...base('event', key, {
+            urgency: h <= 3.5 ? 3 : h <= 30 ? 2 : 1, ...(due ? { dueAt: due } : {}), state, title: cut(kind.title, 120), chat, ...(x.chat_jid ? { chatJid: x.chat_jid } : {}),
+            at: due ?? created, whenText: due ? when(due, l, now) : t.dateOpen,
+            say: due ? t.eventFromChat(cut(kind.title, 120), when(due, l, now)) : t.eventUndated(cut(kind.title, 120)), context: note || undefined,
+            suggestions: eventSuggestions(due, l, now), group: 'schedule',
+          }, l, now),
+          data: { day: p?.day ?? '', weekday: p?.weekday ?? t.dateOpen, month: p?.month ?? '', time: p?.time ?? '', ...(place ? { place } : {}), attendees: [], yes: 0, stats: [] },
+        },
+      })
+      continue
+    }
     const daysLeft = due ? Math.ceil((due.getTime() - now.getTime()) / 86400_000) : undefined
     out.push({
-      at: (due ?? new Date(x.created_at)).getTime(), ref: { actionId: Number(x.id) },
+      at: (due ?? created).getTime(), ref,
       card: {
         ...base('task', key, {
-          urgency: daysLeft !== undefined && daysLeft <= 1 ? 2 : 1, ...(due ? { dueAt: due } : {}), state, title: cut(x.title, 120), chat: t.task, at: due ?? new Date(x.created_at), say: t.taskSay(cut(x.title, 120)),
+          urgency: daysLeft !== undefined && daysLeft <= 1 ? 2 : 1, ...(due ? { dueAt: due } : {}), state, title: cut(kind.title, 120), chat, ...(x.chat_jid ? { chatJid: x.chat_jid } : {}),
+          at: due ?? created, ...(due ? { whenText: when(due, l, now) } : {}), say: t.taskSay(cut(kind.title, 120)),
           suggestions: [{ id: 'done', label: t.done, action: { kind: 'done' }, primary: true }, ...laterSuggestions(l, now)],
         }, l, now),
         data: { ...(x.detail ? { note: cut(x.detail, 300) } : {}), ...(due ? { dueAt: iso(due), daysLeft } : {}) },
@@ -270,7 +349,7 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
     if (!state) continue
     const th = await q<{ title: string }>(`SELECT title FROM threads WHERE chat_jid = $1 AND ended_at > now() - interval '2 days' ORDER BY ended_at DESC LIMIT 4`, [x.chat_jid])
     const last = new Date(x.last)
-    out.push({ at: last.getTime(), ref: { chatJid: x.chat_jid }, card: { ...base('digest', key, { urgency: 1, state, title: x.chat_name, chat: x.chat_name, chatJid: x.chat_jid, at: last, say: t.digestSay(x.chat_name, Number(x.n)), suggestions: [{ id: 'done', label: t.done, action: { kind: 'done' }, primary: true }] }, l, now), data: { unread: Number(x.n), bullets: th.map((y) => y.title) } } })
+    out.push({ at: last.getTime(), ref: { chatJid: x.chat_jid }, card: { ...base('digest', key, { urgency: 1, state, title: niceName(x.chat_name, l), chat: x.chat_name, chatJid: x.chat_jid, at: last, say: t.digestSay(niceName(x.chat_name, l), Number(x.n)), suggestions: [{ id: 'done', label: t.done, action: { kind: 'done' }, primary: true }] }, l, now), data: { unread: Number(x.n), bullets: th.map((y) => y.title) } } })
   }
 
   // --- people to keep in touch with: close, but no contact for three weeks ---
@@ -288,7 +367,7 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
     const facts: Stat[] = [{ label: t.relation, value: relLabel(x.relationship, l) ?? '-' }, { label: t.closeness, value: `${x.closeness}/5` }]
     if (x.messages) facts.push({ label: t.messages, value: String(x.messages) })
     const lastText = last ? when(last, l, now) : '-'
-    out.push({ at: last?.getTime() ?? 0, ref: { chatJid: x.jid }, card: { ...base('person', key, { urgency: 1, state, title: x.name, chat: x.name, chatJid: x.jid, ...(last ? { at: last } : {}), say: t.personSay(x.name, lastText), suggestions: laterSuggestions(l, now) }, l, now), data: { person: person(x.name, x.jid), facts, lastContact: lastText } } })
+    out.push({ at: last?.getTime() ?? 0, ref: { chatJid: x.jid }, card: { ...base('person', key, { urgency: 1, state, title: niceName(x.name, l), chat: x.name, chatJid: x.jid, ...(last ? { at: last } : {}), say: t.personSay(niceName(x.name, l), lastText), suggestions: laterSuggestions(l, now) }, l, now), data: { person: person(x.name, x.jid, l), facts, lastContact: lastText } } })
   }
 
   // --- organizer cards (cards table) ---
@@ -309,9 +388,17 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
     out.push({ at: new Date(x.due_at ?? x.created_at).getTime(), ref: { storedId: Number(x.id), ...(x.chat_jid ? { chatJid: x.chat_jid } : {}) }, card })
   }
 
-  // The owner's own importance (watch_state.priority) beats Jarvis' guess.
-  for (const b of out) {
-    const p = priorityOf(b.card.key, watch)
+  // The owner's own importance (watch_state.priority) beats a rule for the chat or type, which beats Jarvis' guess.
+  // Rules are learned from the owner's choices or set in the app (prefs.ts); a hidden rule keeps the card off the feed.
+  const rules = rulesOf(watch)
+  for (let i = out.length - 1; i >= 0; i--) {
+    const b = out[i]
+    const rule = ruleFor(b.card, b.ref.chatJid, rules)
+    if (rule?.dismissed) {
+      out.splice(i, 1)
+      continue
+    }
+    const p = priorityOf(b.card.key, watch) ?? (rule?.priority ? (rule.priority as Urgency) : undefined)
     if (p) b.card.urgency = p
   }
   // Importance first, then the nearest deadline, then the newest.
@@ -379,7 +466,8 @@ export async function act(b: Built, a: CardAction, l: Lang): Promise<ActResult> 
       else if (ref.actionId != null) await memDb.query(`UPDATE suggested_actions SET status = 'dismissed' WHERE id = $1`, [ref.actionId])
       else if (ref.storedId != null) await memDb.query(`UPDATE cards SET status = 'dismissed', updated_at = now() WHERE id = $1`, [ref.storedId])
       else await setWatchFeedback(key, 'dismiss', { note: `${OWNER}: unwichtig (App)` })
-      return { message: de ? 'Wird nicht mehr angezeigt.' : 'Will not be shown again.', removed: true }
+      const learned = card.type === 'reminder' ? null : await learnFrom(card, ref.chatJid, 'down', l).catch(() => null)
+      return { message: learned ?? (de ? 'Wird nicht mehr angezeigt.' : 'Will not be shown again.'), removed: true }
     }
     case 'snooze': {
       const until = parseUntil(a.until, 'until')

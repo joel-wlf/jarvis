@@ -12,6 +12,8 @@ import { type } from '@/theme/type'
 import { Icon } from '../Icon'
 import { Mark, Meta, Micro, Press, Route, Seg, Slab, type SegItem } from '../ui'
 import * as P from './parts'
+import { Background } from './Background'
+import { VoicePlayer } from './VoicePlayer'
 
 export type ActFn = (card: Card, action: CardAction) => void
 
@@ -34,6 +36,14 @@ const CHOICE_PREFIX: Partial<Record<Card['type'], string>> = { ride: 'ride', sig
 const isChoice = (card: Card, s: Suggestion) => { const pre = CHOICE_PREFIX[card.type]; return !!pre && s.id.startsWith(`${pre}:`) }
 
 const primaryOf = (c: Card): Suggestion | undefined => c.suggestions.find((s) => s.primary) ?? c.suggestions[0]
+
+/** Loaded replies go first. On reply cards the first reply is the main action; elsewhere they are extra options. */
+function mergeSuggestions(card: Card, extra: Suggestion[]): Suggestion[] {
+  const known = new Set(card.suggestions.map((s) => (s.action.kind === 'send' ? s.action.text : s.id)))
+  const fresh = extra.filter((s) => !(s.action.kind === 'send' && known.has(s.action.text)))
+  if (card.group !== 'reply') return [...card.suggestions, ...fresh.map((s) => ({ ...s, primary: false }))]
+  return [...fresh.map((s, i) => ({ ...s, primary: i === 0 })), ...card.suggestions.map((s) => ({ ...s, primary: fresh.length ? false : s.primary }))]
+}
 
 /** Buttons for segmented cards: extra actions and the non-primary suggestions, then the primary in black. */
 function segFor(card: Card, act: ActFn, extra: { key: string; label: string; action: CardAction }[] = []): SegItem[] {
@@ -68,12 +78,12 @@ function spec(card: Card, act: ActFn, t: TFunction, pick: Suggestion | undefined
         sub: `${d.person.name} · ${card.source.when}`,
         body: (
           <>
-            <P.VoiceRow seconds={d.durationSec} />
-            <P.Quote text={d.summary} />
+            <VoicePlayer seconds={d.durationSec} chatJid={d.person.jid ?? card.source.chatJid} messageId={d.messageId} />
+            <P.Quote text={d.transcript || d.summary || t('card.noTranscript')} />
             <Meta stats={d.stats} />
           </>
         ),
-        headline: t('card.replyPrepared'),
+        headline: card.suggestions.some((x) => x.action.kind === 'send') ? t('card.replyPrepared') : undefined,
       }
     }
     case 'reaction': {
@@ -85,11 +95,11 @@ function spec(card: Card, act: ActFn, t: TFunction, pick: Suggestion | undefined
       return {
         body: (
           <>
-            <P.DateBig big={d.day} line={`${d.weekday} · ${d.month}`} small={d.place} />
-            <Meta stats={d.stats} />
+            <P.DateBig big={d.day || '–'} line={d.day ? `${d.weekday} · ${d.month}` : t('card.dateOpen')} small={d.place} />
+            {d.stats.length ? <Meta stats={d.stats} /> : null}
           </>
         ),
-        headline: `${d.weekday} ${d.time}`,
+        headline: d.day ? `${d.weekday} ${d.time}` : t('card.dateOpen'),
       }
     }
     case 'conflict': {
@@ -136,7 +146,7 @@ function spec(card: Card, act: ActFn, t: TFunction, pick: Suggestion | undefined
             {d.daysLeft !== undefined && d.daysTotal ? <P.Due fraction={1 - d.daysLeft / d.daysTotal} label={t('card.daysLeft', { count: d.daysLeft })} color={c} /> : null}
           </>
         ),
-        headline: card.source.when,
+        headline: d.dueAt ? t('card.dueWhen', { when: card.source.when }) : card.source.chatJid ? t('card.fromChat', { chat: card.source.chat }) : t('card.openTask'),
       }
     }
     case 'poll': {
@@ -405,16 +415,24 @@ function spec(card: Card, act: ActFn, t: TFunction, pick: Suggestion | undefined
 
 interface Props {
   card: Card
+  /** reply suggestions loaded for the selected card (POST /cards/:key/suggest) */
+  extra?: Suggestion[]
+  /** true while they are being written */
+  suggesting?: boolean
   selected: boolean
   onSelect: (key: string) => void
   act: ActFn
   /** the owner's importance for this card (or Jarvis' guess) */
   priority: Urgency
   onPriority: (key: string, level: Urgency) => void
+  /** a rule for every card from this card's chat (learning page lists and undoes it) */
+  onChatRule?: (card: Card, level: 'later' | 'important' | 'hidden') => void
 }
 
-export const CardView = memo(function CardView({ card, selected, onSelect, act, priority, onPriority }: Props) {
+export const CardView = memo(function CardView({ card: raw, extra, suggesting, selected, onSelect, act, priority, onPriority, onChatRule }: Props) {
   const { t } = useTranslation()
+  // Written replies come first; on reply cards the best one becomes the main action
+  const card = extra?.length ? ({ ...raw, suggestions: mergeSuggestions(raw, extra) } as Card) : raw
   const c = groupColor[card.group]
   const [pickId, setPickId] = useState<string | null>(null)
   // Picking a car or a sign-up line swaps the primary suggestion; the owner's own pick wins over Jarvis' recommendation.
@@ -470,6 +488,7 @@ export const CardView = memo(function CardView({ card, selected, onSelect, act, 
           <Text style={[type.bodyItalic, { fontSize: 14.5, flex: 1, color: colors.ink2 }]}>{card.context}</Text>
         </View>
       ) : null}
+      {selected && suggesting ? <Text style={[type.small, { fontStyle: 'italic' }]}>{t('card.writingReplies')}</Text> : null}
       {selected && others.length ? (
         <View style={st.more}>
           <Micro style={{ paddingTop: 12, paddingBottom: 4, paddingHorizontal: 18 }}>{t('card.otherSuggestions')}</Micro>
@@ -481,8 +500,17 @@ export const CardView = memo(function CardView({ card, selected, onSelect, act, 
           ))}
         </View>
       ) : null}
+      {selected && (card.source.chatJid || card.type === 'event') ? <Background cardKey={card.key} color={c} /> : null}
       {selected ? <P.Priority value={priority} color={c} onChange={(u) => onPriority(card.key, u)} /> : null}
+      {selected && onChatRule && card.source.chatJid ? <P.ChatRule chat={card.source.chat} onRule={(level) => onChatRule(card, level)} /> : null}
       {sp.seg ? <Seg items={sp.seg} style={{ marginBottom: 18 }} /> : null}
+      {!sp.seg && !sp.bare && primary?.action.kind === 'send' ? (
+        // never send words the owner has not seen
+        <View style={st.draft}>
+          <Micro>{t('card.willSend')}</Micro>
+          <Text style={[type.body, { fontSize: 15 }]}>{primary.action.text}</Text>
+        </View>
+      ) : null}
       {!sp.seg && !sp.bare && primary ? (
         <Slab big={sp.headline ?? primary.label} button={sp.button ?? (sp.headline && primary.label.length <= 18 ? primary.label : verb)} onPress={() => act(card, primary.action)} />
       ) : null}
@@ -499,5 +527,6 @@ const st = StyleSheet.create({
   avatar: { width: 54, height: 54, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.ground2 },
   avatarText: { fontFamily: 'Urbanist-LightItalic', fontSize: 20, color: colors.ink2 },
   more: { marginHorizontal: -18, borderTopWidth: 1, borderTopColor: colors.line },
+  draft: { gap: 4, borderLeftWidth: 2, borderLeftColor: colors.line2, paddingLeft: 10 },
   moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 18, backgroundColor: colors.card },
 })

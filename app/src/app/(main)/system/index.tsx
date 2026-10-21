@@ -7,10 +7,13 @@ import { useRouter, type Href } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { API_VERSION, type ServerInfo } from '@jarvis/contract'
 import type { StatusResponse } from '@/api/admin'
+import type { StatusResponse as PipelineStatus } from '@jarvis/contract'
+import { Processing } from '@/components/today/Processing'
 import { fetchInfo } from '@/api/client'
 import { Page, Section } from '@/components/Page'
 import { AdminGate, useAdmin } from '@/components/system/AdminGate'
-import { BlockButton, Meta, Notice, Panel, Row } from '@/components/ui'
+import { BlockButton, Meta, Notice, Panel, Row, Seg } from '@/components/ui'
+import i18n, { setLanguage } from '@/i18n'
 import { ago, bytes, errorText } from '@/i18n/format'
 import { useSession } from '@/state/session'
 import { colors } from '@/theme/tokens'
@@ -23,7 +26,23 @@ export default function System() {
       <AdminGate>
         <Overview />
       </AdminGate>
+      <LanguagePicker />
     </Page>
+  )
+}
+
+/** Outside the admin gate: the language is the owner's own preference on this device. */
+function LanguagePicker() {
+  const { t } = useTranslation()
+  return (
+    <Section title={t('system.language')}>
+      <Seg
+        items={[
+          { key: 'en', label: 'English', on: i18n.language === 'en', onPress: () => void setLanguage('en') },
+          { key: 'de', label: 'Deutsch', on: i18n.language === 'de', onPress: () => void setLanguage('de') },
+        ]}
+      />
+    </Section>
   )
 }
 
@@ -44,20 +63,22 @@ function Overview() {
   const { t } = useTranslation()
   const router = useRouter()
   const { admin } = useAdmin()
-  const { session, signOut } = useSession()
+  const { session, signOut, api } = useSession()
   const wide = useWide()
   const [status, setStatus] = useState<StatusResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<ServerInfo | null>(null)
+  const [pipeline, setPipeline] = useState<PipelineStatus | null>(null)
 
   const load = useCallback(async () => {
+    void api.status().then(setPipeline).catch(() => {})
     try {
       setError(null)
       setStatus(await admin.status())
     } catch (e) {
       setError(errorText(e))
     }
-  }, [admin])
+  }, [admin, api])
 
   useEffect(() => {
     void load()
@@ -69,8 +90,9 @@ function Overview() {
   }, [session])
 
   const areas: { href: Href; title: string; sub: string }[] = [
-    { href: '/system/access', title: 'Dein Passwort', sub: 'Ein Passwort für Web, Mobile und MCP-Anmeldung' },
-    { href: '/system/connections', title: 'Verbindungen', sub: 'Mobile App verbinden · MCP für Claude und andere KI-Clients' },
+    { href: '/system/learning', title: t('learning.title'), sub: t('learning.areaSub') },
+    { href: '/system/access', title: t('system.password'), sub: t('system.passwordSub') },
+    { href: '/system/connections', title: t('system.connections'), sub: t('system.connectionsSub') },
     { href: '/system/settings', title: t('system.settings'), sub: t('system.settingsSub') },
     { href: '/system/whatsapp', title: t('system.wa'), sub: t('system.waSub') },
     { href: '/system/devices', title: t('system.devices'), sub: t('system.devicesSub') },
@@ -83,6 +105,7 @@ function Overview() {
   const statusSection = (
       <Section title={t('system.status')}>
         {error ? <Notice level="error" text={error} /> : null}
+        {pipeline ? <Processing status={pipeline} collapsible={false} /> : null}
         {!status ? (
           <Text style={type.sub}>{t('common.loading')}</Text>
         ) : (
@@ -139,17 +162,17 @@ function Overview() {
 
   const buttons = (
       <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+        {/* One sign-out for everything: this device's session and the administration */}
         <BlockButton
-          label={t('system.logout')}
+          label={t('common.signOut')}
           variant="line"
           onPress={() =>
             void admin
               .logout()
               .catch(() => {})
-              .then(() => router.replace('/'))
+              .then(() => signOut())
           }
         />
-        <BlockButton label={t('common.signOut')} variant="line" onPress={() => void signOut()} />
       </View>
   )
 

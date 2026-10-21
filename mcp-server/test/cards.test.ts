@@ -84,7 +84,8 @@ test('done and dismiss on reminders and tasks update their own tables', async ()
   assert.equal((await pg.query<any>(`SELECT status FROM reminders WHERE id = 1`)).rows[0].status, 'done')
   assert.equal((await actOn('aktion:1', { kind: 'dismiss' })).status, 200)
   assert.equal((await pg.query<any>(`SELECT status FROM suggested_actions WHERE id = 1`)).rows[0].status, 'dismissed')
-  assert.equal((await pg.query(`SELECT 1 FROM watch_state`)).rows.length, 0)
+  // only the learning counters (prefs.ts) are written, never a dismiss entry for the task itself
+  assert.deepEqual((await pg.query<any>(`SELECT key FROM watch_state ORDER BY key`)).rows.map((r) => r.key), ['learn:type:task'])
 })
 
 test('remind creates a reminder referencing the card', async () => {
@@ -102,7 +103,7 @@ test('send and vote go through the outbox', async () => {
   const q = byType(await cards(), 'question')
   const sent = await actOn(q.key, { kind: 'send', text: 'Klar, bin dabei!' })
   assert.equal(sent.status, 200)
-  assert.deepEqual(await sent.json(), { ok: true, message: 'Gesendet.', removed: true })
+  assert.deepEqual(await sent.json(), { ok: true, message: 'Sent.', removed: true }) // English without Accept-Language
   const job = (await pg.query<any>(`SELECT kind, chat_jid, payload FROM outbox ORDER BY id DESC LIMIT 1`)).rows[0]
   assert.equal(job.kind, 'send_text')
   assert.equal(job.chat_jid, ANNA)

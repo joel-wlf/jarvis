@@ -37,14 +37,14 @@ export function apiErrorHandler(err: unknown, _req: Request, res: Response, _nex
 
 export type Lang = 'de' | 'en'
 
-/** German or English from Accept-Language (first of the two that appears), German by default. */
+/** German or English from Accept-Language (first of the two that appears), English by default. */
 export function lang(req: Pick<Request, 'headers'>): Lang {
   const h = String(req.headers['accept-language'] ?? '').toLowerCase()
   for (const part of h.split(',')) {
     const tag = part.trim().slice(0, 2)
     if (tag === 'de' || tag === 'en') return tag
   }
-  return 'de'
+  return 'en'
 }
 
 export const bearerOf = (req: Request) => {

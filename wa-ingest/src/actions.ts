@@ -17,7 +17,26 @@ import {
   type WASocket,
 } from '@whiskeysockets/baileys'
 import pino from 'pino'
-import { getSelfIds, loadPoll, pollOptionNames, pool, prepareMediaForDownload } from './store.js'
+import { fillLidNames, getSelfIds, loadPoll, pollOptionNames, pool, prepareMediaForDownload } from './store.js'
+
+
+/** Re-encodes audio as MP3 (64 kbit/s mono) with ffmpeg, which the image already ships for transcription. */
+function toMp3(input: Buffer): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const ff = spawn('ffmpeg', ['-v', 'error', '-i', 'pipe:0', '-vn', '-ac', '1', '-b:a', '64k', '-f', 'mp3', 'pipe:1'])
+    const out: Buffer[] = []
+    ff.stdout.on('data', (d: Buffer) => out.push(d))
+    ff.on('error', reject)
+    ff.on('close', (code) => (code === 0 && out.length ? resolve(Buffer.concat(out)) : reject(new Error('Audio konnte nicht umgewandelt werden'))))
+    ff.stdin.on('error', () => {})
+    ff.stdin.end(input)
+  })
+}
+
+async function namedCount(): Promise<number> {
+  const r = await pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM contacts WHERE NOT is_group AND coalesce(name, push_name) IS NOT NULL`)
+  return Number(r.rows[0]?.n ?? 0)
+}
 
 const log = pino({ level: process.env.LOG_LEVEL ?? 'info' }).child({ module: 'actions' })
 
@@ -470,6 +489,19 @@ async function run(s: WASocket, job: Job): Promise<Record<string, unknown>> {
       return { ok: true }
     }
 
+    // ---------- Kontaktnamen neu abgleichen ----------
+    case 'resync_contacts': {
+      // Names from the phone's address book arrive as app state ("critical_unblock_low"), normally only once after
+      // linking. Forgetting the stored version makes WhatsApp send the full snapshot again; contacts.upsert stores it.
+      const before = await namedCount()
+      await s.authState.keys.set({ 'app-state-sync-version': { critical_unblock_low: null } })
+      await s.resyncAppState(['critical_unblock_low'], false)
+      await new Promise((r) => setTimeout(r, 1500)) // contacts.upsert is written asynchronously
+      await fillLidNames()
+      const after = await namedCount()
+      return { before, after }
+    }
+
     // ---------- Medien ansehen ----------
     case 'download_media': {
       const f = await loadFull(chat, p.message_id)
@@ -481,6 +513,11 @@ async function run(s: WASocket, job: Job): Promise<Record<string, unknown>> {
         c?.imageMessage?.mimetype ?? c?.stickerMessage?.mimetype ?? c?.documentMessage?.mimetype ??
         c?.videoMessage?.mimetype ?? c?.audioMessage?.mimetype ?? 'application/octet-stream'
       if (buf.length > 8 * 1024 * 1024) throw new Error(`Datei zu groß zum Anzeigen (${Math.round(buf.length / 1048576)} MB)`)
+      // Voice messages are Ogg/Opus, which Safari and iOS cannot play: hand out MP3 when asked
+      if (p.as === 'mp3' && f.type === 'audio') {
+        const mp3 = await toMp3(buf)
+        return { mimetype: 'audio/mpeg', type: f.type, bytes: mp3.length, base64: mp3.toString('base64') }
+      }
       return { mimetype, type: f.type, bytes: buf.length, base64: buf.toString('base64') }
     }
     default:
