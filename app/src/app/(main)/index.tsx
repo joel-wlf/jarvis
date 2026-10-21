@@ -11,6 +11,7 @@ import { Subtitle } from '@/components/jarvis/Subtitle'
 import { AskDock } from '@/components/today/AskDock'
 import { GroupTabs } from '@/components/today/GroupTabs'
 import { Modules } from '@/components/today/Modules'
+import { Processing } from '@/components/today/Processing'
 import { StatsStrip } from '@/components/today/Stats'
 import { BlockButton, Micro } from '@/components/ui'
 import { useWide } from '@/components/useWide'
@@ -53,7 +54,7 @@ export default function Today() {
     >
       <Floor width={stage.w} height={stage.h} />
       <JarvisFigure state={s.figure} size={figureSize} />
-      <Subtitle text={s.say} onDone={s.onSayDone} style={wide ? { fontSize: 22, lineHeight: 29, maxWidth: 460 } : undefined} />
+      <Subtitle text={s.say} lines={s.lines} onDone={s.onSayDone} style={wide ? { fontSize: 22, lineHeight: 29, maxWidth: 460 } : undefined} />
     </View>
   )
 
@@ -63,6 +64,12 @@ export default function Today() {
     </View>
   ) : null
   const modulesView = s.home ? <Modules modules={s.home.modules} lastSource={s.lastSource} wide={wide} /> : null
+  // While Jarvis is still reading in, show how far it is (import, transcripts, search index, sorting)
+  const processingView = s.status?.busy ? (
+    <View style={{ marginHorizontal: pad, marginTop: 14 }}>
+      <Processing status={s.status} />
+    </View>
+  ) : null
 
   const feed = (
     <View style={{ paddingTop: wide ? 28 : 26 }} accessibilityLabel={t('today.feedLabel')}>
@@ -87,7 +94,7 @@ export default function Today() {
         ) : s.visible.length === 0 ? (
           <Text style={[type.body, { paddingVertical: 12 }]}>{s.counts.all ? t('today.emptyGroup') : t('today.emptyAll')}</Text>
         ) : (
-          s.visible.map((c) => <CardView key={c.key} card={c} selected={s.selected === c.key} onSelect={s.select} act={s.act} priority={s.priorityOf(c)} onPriority={s.setPriority} />)
+          s.visible.map((c) => <CardView key={c.key} card={c} extra={s.extras[c.key]} suggesting={s.suggesting === c.key} selected={s.selected === c.key} onSelect={s.select} act={s.act} priority={s.priorityOf(c)} onPriority={s.setPriority} onChatRule={s.setChatRule} />)
         )}
       </View>
     </View>
@@ -100,6 +107,7 @@ export default function Today() {
           {header}
           {stageView}
           {statsView}
+          {processingView}
           {modulesView}
           <AskDock onSubmit={ask} onFocusChange={(f) => s.setFigure(f ? 'listening' : 'idle')} style={{ marginTop: 14, marginHorizontal: 28 }} />
         </View>
@@ -116,6 +124,7 @@ export default function Today() {
         {header}
         {stageView}
         {statsView}
+        {processingView}
         {modulesView}
         {feed}
       </ScrollView>

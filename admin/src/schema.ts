@@ -32,6 +32,8 @@ export interface Field {
   adminOnly?: boolean
   placeholder?: string
   unit?: string
+  /** Common values the interface offers as choices; any other valid value can still be typed in */
+  presets?: { value: string; label: string }[]
 }
 
 export const GROUPS = [
@@ -151,7 +153,7 @@ export const FIELDS: Field[] = [
     advanced: true, services: ['organizer', 'wa-ingest', 'mcp-server'],
   },
   {
-    key: 'APP_MODEL', group: 'ai', type: 'text', default: 'gpt-4.1-mini', label: 'Modell der App',
+    key: 'APP_MODEL', group: 'ai', type: 'text', default: 'gpt-4.1-mini', presets: [{ value: 'gpt-4.1-mini', label: 'gpt-4.1-mini' }, { value: 'gpt-4.1-nano', label: 'gpt-4.1-nano' }, { value: 'gpt-4.1', label: 'gpt-4.1' }, { value: 'gpt-4o-mini', label: 'gpt-4o-mini' }], label: 'Modell der App',
     help: 'Für Antwortvorschläge und „Frag Jarvis" in der App. Braucht einen OpenAI-Schlüssel.',
     pattern: MODEL, patternHelp: MODEL_HELP, advanced: true, services: ['mcp-server'],
   },
@@ -184,16 +186,16 @@ export const FIELDS: Field[] = [
     services: ['wa-ingest'],
   },
   {
-    key: 'OPENAI_TRANSCRIBE_MODEL', group: 'voice', type: 'text', default: 'gpt-4o-mini-transcribe', label: 'OpenAI-Modell',
+    key: 'OPENAI_TRANSCRIBE_MODEL', group: 'voice', type: 'text', default: 'gpt-4o-mini-transcribe', presets: [{ value: 'gpt-4o-mini-transcribe', label: 'gpt-4o-mini-transcribe' }, { value: 'gpt-4o-transcribe', label: 'gpt-4o-transcribe' }, { value: 'whisper-1', label: 'whisper-1' }], label: 'OpenAI-Modell',
     help: 'Modell für die Transkription bei OpenAI.', pattern: MODEL, patternHelp: MODEL_HELP, services: ['wa-ingest'],
   },
   {
-    key: 'TRANSCRIBE_LANG', group: 'voice', type: 'text', default: 'de', label: 'Sprache',
+    key: 'TRANSCRIBE_LANG', group: 'voice', type: 'text', default: 'de', presets: [{ value: 'auto', label: 'Automatisch' }, { value: 'de', label: 'Deutsch' }, { value: 'en', label: 'English' }, { value: 'fr', label: 'Français' }, { value: 'es', label: 'Español' }, { value: 'it', label: 'Italiano' }, { value: 'nl', label: 'Nederlands' }, { value: 'pl', label: 'Polski' }, { value: 'tr', label: 'Türkçe' }], label: 'Sprache',
     help: 'Sprachcode wie de oder en, oder auto.', pattern: '^(auto|[a-z]{2})$', patternHelp: 'Zwei Buchstaben (de, en …) oder auto',
     services: ['wa-ingest'],
   },
   {
-    key: 'TRANSCRIBE_MAX_AGE_DAYS', group: 'voice', type: 'int', default: '', min: 1, max: 36500, unit: 'Tage', label: 'Ältere Sprachnachrichten',
+    key: 'TRANSCRIBE_MAX_AGE_DAYS', group: 'voice', type: 'int', default: '', presets: [{ value: '', label: 'Alles' }, { value: '30', label: '30 Tage' }, { value: '90', label: '90 Tage' }, { value: '365', label: '1 Jahr' }], min: 1, max: 36500, unit: 'Tage', label: 'Ältere Sprachnachrichten',
     help: 'Nur Sprachnachrichten bis zu diesem Alter transkribieren. Leer = gesamter noch verfügbarer Verlauf (bis zu 10 Jahre).',
     services: ['wa-ingest'],
   },
@@ -208,7 +210,7 @@ export const FIELDS: Field[] = [
     help: 'Beschreibt jedes Bild per KI, damit es durchsuchbar wird. Braucht einen OpenAI-Schlüssel.', services: ['wa-ingest'],
   },
   {
-    key: 'IMAGE_MODEL', group: 'images', type: 'text', default: 'gpt-4.1-mini', label: 'Modell',
+    key: 'IMAGE_MODEL', group: 'images', type: 'text', default: 'gpt-4.1-mini', presets: [{ value: 'gpt-4.1-mini', label: 'gpt-4.1-mini' }, { value: 'gpt-4.1-nano', label: 'gpt-4.1-nano' }, { value: 'gpt-4.1', label: 'gpt-4.1' }, { value: 'gpt-4o-mini', label: 'gpt-4o-mini' }], label: 'Modell',
     help: 'Vision-fähiges Modell.', pattern: MODEL, patternHelp: MODEL_HELP, services: ['wa-ingest'],
   },
   {
@@ -230,7 +232,7 @@ export const FIELDS: Field[] = [
     services: ['embedder'],
   },
   {
-    key: 'OPENAI_EMBED_MODEL', group: 'search', type: 'text', default: 'text-embedding-3-small', label: 'OpenAI-Modell',
+    key: 'OPENAI_EMBED_MODEL', group: 'search', type: 'text', default: 'text-embedding-3-small', presets: [{ value: 'text-embedding-3-small', label: 'text-embedding-3-small' }, { value: 'text-embedding-3-large', label: 'text-embedding-3-large' }], label: 'OpenAI-Modell',
     help: 'Wird auf 384 Dimensionen gekürzt.', pattern: MODEL, patternHelp: MODEL_HELP, services: ['embedder'],
   },
   {
@@ -250,7 +252,7 @@ export const FIELDS: Field[] = [
     services: ['organizer'],
   },
   {
-    key: 'ORGANIZER_MODEL', group: 'organizer', type: 'text', default: 'gpt-4.1-mini', label: 'Modell',
+    key: 'ORGANIZER_MODEL', group: 'organizer', type: 'text', default: 'gpt-4.1-mini', presets: [{ value: 'gpt-4.1-mini', label: 'gpt-4.1-mini' }, { value: 'gpt-4.1-nano', label: 'gpt-4.1-nano' }, { value: 'gpt-4.1', label: 'gpt-4.1' }, { value: 'gpt-4o-mini', label: 'gpt-4o-mini' }], label: 'Modell',
     help: 'Günstiges Modell mit strukturierter Ausgabe.', pattern: MODEL, patternHelp: MODEL_HELP, services: ['organizer'],
   },
   {
@@ -260,7 +262,7 @@ export const FIELDS: Field[] = [
     advanced: true, services: ['organizer'],
   },
   {
-    key: 'ORGANIZER_DAILY_TOKEN_BUDGET', group: 'organizer', type: 'int', default: '3000000', min: 0, max: 1_000_000_000, unit: 'Token/Tag', label: 'Tagesbudget',
+    key: 'ORGANIZER_DAILY_TOKEN_BUDGET', group: 'organizer', type: 'int', default: '3000000', presets: [{ value: '500000', label: '0,5 Mio' }, { value: '1000000', label: '1 Mio' }, { value: '3000000', label: '3 Mio' }, { value: '10000000', label: '10 Mio' }], min: 0, max: 1_000_000_000, unit: 'Token/Tag', label: 'Tagesbudget',
     help: 'Obergrenze Eingabe + Ausgabe pro Tag. Danach pausiert die Sortierung bis morgen.', services: ['organizer'],
   },
   {

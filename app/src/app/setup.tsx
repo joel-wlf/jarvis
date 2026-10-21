@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type ComponentRef } from 'react'
 import { KeyboardAvoidingView, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
 import { SvgXml } from 'react-native-svg'
 import type { AdminState, ConnectionInfo, Job, SettingsResponse, SetupProgress, WaLink } from '@/api/admin'
 import { BlockButton, Field, Notice, Press, Seg, Toggle } from '@/components/ui'
@@ -18,13 +19,14 @@ import { colors, layout } from '@/theme/tokens'
 import { type } from '@/theme/type'
 
 const STEPS = ['name', 'account', 'source', 'whatsapp', 'settings', 'remote', 'done'] as const
-const LABELS = ['Benennen', 'Passwort', 'Quelle', 'WhatsApp', 'Einstellungen', 'Fernzugriff', 'Fertig']
 const EMPTY: SetupProgress = { revision: 0, step: 'name', furthest: 0, complete: false, draft: {} }
 const SETTINGS_KEYS = ['OWNER_NAME', 'ORGANIZER_EXCLUDE_NAMES', 'ORGANIZER_REDACT', 'OPENAI_API_KEY', 'TRANSCRIBE_PROVIDER', 'IMAGE_DESCRIBE', 'EMBED_PROVIDER', 'ORGANIZER_ENABLED']
 const REMOTE_KEYS = ['APP_HOME_URL', 'APP_PUBLIC_URL', 'CLOUDFLARE_TUNNEL_TOKEN']
 const NAME_KEY = 'jarvis.setup.name'
 
 export default function Setup() {
+  const { t } = useTranslation()
+  const LABELS = STEPS.map((x) => t(`wizard.labels.${x}`))
   const { admin, adminChecked } = useSession()
   const router = useRouter()
   const wide = useWide()
@@ -103,9 +105,9 @@ export default function Setup() {
       if (e instanceof JarvisError && e.status === 401) { setJob(null); await load() }
       else if (e instanceof JarvisError && e.status === 409) {
         setNeedsReload(true)
-        setError('Die Einrichtung wurde in einem anderen Fenster geändert oder dort gestartet. Lade den aktuellen Stand, bevor du weitermachst.')
+        setError(t('wizard.err.conflict'))
       } else if (e instanceof JarvisError && (e.code === 'network' || e.code === 'timeout')) {
-        setError('Dein Server ist gerade nicht erreichbar. Prüfe deine Verbindung und lade den aktuellen Stand. Deine Eingaben bleiben in diesem Fenster erhalten.')
+        setError(t('wizard.err.offline'))
         setNeedsReload(true)
       } else setError(errorText(e))
     } finally { actionLock.current = false; setBusy(false) }
@@ -128,20 +130,20 @@ export default function Setup() {
     setState(current)
     const preview = await admin.preview(valuesWithName, !current.initialized)
     const problems = [...Object.values(preview.errors), ...preview.checks.filter((c) => c.level === 'error').map((c) => c.message)]
-    if (problems.length) { setFieldErrors(preview.errors); throw new Error('Bitte überprüfe deine Eingaben. ' + preview.checks.filter((c) => c.level === 'error').map((c) => c.message).join(' ')) }
+    if (problems.length) { setFieldErrors(preview.errors); throw new Error(t('wizard.err.check') + ' ' + preview.checks.filter((c) => c.level === 'error').map((c) => c.message).join(' ')) }
     setJob(await admin.apply(valuesWithName, !current.initialized))
   }
   const next = async (from = progress) => {
     if (!admin) return
     if (step === 'name') {
-      if (!name.trim() || name.trim().length > 40 || !/^[\p{L}\p{N} .-]+$/u.test(name.trim())) { setFieldErrors({ name: 'Bitte wähle einen Namen mit bis zu 40 Zeichen (Buchstaben, Ziffern, Punkt oder Bindestrich).' }); return }
+      if (!name.trim() || name.trim().length > 40 || !/^[\p{L}\p{N} .-]+$/u.test(name.trim())) { setFieldErrors({ name: t('wizard.err.name') }); return }
       await setItem(NAME_KEY, name.trim())
       if (state?.loggedIn) await save('account')
       else setStep('account')
     } else if (step === 'account') {
       if (!state?.loggedIn) {
-        if (password.length < 15 || password.length > 200) { setFieldErrors({ password: 'Bitte wähle ein Passwort mit 15 bis 200 Zeichen.' }); return }
-        if (password !== repeat) { setFieldErrors({ repeat: 'Die Passwörter stimmen noch nicht überein.' }); return }
+        if (password.length < 15 || password.length > 200) { setFieldErrors({ password: t('wizard.err.password') }); return }
+        if (password !== repeat) { setFieldErrors({ repeat: t('wizard.err.repeat') }); return }
         await admin.setup('', password)
         setPassword(''); setRepeat('')
         setState(await admin.state())
@@ -152,14 +154,14 @@ export default function Setup() {
         await save('source', false, account)
       } else await save('source', false, from)
     } else if (step === 'source') {
-      if (source === 'whatsapp' && !consent) throw new Error('Bitte bestätige zuerst die Hinweise zur WhatsApp-Verbindung.')
+      if (source === 'whatsapp' && !consent) throw new Error(t('wizard.err.consent'))
       await save('source', false, from)
       await apply(state?.initialized ? {} : { REQUIRE_CONFIRM: 'true' })
     } else if (step === 'whatsapp') {
-      if (source === 'whatsapp' && wa?.state !== 'open') throw new Error('WhatsApp ist noch nicht verbunden. Scanne den Code oder wähle „Später verbinden“.')
+      if (source === 'whatsapp' && wa?.state !== 'open') throw new Error(t('wizard.err.waNotLinked'))
       await save('settings', false, from)
     } else if (step === 'settings') {
-      if (!changes.OPENAI_API_KEY && !settings?.secrets.OPENAI_API_KEY?.set) throw new Error(`${name} arbeitet mit KI. Bitte trage deinen API-Schlüssel ein.`)
+      if (!changes.OPENAI_API_KEY && !settings?.secrets.OPENAI_API_KEY?.set) throw new Error(t('wizard.err.key', { name }))
       const selected = Object.fromEntries(Object.entries(changes).filter(([key]) => SETTINGS_KEYS.includes(key)))
       if (settings?.values.ORGANIZER_ENABLED !== 'true' && selected.ORGANIZER_ENABLED === undefined) selected.ORGANIZER_ENABLED = 'true'
       await apply(selected)
@@ -167,9 +169,9 @@ export default function Setup() {
       const url = changes.APP_PUBLIC_URL ?? settings?.values.APP_PUBLIC_URL ?? ''
       if (remote !== 'local') {
         let u: URL
-        try { u = new URL(url) } catch { throw new Error('Bitte gib eine vollständige Adresse ein, zum Beispiel https://jarvis.deine-domain.de.') }
-        if (u.protocol !== 'https:' || u.username || u.password || u.search || u.hash || u.pathname !== '/') throw new Error('Bitte gib eine HTTPS-Server-Adresse ohne Pfad ein.')
-        if (remote === 'cloudflare' && !changes.CLOUDFLARE_TUNNEL_TOKEN && !settings?.secrets.CLOUDFLARE_TUNNEL_TOKEN?.set) throw new Error('Bitte füge den Tunnel-Token ein.')
+        try { u = new URL(url) } catch { throw new Error(t('wizard.err.url')) }
+        if (u.protocol !== 'https:' || u.username || u.password || u.search || u.hash || u.pathname !== '/') throw new Error(t('wizard.err.https'))
+        if (remote === 'cloudflare' && !changes.CLOUDFLARE_TUNNEL_TOKEN && !settings?.secrets.CLOUDFLARE_TUNNEL_TOKEN?.set) throw new Error(t('wizard.err.token'))
       }
       await save('remote', false, from)
       const selected = Object.fromEntries(Object.entries(changes).filter(([key]) => REMOTE_KEYS.includes(key)))
@@ -198,26 +200,26 @@ export default function Setup() {
       else if (step === 'settings') await save('remote', false, latest)
       else if (step === 'remote') {
         if (remote !== 'local') {
-          try { await admin.checkRemote() } catch { throw new Error('Die Adresse ist noch nicht erreichbar oder zeigt nicht auf diesen Server. Prüfe deine Angaben oder wähle vorerst dein Heimnetz. Dein lokaler Zugang funktioniert weiterhin.') }
+          try { await admin.checkRemote() } catch { throw new Error(t('wizard.err.remote')) }
         }
         await save('done', true, latest)
       }
     })
   }
 
-  if (!adminChecked) return <View style={st.loading}><Text style={type.body}>{error || 'Einrichtung wird geladen …'}</Text>{error ? <BlockButton label="Erneut versuchen" onPress={() => void act(load)} /> : null}</View>
-  if (!admin) return <View style={st.loading}><Notice level="error" text="Öffne die Server-Adresse im Browser, um Jarvis einzurichten." /></View>
-  if (!state) return <View style={st.loading}><Text style={type.body}>{error || 'Einrichtung wird geladen …'}</Text><BlockButton label="Erneut versuchen" onPress={() => void act(load)} /></View>
+  if (!adminChecked) return <View style={st.loading}><Text style={type.body}>{error || t('wizard.loading')}</Text>{error ? <BlockButton label={t('common.retry')} onPress={() => void act(load)} /> : null}</View>
+  if (!admin) return <View style={st.loading}><Notice level="error" text={t('wizard.openInBrowser')} /></View>
+  if (!state) return <View style={st.loading}><Text style={type.body}>{error || t('wizard.loading')}</Text><BlockButton label={t('common.retry')} onPress={() => void act(load)} /></View>
   if (state.configured && !state.loggedIn) return (
     <ScrollView contentContainerStyle={st.login} keyboardShouldPersistTaps="handled">
-      <Text style={type.h1}>Einrichtung fortsetzen</Text>
-      <Text style={type.body}>Dein Passwort schützt die Einrichtung. Bereits bestätigte Schritte bleiben gespeichert.</Text>
-      <Field label="Passwort" value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" onSubmitEditing={() => void act(async () => { await admin.login(password); setPassword(''); await load() })} />
+      <Text style={type.h1}>{t('wizard.resume')}</Text>
+      <Text style={type.body}>{t('wizard.resumeLead')}</Text>
+      <Field label={t('wizard.password')} value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" onSubmitEditing={() => void act(async () => { await admin.login(password); setPassword(''); await load() })} />
       {error ? <Notice level="error" text={error} /> : null}
-      <BlockButton label="Anmelden" busy={busy} onPress={() => void act(async () => { await admin.login(password); setPassword(''); await load() })} />
+      <BlockButton label={t('wizard.signIn')} busy={busy} onPress={() => void act(async () => { await admin.login(password); setPassword(''); await load() })} />
     </ScrollView>
   )
-  if (progress.complete && step !== 'done') return <View style={st.login}><Text style={type.h1}>Die Einrichtung ist abgeschlossen.</Text><BlockButton label="Zur Anmeldung" onPress={() => router.replace('/connect')} /></View>
+  if (progress.complete && step !== 'done') return <View style={st.login}><Text style={type.h1}>{t('wizard.complete')}</Text><BlockButton label={t('wizard.toLogin')} onPress={() => router.replace('/connect')} /></View>
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -226,116 +228,117 @@ export default function Setup() {
           {wide ? <View style={st.rail}>
             <Text style={[type.cardTitle, { marginBottom: 24 }]}>{name}</Text>
             {STEPS.map((s, n) => <Press key={s} accessibilityRole="button" accessibilityState={{ selected: s === step, disabled: (s === 'whatsapp' && source === 'later') || n > (state.loggedIn ? progress.furthest : index) || !!job || !!failedJob || progress.complete }} disabled={(s === 'whatsapp' && source === 'later') || n > (state.loggedIn ? progress.furthest : index) || !!job || !!failedJob || progress.complete || busy || (!state.loggedIn && n > index)} onPress={() => void act(async () => { if (state.loggedIn) await save(s); else setStep(s) })} style={() => ({ paddingVertical: 14, opacity: n > Math.max(progress.furthest, index) ? 0.45 : 1 })}><Text style={[type.body, { color: s === step ? colors.ink : colors.ink2 }]}>{n + 1} · {LABELS[n]}</Text></Press>)}
-          </View> : <Text style={type.small}>Schritt {index + 1} von {STEPS.length} · {LABELS[index]}</Text>}
+          </View> : <Text style={type.small}>{t('wizard.stepOf', { n: index + 1, total: STEPS.length, label: LABELS[index] })}</Text>}
           <View style={st.content}>
             <View style={{ alignItems: 'flex-start' }}><JarvisFigure state={job || busy ? 'thinking' : step === 'done' ? 'happy' : 'idle'} size={110} /></View>
             {!job && !failedJob ? <>
             {step === 'name' ? <>
-              <Text style={type.h1} accessibilityRole="header">Wie soll dein Assistent heißen?</Text>
-              <Text style={type.body}>Dein privater Kontext-Manager läuft auf deinem eigenen Rechner. Du richtest ihn einmal ein und nutzt ihn im Browser oder in der Mobile App.</Text>
-              <Field label="Name des Assistenten" error={fieldErrors.name} value={name} onChangeText={setName} maxLength={40} autoFocus />
+              <Text style={type.h1} accessibilityRole="header">{t('wizard.name.title')}</Text>
+              <Text style={type.body}>{t('wizard.name.lead')}</Text>
+              <Field label={t('wizard.name.field')} error={fieldErrors.name} value={name} onChangeText={setName} maxLength={40} autoFocus />
             </> : null}
             {step === 'account' ? <>
-              <Text style={type.h1} accessibilityRole="header">Dein Zugang zu {name}</Text>
-              {state.loggedIn ? <Notice level="ok" text="Dein Passwort ist eingerichtet. Es gilt für Web, Mobile und Verwaltung." /> : <>
-                <Text style={type.body}>Wer hier zuerst ein Passwort festlegt, wird Besitzer dieser Installation. Wähle dein eigenes Passwort für Web, Mobile und Verwaltung.</Text>
-                <Field label="Dein Passwort" error={fieldErrors.password} help="15 bis 200 Zeichen. Eine lange Passphrase ist gut merkbar. Passwortmanager werden unterstützt." value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoComplete="new-password" autoCapitalize="none" autoCorrect={false} />
-                <Field label="Passwort wiederholen" error={fieldErrors.repeat} value={repeat} onChangeText={setRepeat} secureTextEntry={!showPassword} autoComplete="new-password" autoCapitalize="none" autoCorrect={false} />
-                <Toggle label="Passwort anzeigen" value={showPassword} onChange={setShowPassword} />
+              <Text style={type.h1} accessibilityRole="header">{t('wizard.account.title', { name })}</Text>
+              {state.loggedIn ? <Notice level="ok" text={t('wizard.account.done')} /> : <>
+                <Text style={type.body}>{t('wizard.account.lead')}</Text>
+                <Field label={t('wizard.account.password')} error={fieldErrors.password} help={t('wizard.account.passwordHelp')} value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoComplete="new-password" autoCapitalize="none" autoCorrect={false} />
+                <Field label={t('wizard.account.repeat')} error={fieldErrors.repeat} value={repeat} onChangeText={setRepeat} secureTextEntry={!showPassword} autoComplete="new-password" autoCapitalize="none" autoCorrect={false} />
+                <Toggle label={t('wizard.account.show')} value={showPassword} onChange={setShowPassword} />
               </>}
             </> : null}
             {step === 'source' ? <>
-              <Text style={type.h1} accessibilityRole="header">Was möchtest du verbinden?</Text>
-              <Text style={type.body}>Aktuell kannst du WhatsApp verbinden. Weitere Quellen lassen sich später ergänzen.</Text>
-              <Seg items={[{ key: 'whatsapp', label: 'WhatsApp', on: source === 'whatsapp', onPress: () => setSource('whatsapp') }, { key: 'later', label: 'Später verbinden', on: source === 'later', onPress: () => setSource('later') }]} />
+              <Text style={type.h1} accessibilityRole="header">{t('wizard.source.title')}</Text>
+              <Text style={type.body}>{t('wizard.source.lead')}</Text>
+              <Seg items={[{ key: 'whatsapp', label: 'WhatsApp', on: source === 'whatsapp', onPress: () => setSource('whatsapp') }, { key: 'later', label: t('wizard.source.later'), on: source === 'later', onPress: () => setSource('later') }]} />
               {source === 'whatsapp' ? <>
-                <Notice level="warn" text="Jarvis nutzt eine inoffizielle WhatsApp-Anbindung. WhatsApp unterstützt diese Nutzung nicht offiziell; eine Einschränkung oder Sperre des Kontos ist möglich." />
-                <Text style={type.body}>Nachrichten und Metadaten werden auf deinem Server archiviert. Den KI-Anbieter richtest du gleich ein. Wie viel Verlauf importiert wird, bestimmt WhatsApp.</Text>
-                <Toggle label="Ich habe die Hinweise gelesen und möchte WhatsApp verbinden" value={consent} onChange={setConsent} />
+                <Notice level="warn" text={t('wizard.source.warn')} />
+                <Text style={type.body}>{t('wizard.source.archive')}</Text>
+                <Toggle label={t('wizard.source.consent')} value={consent} onChange={setConsent} />
               </> : null}
-              <Text style={type.small}>Als Nächstes werden die Basisdienste eingerichtet. Das kann beim ersten Mal einige Minuten dauern.</Text>
+              <Text style={type.small}>{t('wizard.source.next')}</Text>
             </> : null}
             {step === 'whatsapp' ? <>
-              <Text style={type.h1} accessibilityRole="header">WhatsApp verbinden</Text>
-              {source === 'later' ? <Notice level="info" text="Du kannst WhatsApp später unter Verbindungen einrichten." /> : <>
-                <Text style={type.body}>Öffne WhatsApp auf deinem Handy → Einstellungen oder Menü → Verknüpfte Geräte → Gerät hinzufügen. Scanne dann diesen QR-Code.</Text>
+              <Text style={type.h1} accessibilityRole="header">{t('wizard.wa.title')}</Text>
+              {source === 'later' ? <Notice level="info" text={t('wizard.wa.later')} /> : <>
+                <Text style={type.body}>{t('wizard.wa.how')}</Text>
                 <View style={{ alignItems: 'center' }} accessibilityLiveRegion="polite">
                   {wa?.qrSvg ? <SvgXml xml={wa.qrSvg} width={240} height={240} /> : null}
                   {wa?.pairingCode ? <Text selectable style={type.h1}>{wa.pairingCode}</Text> : null}
-                  <Text style={type.body}>{wa?.state === 'open' ? 'WhatsApp ist verbunden.' : wa?.expired ? 'Der Code ist abgelaufen. Ein neuer Code erscheint automatisch.' : wa?.qrSvg ? 'Der Code wird automatisch erneuert.' : 'Warte auf WhatsApp …'}</Text>
+                  <Text style={type.body}>{wa?.state === 'open' ? t('wizard.wa.linked') : wa?.expired ? t('wizard.wa.expired') : wa?.qrSvg ? t('wizard.wa.renews') : t('wizard.wa.waiting')}</Text>
                 </View>
                 {wa?.error ? <Notice level="warn" text={wa.error} /> : null}
-                <Field label="Alternativ: Telefonnummer mit Ländervorwahl" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="49151…" />
-                <BlockButton label={phone ? 'Kopplungscode anfordern' : 'Neuen QR-Code anfordern'} variant="line" busy={busy || !!job} onPress={() => void act(async () => { setJob(await admin.relink('NEU VERKNÜPFEN', phone || undefined)) })} />
-                {wa?.pairingCode ? <Text style={type.small}>Wähle auf dem Handy „Stattdessen mit Telefonnummer verknüpfen“ und gib diesen Code ein.</Text> : null}
-                <BlockButton label="Später verbinden" variant="line" disabled={!!job} onPress={() => void act(async () => { setSource('later'); await save('settings', false, progress, { source: 'later' }) })} />
+                <Field label={t('wizard.wa.phone')} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="49151…" />
+                <BlockButton label={phone ? t('wizard.wa.requestCode') : t('wizard.wa.requestQr')} variant="line" busy={busy || !!job} onPress={() => void act(async () => { setJob(await admin.relink('NEU VERKNÜPFEN', phone || undefined)) })} />
+                {wa?.pairingCode ? <Text style={type.small}>{t('wizard.wa.codeHelp')}</Text> : null}
+                <BlockButton label={t('wizard.source.later')} variant="line" disabled={!!job} onPress={() => void act(async () => { setSource('later'); await save('settings', false, progress, { source: 'later' }) })} />
               </>}
             </> : null}
             {step === 'settings' ? <>
-              <Text style={type.h1} accessibilityRole="header">Verbinde die KI von {name}</Text>
-              <Text style={type.body}>{name} ist ein KI-Assistent: Er versteht deine Nachrichten, sortiert sie nach Themen, transkribiert Sprachnachrichten und beantwortet deine Fragen. Dafür braucht er einen KI-Anbieter. Aktuell wird OpenAI unterstützt.</Text>
+              <Text style={type.h1} accessibilityRole="header">{t('wizard.ai.title', { name })}</Text>
+              <Text style={type.body}>{t('wizard.ai.lead', { name })}</Text>
               {field('OWNER_NAME')}
-              <Notice level="info" text="Dabei werden Texte, Audios und Bilder an den Anbieter übertragen und es entstehen API-Kosten. Chat-Ausschlüsse gelten für Suche und Themen-Sortierung, nicht automatisch für Audio und Bilder. Lege unten fest, was nie an die KI gehen darf." />
+              <Notice level="info" text={t('wizard.ai.cost')} />
               {field('OPENAI_API_KEY')}
-              <BlockButton label="API-Schlüssel prüfen" variant="line" busy={busy} onPress={() => void act(async () => { const r = await admin.testOpenAi(changes.OPENAI_API_KEY || undefined); if (!r.ok) throw new Error(r.message); setMessage(r.message) })} />
+              <BlockButton label={t('wizard.ai.test')} variant="line" busy={busy} onPress={() => void act(async () => { const r = await admin.testOpenAi(changes.OPENAI_API_KEY || undefined); if (!r.ok) throw new Error(r.message); setMessage(r.message) })} />
               {field('ORGANIZER_EXCLUDE_NAMES')}{field('ORGANIZER_REDACT')}
-              <Text style={type.small}>Weitere Einstellungen wie Transkription, Bildbeschreibung und Themen-Sortierung stehen auf sinnvollen Werten und lassen sich später unter Einstellungen ändern.</Text>
+              <Text style={type.small}>{t('wizard.ai.more')}</Text>
             </> : null}
             {step === 'remote' ? <>
-              <Text style={type.h1} accessibilityRole="header">Wo möchtest du {name} nutzen?</Text>
-              <Text style={type.body}>Für den Anfang empfehlen wir dein Heimnetz. Du kannst den Zugang für unterwegs jederzeit später einrichten.</Text>
-              <Seg items={[{ key: 'local', label: 'Heimnetz', on: remote === 'local', onPress: () => setRemote('local') }, { key: 'cloudflare', label: 'Cloudflare', on: remote === 'cloudflare', onPress: () => setRemote('cloudflare') }, { key: 'existing', label: 'Eigene Adresse', on: remote === 'existing', onPress: () => setRemote('existing') }]} />
+              <Text style={type.h1} accessibilityRole="header">{t('wizard.remote.title', { name })}</Text>
+              <Text style={type.body}>{t('wizard.remote.lead')}</Text>
+              <Seg items={[{ key: 'local', label: t('wizard.remote.local'), on: remote === 'local', onPress: () => setRemote('local') }, { key: 'cloudflare', label: 'Cloudflare', on: remote === 'cloudflare', onPress: () => setRemote('cloudflare') }, { key: 'existing', label: t('wizard.remote.own'), on: remote === 'existing', onPress: () => setRemote('existing') }]} />
               {remote === 'local' ? <>
-                <Text style={type.body}>Deine Geräte erreichen den Server im gleichen Heimnetz. Unterwegs brauchst du später einen Fernzugriff oder ein VPN. HTTP im Heimnetz ist unverschlüsselt.</Text>
+                <Text style={type.body}>{t('wizard.remote.localLead')}</Text>
                 {field('APP_HOME_URL')}
-                <Text style={type.small}>Leer lassen: Jarvis ermittelt die Heimnetz-Adresse automatisch. Falls dein Server mehrere Netze hat, kannst du die passende Adresse hier angeben.</Text>
+                <Text style={type.small}>{t('wizard.remote.localHelp')}</Text>
               </> : <>
-                <Notice level="warn" text="Über diese Adresse sind nach Anmeldung auch Einstellungen und Wartung erreichbar. Dein Passwort schützt damit die gesamte Installation. Cloudflare vermittelt beim Tunnel den Datenverkehr." />
+                <Notice level="warn" text={t('wizard.remote.warn')} />
                 {remote === 'cloudflare' ? <>
-                  <Text style={type.body}>1. Melde dich bei Cloudflare an und verwende eine dort verwaltete Domain.</Text>
-                  <BlockButton label="Cloudflare-Anleitung öffnen" variant="line" onPress={() => void Linking.openURL('https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/')} />
-                  <Text style={type.body}>2. Erstelle einen Cloudflared-Tunnel. Kopiere dessen Token hierher; du musst den Installationsbefehl von Cloudflare nicht ausführen.</Text>
+                  <Text style={type.body}>{t('wizard.remote.cf1')}</Text>
+                  <BlockButton label={t('wizard.remote.cfGuide')} variant="line" onPress={() => void Linking.openURL('https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/')} />
+                  <Text style={type.body}>{t('wizard.remote.cf2')}</Text>
                   {field('CLOUDFLARE_TUNNEL_TOKEN')}
-                  <Text style={type.body}>3. Lege eine veröffentlichte Anwendungsroute an. Als Dienst wählst du HTTP und trägst app-web:8084 ein. Diese Adresse ist nur innerhalb von Docker erreichbar.</Text>
-                </> : <Text style={type.body}>Leite deine HTTPS-Adresse auf den Web-Einstieg von Jarvis weiter (lokaler Port 8081). Verwende dieselbe Adresse für Web und Mobile.</Text>}
+                  <Text style={type.body}>{t('wizard.remote.cf3')}</Text>
+                </> : <Text style={type.body}>{t('wizard.remote.ownLead')}</Text>}
                 {field('APP_PUBLIC_URL')}
-                <Text style={type.small}>Beim Weitergehen startet Jarvis den Zugang und prüft, ob die Adresse tatsächlich auf diesen Server zeigt.</Text>
-                <BlockButton label="Vorerst nur im Heimnetz nutzen" variant="line" onPress={() => { setRemote('local'); setError(null) }} />
+                <Text style={type.small}>{t('wizard.remote.check')}</Text>
+                <BlockButton label={t('wizard.remote.localOnly')} variant="line" onPress={() => { setRemote('local'); setError(null) }} />
               </>}
             </> : null}
             {step === 'done' ? <>
-              <Text style={type.h1} accessibilityRole="header">{name} ist bereit.</Text>
-              <Text style={type.body}>Im Browser meldest du dich direkt mit deinem Passwort an. In der Mobile App scannst du zuerst diesen Code oder gibst die Server-Adresse ein und meldest dich danach an.</Text>
+              <Text style={type.h1} accessibilityRole="header">{t('wizard.done.title', { name })}</Text>
+              <Notice level="info" text={t('wizard.done.reading')} />
+              <Text style={type.body}>{t('wizard.done.lead')}</Text>
               {connection ? <>
-                {connection.localOnly ? <Notice level="warn" text="Diese Adresse funktioniert nur auf dem Server selbst. Trage unter System → Einstellungen → Zugang & Fernzugriff eine Heimnetz-Adresse ein, bevor du die Mobile App verbindest." /> : null}
+                {connection.localOnly ? <Notice level="warn" text={t('wizard.done.localOnly')} /> : null}
                 <Text selectable style={type.body}>{connection.url}</Text>
                 <View style={{ alignItems: 'center' }}>{connection.qrSvg ? <SvgXml xml={connection.qrSvg} width={240} height={240} /> : null}</View>
-                <Text style={type.small}>Der QR-Code enthält nur die Server-Adresse, kein Passwort und keinen Anmeldetoken.</Text>
-                {Platform.OS === 'web' ? <BlockButton label="Server-Adresse kopieren" variant="line" onPress={() => void act(async () => { await navigator.clipboard.writeText(connection.url); setMessage('Adresse kopiert.') })} /> : null}
+                <Text style={type.small}>{t('wizard.done.qr')}</Text>
+                {Platform.OS === 'web' ? <BlockButton label={t('wizard.done.copy')} variant="line" onPress={() => void act(async () => { await navigator.clipboard.writeText(connection.url); setMessage(t('wizard.done.copied')) })} /> : null}
               </> : null}
               <View style={{ gap: 12, paddingTop: 24, borderTopWidth: 1, borderTopColor: colors.line }}>
-                <Text style={type.cardTitle}>Mit Claude und anderen KI-Clients verbinden</Text>
-                <Text style={type.body}>{name} bringt einen MCP-Server mit. Damit kann dein KI-Client in deinem Archiv suchen, Kontext abrufen und freigegebene Aktionen ausführen. Verbinde ihn über diese Adresse und melde dich mit deinem Passwort an.</Text>
+                <Text style={type.cardTitle}>{t('wizard.done.mcpTitle')}</Text>
+                <Text style={type.body}>{t('wizard.done.mcp', { name })}</Text>
                 <Text selectable style={type.body}>{connection ? `${connection.url}/mcp` : ''}</Text>
-                {remote === 'local' ? <Notice level="info" text="Cloudbasierte Clients wie Claude benötigen eine von außen erreichbare HTTPS-Adresse. Du kannst den Fernzugriff später einrichten." /> : null}
-                <Text style={type.small}>Diese Verbindung findest du später unter System → Verbindungen wieder.</Text>
+                {remote === 'local' ? <Notice level="info" text={t('wizard.done.mcpRemote')} /> : null}
+                <Text style={type.small}>{t('wizard.done.mcpLater')}</Text>
               </View>
             </> : null}
             </> : null}
             {job ? <SetupTask key={job.id} admin={admin} job={job} onEnd={onJobEnd} onSessionExpired={() => { setJob(null); void act(load) }} /> : null}
             {failedJob ? <View style={{ gap: 20 }}>
-              <Text style={type.h1} accessibilityRole="header">{setupTaskFailure(failedJob).title}</Text>
-              <Text style={type.body}>{setupTaskFailure(failedJob).message}</Text>
-              <Text style={type.small}>Du bist weiterhin im Schritt „{LABELS[index]}“. Du musst nicht von vorne anfangen.</Text>
-              <BlockButton label="Erneut versuchen" busy={busy} onPress={() => void act(async () => { const p = await admin.progress(); setProgress(p); await save(step, false, p); await next(await admin.progress()) })} />
-              <BlockButton label="Eingaben überprüfen" variant="line" busy={busy} onPress={() => void act(async () => { const p = await admin.progress(); await save(step, false, p) })} />
+              <Text style={type.h1} accessibilityRole="header">{t(setupTaskFailure(failedJob).title)}</Text>
+              <Text style={type.body}>{t(setupTaskFailure(failedJob).message)}</Text>
+              <Text style={type.small}>{t('wizard.stillAt', { step: LABELS[index] })}</Text>
+              <BlockButton label={t('common.retry')} busy={busy} onPress={() => void act(async () => { const p = await admin.progress(); setProgress(p); await save(step, false, p); await next(await admin.progress()) })} />
+              <BlockButton label={t('wizard.review')} variant="line" busy={busy} onPress={() => void act(async () => { const p = await admin.progress(); await save(step, false, p) })} />
             </View> : null}
             {error ? <View accessibilityRole="alert"><Notice level="error" text={error} /></View> : null}
             {message ? <Notice level="ok" text={message} /> : null}
-            {needsReload ? <BlockButton label="Aktuellen Stand laden" busy={busy} onPress={() => void act(load)} /> : null}
+            {needsReload ? <BlockButton label={t('wizard.reload')} busy={busy} onPress={() => void act(load)} /> : null}
             {!job && !failedJob ? <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-              {index > 0 && !progress.complete ? <BlockButton label="Zurück" variant="line" disabled={busy || !!job} style={{ flex: 1 }} onPress={() => void act(async () => { setError(null); setMessage(null); const to = previousSetupStep(step, source); if (state.loggedIn) await save(to); else setStep(to) })} /> : null}
-              <BlockButton label={step === 'done' ? 'Weboberfläche öffnen' : step === 'source' ? (state.initialized ? 'Auswahl übernehmen' : 'Jarvis einrichten') : step === 'account' ? (state.loggedIn ? 'Weiter' : 'Passwort speichern') : step === 'whatsapp' ? 'Verbindung übernehmen' : step === 'settings' ? (Object.keys(changes).length ? 'Einstellungen speichern' : 'Mit Grundeinstellungen weiter') : step === 'remote' ? (remote === 'local' ? 'Einrichtung abschließen' : 'Adresse prüfen und abschließen') : 'Weiter'} busy={busy || !!job} disabled={needsReload} style={{ flex: 2 }} onPress={() => void act(() => next())} />
+              {index > 0 && !progress.complete ? <BlockButton label={t('common.back')} variant="line" disabled={busy || !!job} style={{ flex: 1 }} onPress={() => void act(async () => { setError(null); setMessage(null); const to = previousSetupStep(step, source); if (state.loggedIn) await save(to); else setStep(to) })} /> : null}
+              <BlockButton label={step === 'done' ? t('wizard.btn.open') : step === 'source' ? (state.initialized ? t('wizard.btn.apply') : t('wizard.btn.setup', { name })) : step === 'account' ? (state.loggedIn ? t('common.continue') : t('wizard.btn.savePassword')) : step === 'whatsapp' ? t('wizard.btn.takeLink') : step === 'settings' ? (Object.keys(changes).length ? t('wizard.btn.saveSettings') : t('wizard.btn.defaults')) : step === 'remote' ? (remote === 'local' ? t('wizard.btn.finish') : t('wizard.btn.checkFinish')) : t('common.continue')} busy={busy || !!job} disabled={needsReload} style={{ flex: 2 }} onPress={() => void act(() => next())} />
             </View> : null}
           </View>
         </View>

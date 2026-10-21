@@ -49,7 +49,8 @@
       "expo-localization",
       "expo-image",
       "expo-splash-screen",
-      "./plugins/with-local-http"
+      "./plugins/with-local-http",
+      ["expo-audio", { "microphonePermission": false, "recordAudioAndroid": false, "enableBackgroundPlayback": false }]
     ]
   }
 }

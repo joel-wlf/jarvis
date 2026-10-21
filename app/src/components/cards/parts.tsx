@@ -403,6 +403,24 @@ export function Priority({ value, color, onChange }: { value: Urgency; color: st
   )
 }
 
+/** "Everything from this chat": a rule for all its cards, so one choice covers a noisy group. */
+export function ChatRule({ chat, onRule }: { chat: string; onRule: (level: 'later' | 'important' | 'hidden') => void }) {
+  const { t } = useTranslation()
+  const opts: ['later' | 'important' | 'hidden', string][] = [['later', t('card.priorityLow')], ['important', t('card.priorityHigh')], ['hidden', t('learning.hide')]]
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <Text style={[type.small, { flex: 1, fontSize: 13 }]} numberOfLines={1}>{t('card.allFrom', { chat })}</Text>
+      <View style={{ flexDirection: 'row', gap: 14 }}>
+        {opts.map(([level, label]) => (
+          <Press key={level} onPress={() => onRule(level)} accessibilityRole="button" accessibilityLabel={t('card.allFromSet', { chat, level: label })} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }} style={({ hovered }) => ({ borderBottomWidth: 1, borderBottomColor: hovered ? colors.ink : colors.line2 })}>
+            <Text style={[type.small, { fontSize: 13, color: colors.ink2 }]}>{label}</Text>
+          </Press>
+        ))}
+      </View>
+    </View>
+  )
+}
+
 /** Two-letter square for a person: ink = driver or paid, soft = taken, ghost = open or unpaid, me = the owner. */
 export function Chip({ label, tone = 'soft', accent }: { label: string; tone?: 'ink' | 'soft' | 'ghost' | 'me' | 'pick'; accent?: string }) {
   const base = { width: 24, height: 24, alignItems: 'center' as const, justifyContent: 'center' as const }

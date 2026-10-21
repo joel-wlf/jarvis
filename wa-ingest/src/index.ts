@@ -25,6 +25,8 @@ import {
   upsertContacts,
   upsertGroups,
   fillLidNames,
+  recordHistoryProgress,
+  rememberPushNames,
   upsertMessages,
 } from './store.js'
 
@@ -169,6 +171,8 @@ async function start() {
       await upsertContacts(contacts)
       await upsertChats(chats)
       await upsertMessages(messages)
+      await rememberPushNames(messages).catch((e) => log.warn({ err: (e as Error).message }, 'Namen nicht übernommen'))
+      await recordHistoryProgress({ progress, isLatest, messages: messages.length }).catch(() => {})
       await handlePollVotes(messages)
       await importPollUpdates(messages)
       await handleProtocol(messages)
@@ -205,6 +209,7 @@ async function start() {
 
   sock.ev.on('messages.upsert', ({ messages }) => {
     upsertMessages(messages)
+      .then(() => rememberPushNames(messages))
       .then(() => handlePollVotes(messages))
       .then(() => handleProtocol(messages))
       .catch((e) => log.error(e, 'messages.upsert fehlgeschlagen'))

@@ -88,6 +88,23 @@
       "systemAllOk_one": "One service running",
       "systemAllOk_other": "{{count}} services running",
       "last": "Latest: {{source}}"
+    },
+    "lines": {
+      "replies_one": "One person is waiting for your reply.",
+      "replies_other": "{{count}} people are waiting for your reply.",
+      "next": "Next up: {{title}}, {{when}}.",
+      "today_one": "One message came in today.",
+      "today_other": "{{count}} messages came in today.",
+      "importing": "I am still reading in your history, {{count}} messages so far.",
+      "sorting": "I am sorting your chats into topics: {{pct}} % done.",
+      "indexing": "I am making your messages searchable: {{pct}} %.",
+      "askMe": "Ask me anything, I search all chats by meaning, not just by words.",
+      "names": "{{named}} of {{total}} contacts have a name already, the rest arrive with the next messages."
+    },
+    "chatRule": {
+      "later": "Cards from {{chat}} will show as \"Later\" from now on. Undo under System → Learning.",
+      "important": "Cards from {{chat}} will show as \"Important\" from now on. Undo under System → Learning.",
+      "hidden": "{{chat}} is hidden now. Nothing is deleted; bring it back under System → Learning."
     }
   },
   "groups": {
@@ -137,7 +154,7 @@
     "repliesReady_one": "One reply ready",
     "repliesReady_other": "{{count}} replies ready",
     "replyPrepared": "Reply prepared",
-    "play": "Play (coming soon)",
+    "play": "Play",
     "reactWith": "React with {{emoji}}",
     "react": "Send a reaction",
     "free": "Free: {{when}}",
@@ -207,7 +224,24 @@
     "priority": "Importance",
     "priorityLow": "Later",
     "priorityNormal": "Normal",
-    "priorityHigh": "Important"
+    "priorityHigh": "Important",
+    "pause": "Pause",
+    "playFailed": "Could not play: {{reason}}",
+    "playUnavailable": "The demo has no audio files.",
+    "noTranscript": "Not transcribed yet.",
+    "background": "What is this about?",
+    "topic": "Topic: {{title}}",
+    "inChatNamed": "From {{chat}}",
+    "noBackground": "There are no messages for this card in the archive anymore.",
+    "you": "You",
+    "dateOpen": "Date open",
+    "dueWhen": "Due {{when}}",
+    "fromChat": "From {{chat}}",
+    "openTask": "Open",
+    "writingReplies": "Jarvis is writing reply suggestions …",
+    "willSend": "Will be sent",
+    "allFrom": "Everything from {{chat}}:",
+    "allFromSet": "All cards from {{chat}}: {{level}}"
   },
   "act": {
     "send": "Sent.",
@@ -400,10 +434,18 @@
       "failed": "failed",
       "rolled_back": "rolled back",
       "interrupted": "interrupted",
-      "rolledBackHelp": "Something went wrong. Jarvis restored the previous settings."
+      "rolledBackHelp": "Something went wrong. Jarvis restored the previous settings.",
+      "hideDetails": "Hide technical details",
+      "showDetails": "Show technical details",
+      "disconnected": "Connection lost. Trying to fetch the status again."
     },
     "legal": "Legal notes",
-    "legalSub": "WhatsApp, AI provider, privacy"
+    "legalSub": "WhatsApp, AI provider, privacy",
+    "password": "Your password",
+    "passwordSub": "One password for web, mobile and MCP sign-in",
+    "connections": "Connections",
+    "connectionsSub": "Connect the mobile app · MCP for Claude and other AI clients",
+    "language": "Language"
   },
   "settings": {
     "title": "Settings",
@@ -420,7 +462,23 @@
     "default": "Default: {{value}}",
     "reset": "Discard",
     "rollbackNote": "If a service fails to start afterwards, Jarvis restores the previous settings automatically.",
-    "aiNote": "With AI enabled, message content is sent to this provider."
+    "aiNote": "With AI enabled, message content is sent to this provider.",
+    "auto": "Automatic",
+    "less": "Less",
+    "more": "More",
+    "resetAuto": "Back to automatic",
+    "resetTo": "Back to {{value}}",
+    "removeItem": "Remove {{item}}",
+    "addItem": "Add an entry",
+    "addItemTo": "Add an entry to {{label}}",
+    "listHint": "Press Enter or type a comma to add.",
+    "recommended": "recommended",
+    "custom": "Other value",
+    "customValue": "Your own value",
+    "showAdvanced_one": "Show advanced setting (1)",
+    "showAdvanced_other": "Show advanced settings ({{count}})",
+    "showAdvancedHelp": "Fine tuning. The defaults suit most people.",
+    "groupEmpty": "Nothing to set in this area."
   },
   "wa": {
     "title": "WhatsApp",
@@ -654,7 +712,8 @@
       "messages": "Messages",
       "since": "Since",
       "open": "Open"
-    }
+    },
+    "contextSummary": "Lena is looking for help with the move on Sunday. You said yes for 2 pm."
   },
   "verb": {
     "send": "Send",
@@ -693,5 +752,263 @@
         "body": "Jarvis is provided as is, without warranty of any kind."
       }
     ]
+  },
+  "wizard": {
+    "labels": {
+      "name": "Name",
+      "account": "Password",
+      "source": "Source",
+      "whatsapp": "WhatsApp",
+      "settings": "AI",
+      "remote": "Remote access",
+      "done": "Done"
+    },
+    "err.conflict": "Setup was changed or started in another window. Load the current state before you continue.",
+    "err.offline": "Your server cannot be reached right now. Check your connection and load the current state. What you entered stays in this window.",
+    "err.check": "Please check your input.",
+    "err.name": "Choose a name with up to 40 characters (letters, digits, dot or hyphen).",
+    "err.password": "Choose a password with 15 to 200 characters.",
+    "err.repeat": "The passwords do not match yet.",
+    "err.consent": "Please confirm the notes about the WhatsApp connection first.",
+    "err.waNotLinked": "WhatsApp is not linked yet. Scan the code or choose “Link later”.",
+    "err.key": "{{name}} works with AI. Please enter your API key.",
+    "err.url": "Enter a complete address, for example https://jarvis.your-domain.com.",
+    "err.https": "Enter an HTTPS server address without a path.",
+    "err.token": "Paste the tunnel token.",
+    "err.remote": "The address cannot be reached yet or does not point to this server. Check your input or use your home network for now. Local access keeps working.",
+    "loading": "Loading setup …",
+    "openInBrowser": "Open the server address in a browser to set up Jarvis.",
+    "resume": "Continue setup",
+    "resumeLead": "Your password protects the setup. Steps you already confirmed stay saved.",
+    "password": "Password",
+    "signIn": "Sign in",
+    "complete": "Setup is complete.",
+    "toLogin": "Go to sign-in",
+    "stepOf": "Step {{n}} of {{total}} · {{label}}",
+    "name": {
+      "title": "What should your assistant be called?",
+      "lead": "Your private context manager runs on your own hardware. You set it up once and use it in the browser or the mobile app.",
+      "field": "Assistant name"
+    },
+    "account": {
+      "title": "Your access to {{name}}",
+      "done": "Your password is set. It works for web, mobile and administration.",
+      "lead": "Whoever sets a password here first becomes the owner of this installation. Choose your own password for web, mobile and administration.",
+      "password": "Your password",
+      "passwordHelp": "15 to 200 characters. A long passphrase is easy to remember. Password managers are supported.",
+      "repeat": "Repeat password",
+      "show": "Show password"
+    },
+    "source": {
+      "title": "What do you want to connect?",
+      "lead": "Right now you can connect WhatsApp. More sources can be added later.",
+      "later": "Link later",
+      "warn": "Jarvis uses an unofficial WhatsApp connection. WhatsApp does not officially support this; your account could be restricted or banned.",
+      "archive": "Messages and metadata are archived on your server. You set up the AI provider in a moment. WhatsApp decides how much history is imported.",
+      "consent": "I have read the notes and want to connect WhatsApp",
+      "next": "Next, Jarvis starts its services. You can follow the progress here."
+    },
+    "wa": {
+      "title": "Link WhatsApp",
+      "later": "You can link WhatsApp later under Connections.",
+      "how": "Open WhatsApp on your phone → Settings or menu → Linked devices → Link a device. Then scan this QR code.",
+      "linked": "WhatsApp is linked.",
+      "expired": "The code expired. A new one appears automatically.",
+      "renews": "The code renews automatically.",
+      "waiting": "Waiting for WhatsApp …",
+      "phone": "Or: phone number with country code",
+      "requestCode": "Request pairing code",
+      "requestQr": "Request a new QR code",
+      "codeHelp": "On your phone choose “Link with phone number instead” and enter this code."
+    },
+    "ai": {
+      "title": "Connect {{name}}'s AI",
+      "lead": "{{name}} is an AI assistant: it understands your messages, sorts them into topics, transcribes voice messages and answers your questions. For that it needs an AI provider. OpenAI is supported right now.",
+      "cost": "Texts, audio and images are sent to the provider and API costs apply. Chat exclusions apply to search and topic sorting, not automatically to audio and images. Decide below what must never reach the AI.",
+      "test": "Check API key",
+      "more": "Other settings such as transcription, image descriptions and topic sorting start with sensible values and can be changed later under Settings."
+    },
+    "remote": {
+      "title": "Where do you want to use {{name}}?",
+      "lead": "To begin with we recommend your home network. You can set up access on the go any time later.",
+      "local": "Home network",
+      "own": "Own address",
+      "localLead": "Your devices reach the server in the same home network. On the go you will need remote access or a VPN later. HTTP in the home network is not encrypted.",
+      "localHelp": "Leave empty: Jarvis finds the home network address itself. If your server is in several networks, enter the right address here.",
+      "warn": "After sign-in, settings and maintenance are also reachable at this address. Your password protects the whole installation. With a tunnel, Cloudflare relays the traffic.",
+      "cf1": "1. Sign in to Cloudflare and use a domain managed there.",
+      "cfGuide": "Open Cloudflare guide",
+      "cf2": "2. Create a Cloudflared tunnel. Copy its token here; you do not need to run Cloudflare's install command.",
+      "cf3": "3. Add a published application route. As service choose HTTP and enter app-web:8084. That address only exists inside Docker.",
+      "ownLead": "Forward your HTTPS address to Jarvis' web entry (local port 8081). Use the same address for web and mobile.",
+      "check": "When you continue, Jarvis starts remote access and checks that the address really points to this server.",
+      "localOnly": "Use only the home network for now"
+    },
+    "done": {
+      "title": "{{name}} is ready.",
+      "lead": "In the browser you sign in with your password right away. In the mobile app you first scan this code or enter the server address, then sign in.",
+      "localOnly": "This address only works on the server itself. Add a home network address under System → Settings → Access & remote access before you connect the mobile app.",
+      "qr": "The QR code only contains the server address, no password and no sign-in token.",
+      "copy": "Copy server address",
+      "copied": "Address copied.",
+      "mcpTitle": "Connect Claude and other AI clients",
+      "mcp": "{{name}} comes with an MCP server. With it your AI client can search your archive, fetch context and run the actions you allow. Connect it at this address and sign in with your password.",
+      "mcpRemote": "Cloud clients such as Claude need an HTTPS address reachable from outside. You can set up remote access later.",
+      "mcpLater": "You find this connection again under System → Connections.",
+      "reading": "Jarvis is now reading in your history. The home screen shows how far import, transcription, search and sorting are. The first cards appear bit by bit."
+    },
+    "stillAt": "You are still at step “{{step}}”. You do not have to start over.",
+    "review": "Review input",
+    "reload": "Load current state",
+    "btn": {
+      "open": "Open the web interface",
+      "apply": "Apply selection",
+      "setup": "Set up {{name}}",
+      "savePassword": "Save password",
+      "takeLink": "Use this connection",
+      "saveSettings": "Save settings",
+      "defaults": "Continue with defaults",
+      "finish": "Finish setup",
+      "checkFinish": "Check address and finish"
+    },
+    "fail": {
+      "interrupted": {
+        "title": "Setup was interrupted",
+        "message": "Your server restarted during setup. What you entered is saved. Try this step again."
+      },
+      "rolledBack": {
+        "title": "Change not applied",
+        "message": "This change did not work. Jarvis tried to restore the previous state. You can adjust your input or try again."
+      },
+      "space": {
+        "title": "Your server is low on disk space",
+        "message": "Free up space on your server, then try this step again."
+      },
+      "download": {
+        "title": "A download failed",
+        "message": "Check your server's internet connection and try again. What you entered is saved."
+      },
+      "other": {
+        "title": "This step could not be completed",
+        "message": "Try again, or go back and change your input. Your password and saved settings stay as they are."
+      }
+    },
+    "task": {
+      "setupTitle": "Setting up Jarvis for you",
+      "applyTitle": "Applying your choices",
+      "relinkTitle": "Preparing WhatsApp",
+      "relink": "Preparing a new link code. Keep your phone at hand.",
+      "offlineTitle": "Reconnecting",
+      "offline": "Your server cannot be reached right now. Setup may keep running there. As soon as the connection is back, this continues.",
+      "reconnecting": "Trying to reconnect …",
+      "reconnect": "Reconnect now",
+      "working": "Working …",
+      "progress": "Setup progress",
+      "long": "This takes longer than usual. We keep waiting for your server. You can close this page and come back later.",
+      "closeable": "You can close this window and continue here later. Your saved data is not deleted.",
+      "phase": {
+        "prepare": "Prepare",
+        "install": "Download",
+        "start": "Start",
+        "finish": "Check"
+      },
+      "explain": {
+        "prepare": "Checking your choices and preparing your server.",
+        "install": "Jarvis downloads its building blocks and starts them. How long this takes depends on your internet connection.",
+        "start": "Everything is starting up. We wait until each part is ready.",
+        "finish": "Checking that your archive is reachable. Almost there."
+      },
+      "verbs": {
+        "prepare": [
+          "Checking your choices …",
+          "Writing the configuration …",
+          "Preparing the server …"
+        ],
+        "install": [
+          "Downloading building blocks …",
+          "Unpacking files …",
+          "Setting up the database …",
+          "Starting services …",
+          "Wiring things together …"
+        ],
+        "start": [
+          "Waiting for the database …",
+          "Waking up search …",
+          "Starting the WhatsApp bridge …",
+          "Checking that everything runs …"
+        ],
+        "finish": [
+          "Checking the database …",
+          "Final touches …",
+          "Almost done …"
+        ]
+      }
+    }
+  },
+  "status": {
+    "titleBusy": "Jarvis is reading in",
+    "titleDone": "Archive",
+    "summary": "{{messages}} messages in {{chats}} chats · {{named}} of {{contacts}} contacts with names",
+    "active": {
+      "import": "Loading history from WhatsApp …",
+      "transcripts": "Transcribing voice messages …",
+      "images": "Describing images …",
+      "search": "Making messages searchable …",
+      "organizer": "Sorting chats into topics …",
+      "people": "Getting to know people …"
+    },
+    "step": {
+      "import": "History from WhatsApp",
+      "transcripts": "Voice messages",
+      "images": "Images",
+      "search": "Meaning search",
+      "organizer": "Topics, dates, tasks",
+      "people": "People profiles"
+    },
+    "off": "off",
+    "done": "done",
+    "count": "{{done}} of {{total}}",
+    "waiting": {
+      "organizer": "Waiting for conversations to settle, or for the daily budget.",
+      "search": "The search model is still loading.",
+      "people": "Starts when sorting takes a break."
+    },
+    "waitingGeneric": "Waiting for the next run.",
+    "searchReady": "Meaning search is ready: ask Jarvis something, it also finds messages that use other words.",
+    "searchNotReady": "Meaning search is still starting. Word search already works.",
+    "note": "This keeps running in the background, even if you close the page. New cards show up bit by bit.",
+    "namesMissing_one": "One contact has no name yet. Names come from your phone's address book and from profile names in new messages.",
+    "namesMissing_other": "{{count}} contacts have no name yet. Names come from your phone's address book and from profile names in new messages.",
+    "namesResync": "Reload names from WhatsApp",
+    "namesLoading": "Loading names …",
+    "namesGained_one": "One more contact has a name now.",
+    "namesGained_other": "{{count}} more contacts have a name now.",
+    "namesSame": "No new names. People who are not in your address book get their name with their next message."
+  },
+  "learning": {
+    "title": "Learning",
+    "areaSub": "What Jarvis learned from \"Later\", \"Not important\" and \"Important\"",
+    "sub": "Your choices shape what comes first. Everything here can be changed or undone.",
+    "hide": "Hide",
+    "kindChat": "Chat",
+    "kindType": "Type",
+    "learnedAt": "Learned {{when}}",
+    "setByYou": "Set by you {{when}}",
+    "show": "Show as",
+    "remove": "Remove rule",
+    "removed": "Rule removed. The cards show up as before.",
+    "howTitle": "How Jarvis learns",
+    "how": "If you mark something in a chat as not important or later three times and never as important, Jarvis shows new cards from that chat as \"Later\". Marking a chat important twice makes it important. Five times not important for the same kind of card applies to that kind. Nothing is deleted: rules only change the order and what is shown.",
+    "toggle": "Learn from my choices",
+    "toggleHelp": "Off: Jarvis creates no new rules. Existing ones stay until you remove them.",
+    "rules": "Rules",
+    "empty": "No rules yet. They appear when you mark cards as later, not important or important.",
+    "addTitle": "Set your own",
+    "addType": "Kind of card",
+    "added": "Rule saved.",
+    "addChatHint": "For a whole chat: tap a card and choose \"Everything from …\" at the bottom.",
+    "forget": "Forget everything learned",
+    "forgetConfirm": "Delete all learned rules and counters? Rules you set yourself stay.",
+    "forgotten": "Learned rules forgotten."
   }
 }

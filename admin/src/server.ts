@@ -17,6 +17,7 @@ import {
   RELINK_WORD, ROTATABLE, SERVICES, startApply, startEstimate, startRebuild, startRelink, startRestart, startRestore, startRotate, type Rotatable,
 } from './ops.js'
 import { FIELDS, GROUPS } from './schema.js'
+import { langOf, localizeField, localizeGroup } from './schema.en.js'
 import { linkView } from './wa.js'
 import { appProxy, fakePairing, InternalApi } from './appbridge.js'
 
@@ -224,11 +225,12 @@ export function createApp(ctx: Ctx, auth: Auth) {
   })
 
   // --- Einstellungen ---------------------------------------------------------------------------
-  app.get('/api/settings', requireAuth, wrap((_req, res) => {
+  app.get('/api/settings', requireAuth, wrap((req, res) => {
     const cur = readCurrent(ctx)
+    const lang = langOf(req.headers['accept-language'])
     res.json({
-      groups: GROUPS,
-      fields: FIELDS.filter((f) => !f.managed),
+      groups: GROUPS.map((g) => localizeGroup(g, lang)),
+      fields: FIELDS.filter((f) => !f.managed).map((f) => localizeField(f, lang)),
       exists: cur.exists,
       ...publicValues(cur.env),
       profiles: cur.env.COMPOSE_PROFILES ?? '',

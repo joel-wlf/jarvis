@@ -33,7 +33,7 @@ Everything is distilled from the owner's own conversations, on hardware they own
 - The organizer (optional, OpenAI) sorts messages into threads and topics with summaries, dates, todos, and open questions. Without an API key the archive and local search continue; voice transcription, image descriptions and the organizer are off. Local voice transcription is not supported.
 - A scheduled "Watch" (watch service) uses the same item keys and states (`event:<id>:<stage>`, `frage:<chat>:<ts>`, `umfrage:<id>`, `aktion:<id>`, `reminder:<id>`) to decide what to notify.
 - Outgoing actions (send, vote, react) go through the `outbox` table and are executed by wa-ingest, with confirmation and an hourly limit configurable.
-- Interface language is German.
+- Interface language: English by default, German when the device or the owner picks it (System → Language). Server texts follow the app language.
 
 ## Capabilities and Constraints
 
@@ -50,7 +50,7 @@ Open decisions:
 
 ## Brand Commitments
 
-- Default assistant name: Jarvis, configurable separately from OWNER_NAME. German UI copy, direct "du" address. A single password belongs to the owner across web, mobile, administration and MCP OAuth. Passwordless QR pairing is disabled in this deployment.
+- Default assistant name: Jarvis, configurable separately from OWNER_NAME. English and German UI copy; German uses the direct "du" address. A single password belongs to the owner across web, mobile, administration and MCP OAuth. Passwordless QR pairing is disabled in this deployment.
 - The owner's name comes from `OWNER_NAME`; nothing in the interface may hardcode a person.
 
 ## Evidence on Hand

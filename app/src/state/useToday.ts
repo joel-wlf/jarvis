@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Linking } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import type { Card, CardAction, HomeResponse, JarvisState, Urgency } from '@jarvis/contract'
+import type { Card, CardAction, HomeResponse, JarvisState, StatusResponse, Suggestion, Urgency } from '@jarvis/contract'
 import type { Filter } from '@/components/today/GroupTabs'
 import { errorText } from '@/i18n/format'
 import { useSession } from './session'
@@ -11,6 +11,8 @@ import { useToast } from './toast'
 const due = (c: Card) => (c.dueAt ? new Date(c.dueAt).getTime() : Infinity)
 /** Importance first (the server already applies the owner's own choice), then the nearest deadline, cards without one last. */
 const byUrgency = (a: Card, b: Card) => b.urgency - a.urgency || due(a) - due(b)
+/** Cards where a written reply into the chat can help; the server answers with none when nothing fits. */
+const REPLYABLE = new Set<Card['type']>(['question', 'voice', 'mention', 'waiting', 'followup', 'task', 'event', 'poll', 'money', 'levy', 'signup', 'ride', 'birthday'])
 
 export function useToday(wide: boolean) {
   const { t } = useTranslation()
@@ -28,6 +30,11 @@ export function useToday(wide: boolean) {
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const revert = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const speakUntil = useRef(0)
+  const [status, setStatus] = useState<StatusResponse | null>(null)
+  const [pinned, setPinned] = useState(false)
+  const [extras, setExtras] = useState<Record<string, Suggestion[]>>({})
+  const [suggesting, setSuggesting] = useState<string | null>(null)
+  const asked = useRef(new Set<string>())
   const cardsRef = useRef<Card[]>([])
   cardsRef.current = cards ?? []
 
@@ -53,13 +60,31 @@ export function useToday(wide: boolean) {
     void load()
   }, [load])
 
+  // Import and background work: often while something runs, rarely once everything is through
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>
+    let alive = true
+    const tick = async () => {
+      const st = await api.status().catch(() => null)
+      if (!alive) return
+      if (st) setStatus(st)
+      timer = setTimeout(() => void tick(), st?.busy ? 15_000 : 120_000)
+    }
+    void tick()
+    return () => {
+      alive = false
+      clearTimeout(timer)
+    }
+  }, [api])
+
   // The owner's importance is stored on the server (the watch service follows it); the list shows it optimistically.
   const setPriority = useCallback(
     async (key: string, level: Urgency) => {
       const before = cardsRef.current
       setCards(before.map((c) => (c.key === key ? { ...c, urgency: level } : c)))
       try {
-        await api.setPriority(key, level)
+        const r = await api.setPriority(key, level)
+        if (r.message) toast(r.message)
       } catch (e) {
         setCards(before)
         toast(errorText(e))
@@ -68,6 +93,22 @@ export function useToday(wide: boolean) {
     [api, toast],
   )
   const priorityOf = useCallback((c: Card): Urgency => c.urgency, [])
+
+  // One choice for a whole chat; undone under System → Learning
+  const setChatRule = useCallback(
+    async (card: Card, level: 'later' | 'important' | 'hidden') => {
+      if (!card.source.chatJid) return
+      try {
+        await api.setRule({ kind: 'chat', target: card.source.chatJid, priority: level === 'hidden' ? null : level === 'later' ? 1 : 3, hidden: level === 'hidden' })
+        toast(t(`today.chatRule.${level}`, { chat: card.source.chat }))
+        const c = await api.cards()
+        setCards([...c.cards].sort(byUrgency))
+      } catch (e) {
+        toast(errorText(e))
+      }
+    },
+    [api, toast, t],
+  )
 
   // Wide screens always have one card selected, like the prototype desktop.
   useEffect(() => {
@@ -110,6 +151,8 @@ export function useToday(wide: boolean) {
     (key: string, keep = false) => {
       const next = selected === key && !wide && !keep ? null : key
       setSelected(next)
+      // a card the owner tapped keeps its sentence; the automatic first pick on wide screens lets the facts rotate
+      setPinned(!!next && !keep)
       const card = cardsRef.current.find((c) => c.key === next)
       clearTimeout(revert.current)
       if (!card) {
@@ -119,11 +162,21 @@ export function useToday(wide: boolean) {
       }
       setFigure('speaking')
       setSay(card.say || card.title)
+      // Write replies once per card while it is open; failures stay quiet, the card works without them
+      if (card.source.chatJid && REPLYABLE.has(card.type) && !asked.current.has(card.key)) {
+        asked.current.add(card.key)
+        setSuggesting(card.key)
+        void api
+          .suggest(card.key)
+          .then((r) => setExtras((x) => ({ ...x, [card.key]: r.suggestions })))
+          .catch(() => {})
+          .finally(() => setSuggesting((k) => (k === card.key ? null : k)))
+      }
       // The sprites run at 2 fps: keep speaking for about the sentence's reading time, not the typing time.
       speakUntil.current = Date.now() + Math.min(6000, Math.max(2000, (card.say || card.title).length * 45))
       setAfterSay(card.urgency >= 3 ? 'notify' : 'idle')
     },
-    [selected, wide, summary],
+    [selected, wide, summary, api],
   )
 
   const onSayDone = useCallback(() => {
@@ -143,7 +196,7 @@ export function useToday(wide: boolean) {
       const before = cardsRef.current
       const rest = before.filter((c) => c.key !== card.key)
       setCards(rest)
-      if (selected === card.key) setSelected(null)
+      if (selected === card.key) { setSelected(null); setPinned(false) }
       try {
         const res = await api.act(card.key, action)
         if (!res.removed) setCards(before)
@@ -166,11 +219,36 @@ export function useToday(wide: boolean) {
     return { all: list.length, reply: by('reply'), schedule: by('schedule'), todo: by('todo'), know: by('know') }
   }, [cards])
 
+  // What Jarvis says between cards: one fact after another under the figure
+  const lines = useMemo(() => {
+    if (pinned) return []
+    const out: string[] = []
+    const list = cards ?? []
+    const replies = list.filter((c) => c.group === 'reply').length
+    if (replies) out.push(t('today.lines.replies', { count: replies }))
+    const next = list.filter((c) => (c.type === 'event' || c.type === 'reminder') && c.dueAt).sort((a, b) => due(a) - due(b))[0]
+    if (next) out.push(t('today.lines.next', { title: next.title, when: next.source.when }))
+    const today = home?.modules.messages.incoming.at(-1) ?? 0
+    if (today > 0) out.push(t('today.lines.today', { count: today }))
+    if (status) {
+      const step = (id: string) => status.steps.find((x) => x.id === id)
+      const pct = (x?: { done: number; total: number }) => (x && x.total ? Math.round((x.done / x.total) * 100) : 100)
+      if (step('import')?.state === 'running') out.push(t('today.lines.importing', { count: status.messages }))
+      const org = step('organizer')
+      if (org && (org.state === 'running' || org.state === 'waiting')) out.push(t('today.lines.sorting', { pct: pct(org) }))
+      const search = step('search')
+      if (search && search.state !== 'done' && search.state !== 'off') out.push(t('today.lines.indexing', { pct: pct(search) }))
+      else if (status.searchReady && !status.busy) out.push(t('today.lines.askMe'))
+      if (status.contacts && status.named < status.contacts) out.push(t('today.lines.names', { named: status.named, total: status.contacts }))
+    }
+    return out
+  }, [pinned, cards, home, status, t])
+
   const visible = useMemo(() => (cards ?? []).filter((c) => filter === 'all' || c.group === filter).sort(byUrgency), [cards, filter])
 
   return {
     home, cards, visible, counts, error, reload: load,
-    filter, setFilter, selected, select, act, priorityOf, setPriority,
+    filter, setFilter, selected, select, act, priorityOf, setPriority, extras, suggesting, status, lines, setChatRule,
     figure, setFigure, say, setSay, onSayDone, lastSource, updatedAt,
   }
 }

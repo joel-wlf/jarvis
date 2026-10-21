@@ -69,7 +69,16 @@ function placeholders(rows: number, cols: number): string {
 }
 
 export async function upsertContacts(contacts: Partial<Contact>[]) {
-  const rows = contacts.filter((c) => c.id && !IGNORED_CHATS(c.id))
+  // The address book arrives per phone number, while newer chats address people by LID: the same name belongs to
+  // both ids (Contact.lid / Contact.jid), otherwise LID chats stay nameless.
+  const expanded: Partial<Contact>[] = []
+  for (const c of contacts) {
+    expanded.push(c)
+    for (const alias of [c.lid, c.jid]) {
+      if (alias && alias !== c.id && (c.name || c.notify || c.verifiedName)) expanded.push({ id: jidNormalizedUser(alias), name: c.name, notify: c.notify, verifiedName: c.verifiedName })
+    }
+  }
+  const rows = expanded.filter((c) => c.id && !IGNORED_CHATS(c.id))
   await inChunks(rows, async (chunk) => {
     const params: unknown[] = []
     for (const c of chunk) {
@@ -218,6 +227,42 @@ export function parseContent(raw: WAMessageContent | null | undefined): Parsed |
   if (c.protocolMessage || c.pollUpdateMessage || c.senderKeyDistributionMessage || c.messageContextInfo && Object.keys(c).length === 1)
     return null
   return { ...base, type: 'other', body: null }
+}
+
+/**
+ * Names people gave themselves (pushName) arrive with every message but not always as a contact event. Keep them, so
+ * chats and people show "Lena" instead of a phone number. An address book name (contacts.name) is never replaced.
+ */
+export async function rememberPushNames(msgs: WAMessage[]) {
+  const names = new Map<string, string>()
+  for (const m of msgs) {
+    if (m.key.fromMe || !m.pushName?.trim()) continue
+    const chat = m.key.remoteJid
+    if (!chat || IGNORED_CHATS(chat)) continue
+    const sender = jidNormalizedUser(m.key.participant ?? m.participant ?? chat)
+    if (!sender || sender.endsWith('@g.us')) continue
+    names.set(sender, m.pushName.trim().slice(0, 100))
+    // newer WhatsApp versions address people by LID and send the phone number alongside
+    const pn = (m.key as { participantPn?: string; senderPn?: string }).participantPn ?? (m.key as { senderPn?: string }).senderPn
+    if (pn) names.set(jidNormalizedUser(pn), m.pushName.trim().slice(0, 100))
+  }
+  if (!names.size) return
+  const jids = [...names.keys()]
+  await pool.query(
+    `INSERT INTO contacts (jid, push_name, phone)
+     SELECT j, n, CASE WHEN j LIKE '%@s.whatsapp.net' THEN split_part(split_part(j, '@', 1), ':', 1) END FROM unnest($1::text[], $2::text[]) AS x(j, n)
+     ON CONFLICT (jid) DO UPDATE SET push_name = excluded.push_name, updated_at = now()
+     WHERE contacts.push_name IS DISTINCT FROM excluded.push_name`,
+    [jids, jids.map((j) => names.get(j))],
+  )
+}
+
+/** Progress of WhatsApp's history sync, for the app's status after setup. */
+export async function recordHistoryProgress(info: { progress?: number | null; isLatest?: boolean; messages: number }) {
+  await pool.query(
+    `INSERT INTO meta (key, value) VALUES ('history_sync', $1) ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+    [JSON.stringify({ progress: info.progress ?? null, isLatest: !!info.isLatest, messages: info.messages, at: new Date().toISOString() })],
+  )
 }
 
 export async function upsertMessages(msgs: WAMessage[]) {

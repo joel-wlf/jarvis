@@ -4,7 +4,7 @@ import { actDb, pool } from './db.js'
 export const MAX_PER_HOUR = Number(process.env.MAX_ACTIONS_PER_HOUR ?? 30)
 
 // Pure queries and harmless state changes do not count against the hourly limit
-export const FREE_KINDS = ['group_info', 'check_numbers', 'get_profile', 'blocklist', 'download_media', 'presence', 'chat_modify', 'star', 'privacy', 'group_requests']
+export const FREE_KINDS = ['group_info', 'check_numbers', 'get_profile', 'blocklist', 'download_media', 'resync_contacts', 'presence', 'chat_modify', 'star', 'privacy', 'group_requests']
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 

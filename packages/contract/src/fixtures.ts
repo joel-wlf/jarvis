@@ -10,7 +10,7 @@ const iso = (h: number) => new Date(Date.now() - h * 3600_000).toISOString()
 export const FIXTURE_CARDS: Card[] = [
   {
     key: 'frage:mama:1', type: 'question', group: 'reply', urgency: 3, dueAt: iso(-60), state: 'new',
-    title: 'Mama fragt nach Sonntag', source: { chat: 'Einzelchat', when: 'vor 2 Std.', at: iso(2) },
+    title: 'Mama fragt nach Sonntag', source: { chat: 'Mama', chatJid: 'mama@demo', when: 'vor 2 Std.', at: iso(2) },
     say: 'Mama wartet seit 2 Stunden auf deine Antwort: Sonntagsessen, Oma kommt auch. Um 14 Uhr hilfst du aber Lena beim Umzug.',
     context: 'Sonntag 14 Uhr hilfst du Lena beim Umzug.',
     suggestions: [
@@ -36,7 +36,7 @@ export const FIXTURE_CARDS: Card[] = [
   },
   {
     key: 'sprach:lena:1', type: 'voice', group: 'reply', urgency: 2, state: 'new',
-    title: 'Lena hat eine Sprachnachricht geschickt', source: { chat: 'Einzelchat', when: 'heute 16:10', at: iso(4) },
+    title: 'Lena hat eine Sprachnachricht geschickt', source: { chat: 'Lena', chatJid: 'lena@demo', when: 'heute 16:10', at: iso(4) },
     say: 'Lena hat dir 48 Sekunden gesprochen: Umzug Sonntag ab 14 Uhr, und ob du Kartons von der Arbeit mitbringst.',
     suggestions: [s('a', 'Kartons bringe ich', 'Klar, ich bring Kartons mit! Bis Sonntag 14 Uhr.', true), s('b', 'Ohne Kartons', 'Kartons schaffe ich nicht, aber ich bin pünktlich da.')],
     data: { person: p('Lena', 'LE'), durationSec: 48, summary: 'Umzug Sonntag ab 14 Uhr, Transporter bis 18 Uhr. Fragt, ob du Kartons mitbringst.', stats: [{ label: 'Dauer', value: '0:48' }, { label: 'Thema', value: 'Umzug' }, { label: 'Frage', value: '1' }] },
@@ -65,7 +65,7 @@ export const FIXTURE_CARDS: Card[] = [
   },
   {
     key: 'aktion:31', type: 'task', group: 'todo', urgency: 1, dueAt: iso(-264), state: 'new',
-    title: 'Miete November an Jonas', source: { chat: 'WG Bremer Str.', when: 'bis 1. Nov' },
+    title: 'Miete November an Jonas', source: { chat: 'WG Bremer Str.', chatJid: 'wg@demo', when: 'bis 1. Nov' },
     say: 'Die Miete für November geht an Jonas: 420 € bis zum Ersten. Soll ich dich am 30. erinnern?',
     suggestions: [{ id: 'done', label: 'Erledigt', action: { kind: 'done' }, primary: true }, { id: 'r', label: 'Am 30. erinnern', action: { kind: 'remind', at: iso(-216), text: 'Miete an Jonas' } }],
     data: { amount: '420 €', recipient: 'Jonas', note: 'IBAN wie letzten Monat', daysLeft: 11, daysTotal: 30 },

@@ -4,6 +4,7 @@ import { ActivityIndicator, ScrollView, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { AdminApi, Job } from '@/api/admin'
 import { clock } from '@/i18n/format'
+import { setupTaskProgress } from '@/api/setup-task'
 import { colors } from '@/theme/tokens'
 import { type } from '@/theme/type'
 import { BlockButton, Micro, Notice, Panel } from '../ui'
@@ -49,16 +50,11 @@ export function JobView({ admin, job: initial, onEnd }: { admin: AdminApi; job: 
   const done = job.status !== 'running'
   const lines = job.lines ?? []
   const setup = job.kind === 'setup' || job.kind === 'apply'
-  const phases = ['Konfiguration prüfen', 'Dienste bauen und starten', 'Bereitschaft prüfen', 'Datenbank prüfen']
-  let phase = 0
-  for (const line of lines) {
-    if (line.level === 'out') continue
-    if (line.msg.startsWith('Starte Dienste:')) phase = Math.max(phase, 1)
-    if (line.msg.startsWith('Warte, bis alle Dienste')) phase = Math.max(phase, 2)
-    if (line.msg.startsWith('Prüfe die Datenbank-Anmeldungen')) phase = Math.max(phase, 3)
-  }
+  const phases = [t('wizard.task.phase.prepare'), t('wizard.task.phase.install'), t('wizard.task.phase.start'), t('wizard.task.phase.finish')]
+  const progress = setupTaskProgress(job)
+  const phase = progress.stage
   const error = [...lines].reverse().find((line) => line.level === 'error')
-  const status = job.status === 'ok' ? 'Abgeschlossen' : done ? t(`system.job.${job.status}`) : setup ? phases[phase] : 'Vorgang läuft'
+  const status = done ? t(`system.job.${job.status}`) : setup ? phases[phase] : t('system.job.running')
 
   return (
     <Panel style={{ gap: 12 }}>
@@ -71,14 +67,15 @@ export function JobView({ admin, job: initial, onEnd }: { admin: AdminApi; job: 
           {!done ? <ActivityIndicator size="small" color={colors.ink} /> : null}
           <Text style={type.body} accessibilityLiveRegion="polite">{status}</Text>
         </View>
-        {setup ? <View accessibilityRole="progressbar" accessibilityLabel="Einrichtungsfortschritt" accessibilityValue={{ text: status }} style={{ flexDirection: 'row', gap: 4 }}>
-          {phases.map((label, index) => <View key={label} style={{ flex: 1, height: 6, backgroundColor: job.status === 'ok' || index < phase ? colors.ink : index === phase ? colors.ink2 : colors.line, opacity: index === phase && !done ? 0.6 : 1 }} />)}
-        </View> : null}
-        {!done && setup && phase === 1 ? <Text style={type.small}>Der erste Build kann auf einem Raspberry Pi 10 bis 30 Minuten dauern. Der Balken zeigt die Einrichtungsschritte, keine verbleibende Zeit.</Text> : null}
-        {disconnected ? <Notice level="warn" text="Verbindung unterbrochen. Wir versuchen, den Status erneut abzurufen." /> : null}
+        {setup ? (
+          <View accessibilityRole="progressbar" accessibilityLabel={t('wizard.task.progress')} accessibilityValue={{ min: 0, max: 100, now: Math.round(progress.fraction * 100) }} style={{ height: 6, backgroundColor: colors.line }}>
+            <View style={{ height: 6, width: `${Math.max(2, Math.round((job.status === 'ok' ? 1 : progress.fraction) * 100))}%`, backgroundColor: job.status === 'ok' ? colors.green : colors.ink }} />
+          </View>
+        ) : null}
+        {disconnected ? <Notice level="warn" text={t('system.job.disconnected')} /> : null}
         {done && job.status !== 'ok' && error ? <Notice level="warn" text={error.msg} /> : null}
       </View>
-      <BlockButton variant="line" label={details ? 'Technische Details ausblenden' : 'Technische Details anzeigen'} onPress={() => setDetails(!details)} />
+      <BlockButton variant="line" label={details ? t('system.job.hideDetails') : t('system.job.showDetails')} onPress={() => setDetails(!details)} />
       {details ? <ScrollView style={{ height: 240, flexGrow: 0 }} nestedScrollEnabled contentContainerStyle={{ gap: 4 }}>
         {lines.map((l, i) => (
           <View key={i} style={{ flexDirection: 'row', gap: 10 }}>

@@ -88,6 +88,23 @@
       "systemAllOk_one": "Ein Dienst läuft",
       "systemAllOk_other": "{{count}} Dienste laufen",
       "last": "Zuletzt: {{source}}"
+    },
+    "lines": {
+      "replies_one": "Eine Person wartet auf deine Antwort.",
+      "replies_other": "{{count}} Personen warten auf deine Antwort.",
+      "next": "Als Nächstes: {{title}}, {{when}}.",
+      "today_one": "Heute kam eine Nachricht rein.",
+      "today_other": "Heute kamen {{count}} Nachrichten rein.",
+      "importing": "Ich lese noch deinen Verlauf ein, {{count}} Nachrichten bisher.",
+      "sorting": "Ich sortiere deine Chats nach Themen: {{pct}} % geschafft.",
+      "indexing": "Ich mache deine Nachrichten durchsuchbar: {{pct}} %.",
+      "askMe": "Frag mich etwas, ich suche in allen Chats nach Bedeutung, nicht nur nach Wörtern.",
+      "names": "{{named}} von {{total}} Kontakten haben schon einen Namen, der Rest kommt mit den nächsten Nachrichten."
+    },
+    "chatRule": {
+      "later": "Karten aus {{chat}} zeige ich ab jetzt als „Später“. Rückgängig unter System → Lernen.",
+      "important": "Karten aus {{chat}} zeige ich ab jetzt als „Wichtig“. Rückgängig unter System → Lernen.",
+      "hidden": "{{chat}} blende ich aus. Nichts wird gelöscht; unter System → Lernen holst du es zurück."
     }
   },
   "groups": {
@@ -137,7 +154,7 @@
     "repliesReady_one": "Eine Antwort bereit",
     "repliesReady_other": "{{count}} Antworten bereit",
     "replyPrepared": "Antwort vorbereitet",
-    "play": "Abspielen (kommt bald)",
+    "play": "Abspielen",
     "reactWith": "Mit {{emoji}} reagieren",
     "react": "Reaktion senden",
     "free": "Frei: {{when}}",
@@ -207,7 +224,24 @@
     "priority": "Wichtigkeit",
     "priorityLow": "Später",
     "priorityNormal": "Normal",
-    "priorityHigh": "Wichtig"
+    "priorityHigh": "Wichtig",
+    "pause": "Pause",
+    "playFailed": "Abspielen ging nicht: {{reason}}",
+    "playUnavailable": "In der Demo gibt es keine Audiodateien.",
+    "noTranscript": "Noch nicht transkribiert.",
+    "background": "Worum geht es?",
+    "topic": "Thema: {{title}}",
+    "inChatNamed": "Aus {{chat}}",
+    "noBackground": "Zu dieser Karte gibt es keine Nachrichten mehr im Archiv.",
+    "you": "Du",
+    "dateOpen": "Datum offen",
+    "dueWhen": "Fällig {{when}}",
+    "fromChat": "Aus {{chat}}",
+    "openTask": "Offen",
+    "writingReplies": "Jarvis schreibt Antwortvorschläge …",
+    "willSend": "Wird gesendet",
+    "allFrom": "Alles aus {{chat}}:",
+    "allFromSet": "Alle Karten aus {{chat}}: {{level}}"
   },
   "act": {
     "send": "Gesendet.",
@@ -400,10 +434,18 @@
       "failed": "fehlgeschlagen",
       "rolled_back": "zurückgesetzt",
       "interrupted": "abgebrochen",
-      "rolledBackHelp": "Etwas ging schief. Jarvis hat die vorherigen Einstellungen wiederhergestellt."
+      "rolledBackHelp": "Etwas ging schief. Jarvis hat die vorherigen Einstellungen wiederhergestellt.",
+      "hideDetails": "Technische Details ausblenden",
+      "showDetails": "Technische Details anzeigen",
+      "disconnected": "Verbindung unterbrochen. Wir versuchen, den Status erneut abzurufen."
     },
     "legal": "Rechtliche Hinweise",
-    "legalSub": "WhatsApp, KI-Anbieter, Datenschutz"
+    "legalSub": "WhatsApp, KI-Anbieter, Datenschutz",
+    "password": "Dein Passwort",
+    "passwordSub": "Ein Passwort für Web, Mobile und MCP-Anmeldung",
+    "connections": "Verbindungen",
+    "connectionsSub": "Mobile App verbinden · MCP für Claude und andere KI-Clients",
+    "language": "Sprache"
   },
   "settings": {
     "title": "Einstellungen",
@@ -420,7 +462,23 @@
     "default": "Standard: {{value}}",
     "reset": "Verwerfen",
     "rollbackNote": "Wenn ein Dienst danach nicht startet, setzt Jarvis die Einstellungen automatisch zurück.",
-    "aiNote": "Mit aktivierter KI gehen Nachrichteninhalte an diesen Anbieter."
+    "aiNote": "Mit aktivierter KI gehen Nachrichteninhalte an diesen Anbieter.",
+    "auto": "Automatisch",
+    "less": "Weniger",
+    "more": "Mehr",
+    "resetAuto": "Zurück auf automatisch",
+    "resetTo": "Zurück auf {{value}}",
+    "removeItem": "{{item}} entfernen",
+    "addItem": "Eintrag hinzufügen",
+    "addItemTo": "Eintrag zu {{label}} hinzufügen",
+    "listHint": "Mit Enter oder Komma hinzufügen.",
+    "recommended": "empfohlen",
+    "custom": "Anderer Wert",
+    "customValue": "Eigener Wert",
+    "showAdvanced_one": "Erweiterte Einstellung zeigen (1)",
+    "showAdvanced_other": "Erweiterte Einstellungen zeigen ({{count}})",
+    "showAdvancedHelp": "Feinabstimmung. Die Standardwerte passen für die meisten.",
+    "groupEmpty": "In diesem Bereich gibt es nichts einzustellen."
   },
   "wa": {
     "title": "WhatsApp",
@@ -654,7 +712,8 @@
       "messages": "Nachrichten",
       "since": "Seit",
       "open": "Offen"
-    }
+    },
+    "contextSummary": "Lena sucht Helfer für den Umzug am Sonntag. Du hast für 14 Uhr zugesagt."
   },
   "verb": {
     "send": "Senden",
@@ -693,5 +752,263 @@
         "body": "Jarvis wird bereitgestellt, wie es ist, ohne jede Gewährleistung."
       }
     ]
+  },
+  "wizard": {
+    "labels": {
+      "name": "Benennen",
+      "account": "Passwort",
+      "source": "Quelle",
+      "whatsapp": "WhatsApp",
+      "settings": "KI",
+      "remote": "Fernzugriff",
+      "done": "Fertig"
+    },
+    "err.conflict": "Die Einrichtung wurde in einem anderen Fenster geändert oder dort gestartet. Lade den aktuellen Stand, bevor du weitermachst.",
+    "err.offline": "Dein Server ist gerade nicht erreichbar. Prüfe deine Verbindung und lade den aktuellen Stand. Deine Eingaben bleiben in diesem Fenster erhalten.",
+    "err.check": "Bitte überprüfe deine Eingaben.",
+    "err.name": "Bitte wähle einen Namen mit bis zu 40 Zeichen (Buchstaben, Ziffern, Punkt oder Bindestrich).",
+    "err.password": "Bitte wähle ein Passwort mit 15 bis 200 Zeichen.",
+    "err.repeat": "Die Passwörter stimmen noch nicht überein.",
+    "err.consent": "Bitte bestätige zuerst die Hinweise zur WhatsApp-Verbindung.",
+    "err.waNotLinked": "WhatsApp ist noch nicht verbunden. Scanne den Code oder wähle „Später verbinden“.",
+    "err.key": "{{name}} arbeitet mit KI. Bitte trage deinen API-Schlüssel ein.",
+    "err.url": "Bitte gib eine vollständige Adresse ein, zum Beispiel https://jarvis.deine-domain.de.",
+    "err.https": "Bitte gib eine HTTPS-Server-Adresse ohne Pfad ein.",
+    "err.token": "Bitte füge den Tunnel-Token ein.",
+    "err.remote": "Die Adresse ist noch nicht erreichbar oder zeigt nicht auf diesen Server. Prüfe deine Angaben oder wähle vorerst dein Heimnetz. Dein lokaler Zugang funktioniert weiterhin.",
+    "loading": "Einrichtung wird geladen …",
+    "openInBrowser": "Öffne die Server-Adresse im Browser, um Jarvis einzurichten.",
+    "resume": "Einrichtung fortsetzen",
+    "resumeLead": "Dein Passwort schützt die Einrichtung. Bereits bestätigte Schritte bleiben gespeichert.",
+    "password": "Passwort",
+    "signIn": "Anmelden",
+    "complete": "Die Einrichtung ist abgeschlossen.",
+    "toLogin": "Zur Anmeldung",
+    "stepOf": "Schritt {{n}} von {{total}} · {{label}}",
+    "name": {
+      "title": "Wie soll dein Assistent heißen?",
+      "lead": "Dein privater Kontext-Manager läuft auf deinem eigenen Rechner. Du richtest ihn einmal ein und nutzt ihn im Browser oder in der Mobile App.",
+      "field": "Name des Assistenten"
+    },
+    "account": {
+      "title": "Dein Zugang zu {{name}}",
+      "done": "Dein Passwort ist eingerichtet. Es gilt für Web, Mobile und Verwaltung.",
+      "lead": "Wer hier zuerst ein Passwort festlegt, wird Besitzer dieser Installation. Wähle dein eigenes Passwort für Web, Mobile und Verwaltung.",
+      "password": "Dein Passwort",
+      "passwordHelp": "15 bis 200 Zeichen. Eine lange Passphrase ist gut merkbar. Passwortmanager werden unterstützt.",
+      "repeat": "Passwort wiederholen",
+      "show": "Passwort anzeigen"
+    },
+    "source": {
+      "title": "Was möchtest du verbinden?",
+      "lead": "Aktuell kannst du WhatsApp verbinden. Weitere Quellen lassen sich später ergänzen.",
+      "later": "Später verbinden",
+      "warn": "Jarvis nutzt eine inoffizielle WhatsApp-Anbindung. WhatsApp unterstützt diese Nutzung nicht offiziell; eine Einschränkung oder Sperre des Kontos ist möglich.",
+      "archive": "Nachrichten und Metadaten werden auf deinem Server archiviert. Den KI-Anbieter richtest du gleich ein. Wie viel Verlauf importiert wird, bestimmt WhatsApp.",
+      "consent": "Ich habe die Hinweise gelesen und möchte WhatsApp verbinden",
+      "next": "Als Nächstes startet Jarvis seine Dienste. Den Fortschritt siehst du hier."
+    },
+    "wa": {
+      "title": "WhatsApp verbinden",
+      "later": "Du kannst WhatsApp später unter Verbindungen einrichten.",
+      "how": "Öffne WhatsApp auf deinem Handy → Einstellungen oder Menü → Verknüpfte Geräte → Gerät hinzufügen. Scanne dann diesen QR-Code.",
+      "linked": "WhatsApp ist verbunden.",
+      "expired": "Der Code ist abgelaufen. Ein neuer Code erscheint automatisch.",
+      "renews": "Der Code wird automatisch erneuert.",
+      "waiting": "Warte auf WhatsApp …",
+      "phone": "Alternativ: Telefonnummer mit Ländervorwahl",
+      "requestCode": "Kopplungscode anfordern",
+      "requestQr": "Neuen QR-Code anfordern",
+      "codeHelp": "Wähle auf dem Handy „Stattdessen mit Telefonnummer verknüpfen“ und gib diesen Code ein."
+    },
+    "ai": {
+      "title": "Verbinde die KI von {{name}}",
+      "lead": "{{name}} ist ein KI-Assistent: Er versteht deine Nachrichten, sortiert sie nach Themen, transkribiert Sprachnachrichten und beantwortet deine Fragen. Dafür braucht er einen KI-Anbieter. Aktuell wird OpenAI unterstützt.",
+      "cost": "Dabei werden Texte, Audios und Bilder an den Anbieter übertragen und es entstehen API-Kosten. Chat-Ausschlüsse gelten für Suche und Themen-Sortierung, nicht automatisch für Audio und Bilder. Lege unten fest, was nie an die KI gehen darf.",
+      "test": "API-Schlüssel prüfen",
+      "more": "Weitere Einstellungen wie Transkription, Bildbeschreibung und Themen-Sortierung stehen auf sinnvollen Werten und lassen sich später unter Einstellungen ändern."
+    },
+    "remote": {
+      "title": "Wo möchtest du {{name}} nutzen?",
+      "lead": "Für den Anfang empfehlen wir dein Heimnetz. Du kannst den Zugang für unterwegs jederzeit später einrichten.",
+      "local": "Heimnetz",
+      "own": "Eigene Adresse",
+      "localLead": "Deine Geräte erreichen den Server im gleichen Heimnetz. Unterwegs brauchst du später einen Fernzugriff oder ein VPN. HTTP im Heimnetz ist unverschlüsselt.",
+      "localHelp": "Leer lassen: Jarvis ermittelt die Heimnetz-Adresse automatisch. Falls dein Server mehrere Netze hat, kannst du die passende Adresse hier angeben.",
+      "warn": "Über diese Adresse sind nach Anmeldung auch Einstellungen und Wartung erreichbar. Dein Passwort schützt damit die gesamte Installation. Cloudflare vermittelt beim Tunnel den Datenverkehr.",
+      "cf1": "1. Melde dich bei Cloudflare an und verwende eine dort verwaltete Domain.",
+      "cfGuide": "Cloudflare-Anleitung öffnen",
+      "cf2": "2. Erstelle einen Cloudflared-Tunnel. Kopiere dessen Token hierher; du musst den Installationsbefehl von Cloudflare nicht ausführen.",
+      "cf3": "3. Lege eine veröffentlichte Anwendungsroute an. Als Dienst wählst du HTTP und trägst app-web:8084 ein. Diese Adresse ist nur innerhalb von Docker erreichbar.",
+      "ownLead": "Leite deine HTTPS-Adresse auf den Web-Einstieg von Jarvis weiter (lokaler Port 8081). Verwende dieselbe Adresse für Web und Mobile.",
+      "check": "Beim Weitergehen startet Jarvis den Zugang und prüft, ob die Adresse tatsächlich auf diesen Server zeigt.",
+      "localOnly": "Vorerst nur im Heimnetz nutzen"
+    },
+    "done": {
+      "title": "{{name}} ist bereit.",
+      "lead": "Im Browser meldest du dich direkt mit deinem Passwort an. In der Mobile App scannst du zuerst diesen Code oder gibst die Server-Adresse ein und meldest dich danach an.",
+      "localOnly": "Diese Adresse funktioniert nur auf dem Server selbst. Trage unter System → Einstellungen → Zugang & Fernzugriff eine Heimnetz-Adresse ein, bevor du die Mobile App verbindest.",
+      "qr": "Der QR-Code enthält nur die Server-Adresse, kein Passwort und keinen Anmeldetoken.",
+      "copy": "Server-Adresse kopieren",
+      "copied": "Adresse kopiert.",
+      "mcpTitle": "Mit Claude und anderen KI-Clients verbinden",
+      "mcp": "{{name}} bringt einen MCP-Server mit. Damit kann dein KI-Client in deinem Archiv suchen, Kontext abrufen und freigegebene Aktionen ausführen. Verbinde ihn über diese Adresse und melde dich mit deinem Passwort an.",
+      "mcpRemote": "Cloudbasierte Clients wie Claude benötigen eine von außen erreichbare HTTPS-Adresse. Du kannst den Fernzugriff später einrichten.",
+      "mcpLater": "Diese Verbindung findest du später unter System → Verbindungen wieder.",
+      "reading": "Jarvis liest jetzt deinen Verlauf ein. Auf der Startseite siehst du, wie weit Import, Transkription, Suche und Sortierung sind. Die ersten Karten erscheinen nach und nach."
+    },
+    "stillAt": "Du bist weiterhin im Schritt „{{step}}“. Du musst nicht von vorne anfangen.",
+    "review": "Eingaben überprüfen",
+    "reload": "Aktuellen Stand laden",
+    "btn": {
+      "open": "Weboberfläche öffnen",
+      "apply": "Auswahl übernehmen",
+      "setup": "{{name}} einrichten",
+      "savePassword": "Passwort speichern",
+      "takeLink": "Verbindung übernehmen",
+      "saveSettings": "Einstellungen speichern",
+      "defaults": "Mit Grundeinstellungen weiter",
+      "finish": "Einrichtung abschließen",
+      "checkFinish": "Adresse prüfen und abschließen"
+    },
+    "fail": {
+      "interrupted": {
+        "title": "Einrichtung unterbrochen",
+        "message": "Dein Server wurde während der Einrichtung neu gestartet. Deine gespeicherten Eingaben bleiben erhalten. Versuche den Schritt noch einmal."
+      },
+      "rolledBack": {
+        "title": "Änderung nicht übernommen",
+        "message": "Diese Änderung hat nicht funktioniert. Jarvis hat versucht, den vorherigen Zustand wiederherzustellen. Du kannst deine Eingaben anpassen oder es erneut versuchen."
+      },
+      "space": {
+        "title": "Dein Server hat zu wenig Speicherplatz",
+        "message": "Schaffe auf deinem Server freien Speicherplatz. Danach kannst du diesen Schritt erneut versuchen."
+      },
+      "download": {
+        "title": "Ein Download ist fehlgeschlagen",
+        "message": "Prüfe die Internetverbindung deines Servers und versuche es erneut. Bereits gespeicherte Eingaben bleiben erhalten."
+      },
+      "other": {
+        "title": "Dieser Schritt konnte nicht abgeschlossen werden",
+        "message": "Du kannst es erneut versuchen oder zurückgehen und deine Eingaben ändern. Dein Passwort und bereits gespeicherte Einstellungen bleiben erhalten."
+      }
+    },
+    "task": {
+      "setupTitle": "Wir richten Jarvis für dich ein",
+      "applyTitle": "Wir übernehmen deine Auswahl",
+      "relinkTitle": "WhatsApp wird vorbereitet",
+      "relink": "Wir bereiten einen neuen Verbindungscode vor. Halte dein Handy bereit.",
+      "offlineTitle": "Verbindung wird wiederhergestellt",
+      "offline": "Wir erreichen deinen Server gerade nicht. Die Einrichtung kann dort weiterlaufen. Sobald die Verbindung zurück ist, geht es hier weiter.",
+      "reconnecting": "Verbindung wird erneut versucht …",
+      "reconnect": "Jetzt erneut verbinden",
+      "working": "Arbeite …",
+      "progress": "Fortschritt der Einrichtung",
+      "long": "Das dauert länger als üblich. Wir warten weiter auf deinen Server. Du kannst diese Seite schließen und später zurückkommen.",
+      "closeable": "Du kannst das Fenster schließen und später an dieser Stelle weitermachen. Deine gespeicherten Daten werden nicht gelöscht.",
+      "phase": {
+        "prepare": "Vorbereiten",
+        "install": "Herunterladen",
+        "start": "Starten",
+        "finish": "Prüfen"
+      },
+      "explain": {
+        "prepare": "Wir prüfen deine Auswahl und bereiten deinen Server vor.",
+        "install": "Jarvis lädt seine Bausteine herunter und startet sie. Wie lange das dauert, hängt von deiner Internetverbindung ab.",
+        "start": "Alle Bausteine laufen an. Wir warten, bis jeder von ihnen bereit ist.",
+        "finish": "Wir prüfen, ob dein Archiv erreichbar ist. Gleich geht es weiter."
+      },
+      "verbs": {
+        "prepare": [
+          "Prüfe deine Auswahl …",
+          "Schreibe die Konfiguration …",
+          "Bereite den Server vor …"
+        ],
+        "install": [
+          "Lade Bausteine herunter …",
+          "Entpacke Dateien …",
+          "Richte die Datenbank ein …",
+          "Starte Dienste …",
+          "Verbinde die Teile …"
+        ],
+        "start": [
+          "Warte auf die Datenbank …",
+          "Wecke die Suche auf …",
+          "Starte die WhatsApp-Anbindung …",
+          "Prüfe, ob alles läuft …"
+        ],
+        "finish": [
+          "Prüfe die Datenbank …",
+          "Mache letzte Handgriffe …",
+          "Gleich fertig …"
+        ]
+      }
+    }
+  },
+  "status": {
+    "titleBusy": "Jarvis liest sich ein",
+    "titleDone": "Archiv",
+    "summary": "{{messages}} Nachrichten in {{chats}} Chats · {{named}} von {{contacts}} Kontakten mit Namen",
+    "active": {
+      "import": "Verlauf wird von WhatsApp geladen …",
+      "transcripts": "Sprachnachrichten werden transkribiert …",
+      "images": "Bilder werden beschrieben …",
+      "search": "Nachrichten werden durchsuchbar gemacht …",
+      "organizer": "Chats werden nach Themen sortiert …",
+      "people": "Personen werden eingeschätzt …"
+    },
+    "step": {
+      "import": "Verlauf von WhatsApp",
+      "transcripts": "Sprachnachrichten",
+      "images": "Bilder",
+      "search": "Bedeutungssuche",
+      "organizer": "Themen, Termine, Aufgaben",
+      "people": "Personen-Profile"
+    },
+    "off": "aus",
+    "done": "fertig",
+    "count": "{{done}} von {{total}}",
+    "waiting": {
+      "organizer": "Wartet, bis Gespräche zur Ruhe kommen, oder auf das Tagesbudget.",
+      "search": "Das Suchmodell lädt noch.",
+      "people": "Startet, sobald die Sortierung Pause macht."
+    },
+    "waitingGeneric": "Wartet auf den nächsten Durchlauf.",
+    "searchReady": "Bedeutungssuche ist bereit: Frag Jarvis etwas, er findet auch Nachrichten mit anderen Worten.",
+    "searchNotReady": "Bedeutungssuche startet noch. Die Wortsuche funktioniert schon.",
+    "note": "Das läuft im Hintergrund weiter, auch wenn du die Seite schließt. Neue Karten tauchen nach und nach auf.",
+    "namesMissing_one": "Ein Kontakt hat noch keinen Namen. Namen kommen aus dem Adressbuch deines Handys und aus den Profilnamen in neuen Nachrichten.",
+    "namesMissing_other": "{{count}} Kontakte haben noch keinen Namen. Namen kommen aus dem Adressbuch deines Handys und aus den Profilnamen in neuen Nachrichten.",
+    "namesResync": "Namen aus WhatsApp neu laden",
+    "namesLoading": "Lade Namen …",
+    "namesGained_one": "Ein Kontakt hat jetzt einen Namen.",
+    "namesGained_other": "{{count}} Kontakte haben jetzt einen Namen.",
+    "namesSame": "Keine neuen Namen. Personen, die nicht in deinem Adressbuch stehen, bekommen ihren Namen mit ihrer nächsten Nachricht."
+  },
+  "learning": {
+    "title": "Lernen",
+    "areaSub": "Was Jarvis aus „Später“, „Unwichtig“ und „Wichtig“ gelernt hat",
+    "sub": "Deine Entscheidungen formen, was oben steht. Alles hier lässt sich ändern oder zurücknehmen.",
+    "hide": "Ausblenden",
+    "kindChat": "Chat",
+    "kindType": "Art",
+    "learnedAt": "Gelernt {{when}}",
+    "setByYou": "Von dir festgelegt {{when}}",
+    "show": "Anzeigen als",
+    "remove": "Regel entfernen",
+    "removed": "Regel entfernt. Die Karten erscheinen wieder wie vorher.",
+    "howTitle": "So lernt Jarvis",
+    "how": "Markierst du in einem Chat dreimal etwas als unwichtig oder später und nie als wichtig, zeigt Jarvis neue Karten aus diesem Chat als „Später“. Zweimal „Wichtig“ macht einen Chat wichtig. Fünfmal unwichtig bei derselben Art von Karte gilt für diese Art. Gelöschte Nachrichten oder Karten gibt es dabei nicht: Regeln ändern nur die Reihenfolge und was angezeigt wird.",
+    "toggle": "Aus meinen Entscheidungen lernen",
+    "toggleHelp": "Aus: Jarvis legt keine neuen Regeln an. Bestehende bleiben, bis du sie entfernst.",
+    "rules": "Regeln",
+    "empty": "Noch keine Regeln. Sie entstehen, wenn du Karten als später, unwichtig oder wichtig markierst.",
+    "addTitle": "Selbst festlegen",
+    "addType": "Art von Karte",
+    "added": "Regel gespeichert.",
+    "addChatHint": "Für einen ganzen Chat: Karte antippen und unten „Alles aus …“ wählen.",
+    "forget": "Alles Gelernte vergessen",
+    "forgetConfirm": "Alle gelernten Regeln und Zähler löschen? Regeln, die du selbst festgelegt hast, bleiben.",
+    "forgotten": "Gelerntes vergessen."
   }
 }

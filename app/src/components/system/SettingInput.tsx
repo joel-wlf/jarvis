@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
@@ -5,6 +6,7 @@ import type { SettingsField } from '@/api/admin'
 import { type } from '@/theme/type'
 import { colors } from '@/theme/tokens'
 import { Choice, Field, Press, Toggle } from '../ui'
+import { ListInput, NumberSlider } from './Controls'
 
 /** One field, rendered by its schema type. Secrets are never shown, only replaced. */
 /** Where message content leaves the Pi: the key and provider fields carry a one-line note and the legal link. */
@@ -55,7 +57,13 @@ function SettingField({ f, value, secret, onChange, error }: Props) {
       />
     )
   }
+  if (f.presets?.length) return <PresetInput f={f} value={value} onChange={onChange} error={error} />
+  if (f.type === 'list') return <ListInput label={f.label} help={f.help} value={value} placeholder={f.placeholder} onChange={onChange} error={error} />
   const numeric = f.type === 'int' || f.type === 'float'
+  // A slider where the range is small enough to pick a value by hand; huge ranges (ports, character limits) stay typed
+  if (numeric && f.min !== undefined && f.max !== undefined && f.max - f.min <= 1000) {
+    return <NumberSlider label={f.label} help={f.help} value={value} fallback={f.default} min={f.min} max={f.max} int={f.type === 'int'} unit={f.unit} onChange={onChange} error={error} />
+  }
   return (
     <Field
       label={f.label}
@@ -69,5 +77,23 @@ function SettingField({ f, value, secret, onChange, error }: Props) {
       autoCorrect={false}
       maxLength={f.maxLength}
     />
+  )
+}
+
+/** Common values as choices, and "Other" for anything else that is valid. */
+function PresetInput({ f, value, onChange, error }: { f: SettingsField; value: string; onChange: (v: string) => void; error?: string }) {
+  const { t } = useTranslation()
+  const current = value === '' && !f.presets!.some((p) => p.value === '') ? f.default : value
+  const known = f.presets!.some((p) => p.value === current)
+  const [custom, setCustom] = useState(!known)
+  const options = [...f.presets!.map((p) => ({ value: p.value, label: p.value === f.default ? `${p.label} · ${t('settings.recommended')}` : p.label })), { value: '\u0000custom', label: t('settings.custom') }]
+  return (
+    <View style={{ gap: 8 }}>
+      <Choice label={f.label} options={options} value={custom ? '\u0000custom' : current} onChange={(v) => { if (v === '\u0000custom') setCustom(true); else { setCustom(false); onChange(v) } }} />
+      {custom ? (
+        <Field label={t('settings.customValue')} value={value} onChangeText={onChange} placeholder={f.placeholder ?? f.default} autoCapitalize="none" autoCorrect={false} error={error} help={f.patternHelp} maxLength={f.maxLength} />
+      ) : error ? <Text style={[type.small, { color: colors.warn }]}>{error}</Text> : null}
+      <Text style={type.small}>{f.help}</Text>
+    </View>
   )
 }

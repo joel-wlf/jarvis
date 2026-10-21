@@ -72,7 +72,8 @@ export interface Person {
 // --- per type data ---------------------------------------------------------------------------
 
 export interface QuestionData { person: Person; quote: string; waitingSince: string; stats: Stat[] }
-export interface VoiceData { person: Person; durationSec: number; summary: string; transcript?: string; stats: Stat[] }
+/** `messageId` + `person.jid` address the audio for GET /api/v1/media/:chatJid/:messageId. */
+export interface VoiceData { person: Person; durationSec: number; summary: string; transcript?: string; messageId?: string; stats: Stat[] }
 export interface ReactionData { person: Person; quote: string; messageId: string; emojis: string[] }
 export interface EventData { day: string; weekday: string; month: string; time: string; place?: string; attendees: Person[]; yes: number; stats: Stat[] }
 export interface ConflictData { axis: [number, number]; slots: { label: string; from: number; to: number; group: CardGroup }[]; free?: string; stats: Stat[] }

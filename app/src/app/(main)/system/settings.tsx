@@ -9,7 +9,7 @@ import { Page, Section } from '@/components/Page'
 import { AdminGate, useAdmin } from '@/components/system/AdminGate'
 import { JobView } from '@/components/system/JobView'
 import { SettingInput } from '@/components/system/SettingInput'
-import { BlockButton, Choice, Micro, Notice, Panel, Press } from '@/components/ui'
+import { BlockButton, Choice, Micro, Notice, Panel, Press, Toggle } from '@/components/ui'
 import { errorText } from '@/i18n/format'
 import { colors, fonts } from '@/theme/tokens'
 import { type } from '@/theme/type'
@@ -36,6 +36,7 @@ function SettingsForm() {
   const [job, setJob] = useState<Job | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [advanced, setAdvanced] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -136,9 +137,14 @@ function SettingsForm() {
     <>
       {group_ ? <Text style={type.body}>{group_.help}</Text> : null}
       <Panel style={{ gap: 18 }}>
-        {fields.map((f) => (
+        {/* Fine tuning stays out of the way until asked for, unless one of those fields has a change or an error */}
+        {fields.filter((f) => !f.advanced || advanced || changes[f.key] !== undefined || preview?.errors[f.key]).map((f) => (
           <SettingInput key={f.key} f={f} value={changes[f.key] ?? (f.type === 'secret' ? '' : (data.values[f.key] ?? ''))} secret={data.secrets[f.key]} onChange={(v) => set(f.key, v)} error={preview?.errors[f.key]} />
         ))}
+        {fields.some((f) => f.advanced) ? (
+          <Toggle label={t('settings.showAdvanced', { count: fields.filter((f) => f.advanced).length })} help={t('settings.showAdvancedHelp')} value={advanced} onChange={setAdvanced} />
+        ) : null}
+        {fields.length === 0 ? <Text style={type.small}>{t('settings.groupEmpty')}</Text> : null}
       </Panel>
 
       {data.checks.map((c) => (
