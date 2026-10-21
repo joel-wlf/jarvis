@@ -27,7 +27,6 @@ export default function Connect() {
   const webOrigin = platform === 'web' && typeof window !== 'undefined' ? window.location.origin : undefined
   const { signIn } = useSession()
   const insets = useSafeAreaInsets()
-  const router = useRouter()
   const [mode, setMode] = useState<'scan' | 'manual'>(platform === 'web' ? 'manual' : 'scan')
   const [url, setUrl] = useState(webOrigin ?? '')
   const [password, setPassword] = useState('')

@@ -74,7 +74,7 @@ test('pairing needs a login and returns a QR code', async (t) => {
   t.after(() => server.close())
   const h = { 'content-type': 'application/json', 'x-jarvis': '1' }
   assert.equal((await fetch(`${base}/api/pairing`, { method: 'POST', headers: h })).status, 401)
-  const setup = await fetch(`${base}/api/auth/setup`, { method: 'POST', headers: h, body: JSON.stringify({ code: auth.setupCode(), password: 'langes-passwort' }) })
+  const setup = await fetch(`${base}/api/auth/setup`, { method: 'POST', headers: h, body: JSON.stringify({ code: '', password: 'langes-passwort' }) })
   const cookie = setup.headers.get('set-cookie')!.split(';')[0]
   const p = await (await fetch(`${base}/api/pairing`, { method: 'POST', headers: { ...h, cookie } })).json()
   assert.match(p.qr, /^jarvis:\{/)

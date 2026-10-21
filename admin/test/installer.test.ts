@@ -26,7 +26,7 @@ test('GitHub installer pins sources, launches the shared wizard, and resumes wit
     script('curl', 'if [[ "$*" == *api.github.com* ]]; then printf \'  "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",\\n\'; else cp "$TEST_ARCHIVE" "${!#}"; fi')
     const target = path.join(dir, 'My Jarvis')
     const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, TEST_ARCHIVE: archive, TEST_DOCKER_LOG: path.join(dir, 'docker.log'), SSH_CONNECTION: 'test' }
-    const run = (...args: string[]) => spawnSync('bash', [installer, '--dir', target, ...args], { env, encoding: 'utf8' })
+    const run = (...args: string[]) => spawnSync('bash', [installer, '--accept-risks', '--dir', target, ...args], { env, encoding: 'utf8' })
     const first = run('--port', '18081', '--version', 'v1')
     assert.equal(first.status, 0, first.stderr)
     assert.equal(fs.readFileSync(path.join(target, '.jarvis-install-version'), 'utf8').trim(), 'a'.repeat(40))
@@ -40,10 +40,10 @@ test('GitHub installer pins sources, launches the shared wizard, and resumes wit
     const other = path.join(dir, 'existing')
     fs.mkdirSync(other)
     fs.writeFileSync(path.join(other, 'important.txt'), 'keep')
-    const refused = spawnSync('bash', [installer, '--dir', other], { env, encoding: 'utf8' })
+    const refused = spawnSync('bash', [installer, '--accept-risks', '--dir', other], { env, encoding: 'utf8' })
     assert.equal(refused.status, 1)
     assert.equal(fs.readFileSync(path.join(other, 'important.txt'), 'utf8'), 'keep')
-    const occupied = spawnSync('bash', [installer, '--dir', path.join(dir, 'occupied')], { env: { ...env, TEST_OCCUPIED: '1' }, encoding: 'utf8' })
+    const occupied = spawnSync('bash', [installer, '--accept-risks', '--dir', path.join(dir, 'occupied')], { env: { ...env, TEST_OCCUPIED: '1' }, encoding: 'utf8' })
     assert.equal(occupied.status, 1)
     assert.match(occupied.stderr, /belegt/)
   } finally { fs.rmSync(dir, { recursive: true, force: true }) }

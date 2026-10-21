@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { applyEnv, ApplyError, prepare, waitHealthy } from './apply.js'
+import { applyEnv, ApplyError, prepare, recreateSelf, waitHealthy } from './apply.js'
 import { backupDir, readCurrent, type Ctx } from './context.js'
 import { activeServices } from './docker.js'
 import { parseEnv, randomSecret, readBackup, type Env } from './envfile.js'

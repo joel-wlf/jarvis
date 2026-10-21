@@ -114,6 +114,14 @@ export interface SetupProgress {
 }
 export interface ConnectionInfo { url: string; qrSvg: string; localOnly?: boolean }
 
+/** POST /api/pairing on the admin interface: one-time code and QR for a new device. */
+export interface PairingCode {
+  code: string
+  expiresAt: string
+  qr: string
+  qrSvg: string
+}
+
 export interface AdminApi {
   progress(): Promise<SetupProgress>
   saveProgress(progress: SetupProgress): Promise<SetupProgress>

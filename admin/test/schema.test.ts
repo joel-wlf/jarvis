@@ -87,6 +87,6 @@ test('jedes Image in docker-compose.yml nutzt die Standard-Registry aus dem Sche
     assert.equal(m[1], FIELD.get('JARVIS_REGISTRY')!.default, `${m[2]}: Registry`)
     assert.equal(m[3], FIELD.get('JARVIS_VERSION')!.default, `${m[2]}: Version`)
   }
-  const services = ['admin', 'mcp-server', 'wa-ingest', 'embedder', 'organizer', 'whisper']
+  const services = ['admin', 'mcp-server', 'wa-ingest', 'embedder', 'organizer']
   assert.deepEqual(refs.map((m) => m[2]).sort(), services.sort())
 })
