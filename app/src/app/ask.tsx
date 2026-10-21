@@ -91,13 +91,23 @@ export default function Ask() {
         </Press>
       </View>
       <ScrollView ref={scroll} onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })} contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
-        <View style={[st.col, { paddingHorizontal: pad }]}>
-          <View style={{ alignItems: 'center', paddingVertical: 12 }}>
-            <JarvisFigure state={figure} size={wide ? 170 : 132} />
-          </View>
+        <View style={[wide ? st.wideRow : st.col, { paddingHorizontal: pad }]}>
+          {wide ? (
+            <View style={st.figureCol}>
+              <View style={st.figureSticky}>
+                <JarvisFigure state={figure} size={190} />
+              </View>
+            </View>
+          ) : null}
+          <View style={wide ? st.reading : { width: '100%' }}>
+          {wide ? null : (
+            <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+              <JarvisFigure state={figure} size={132} />
+            </View>
+          )}
           {turns.length === 0 ? (
             <View style={{ gap: 18 }}>
-              <Text style={[type.voice, { alignSelf: 'center', maxWidth: 420 }]}>{t('ask.intro')}</Text>
+              <Text style={[type.voice, wide ? { textAlign: 'left', fontSize: 24, lineHeight: 31, paddingTop: 28 } : { alignSelf: 'center', maxWidth: 420 }]}>{t('ask.intro')}</Text>
               <View style={st.examples}>
                 {examples.map((ex, i) => (
                   <Press key={ex} onPress={() => void ask(ex)} accessibilityRole="button" style={({ pressed, hovered }) => [st.example, i > 0 && { borderTopWidth: 1, borderTopColor: colors.line }, (pressed || hovered) && { backgroundColor: colors.ground2 }]}>
@@ -134,11 +144,15 @@ export default function Ask() {
               </View>
             ))
           )}
+          </View>
         </View>
       </ScrollView>
-      <View style={[st.col, { paddingHorizontal: wide ? 28 : 12, paddingBottom: Math.max(12, insets.bottom), gap: 10 }]}>
-        {streaming ? <BlockButton label={t('ask.stop')} icon="stop" variant="line" onPress={() => abort.current?.abort()} /> : null}
-        <AskDock onSubmit={(q) => void ask(q)} onFocusChange={(f) => !streaming && setFigure(f ? 'listening' : 'idle')} autoFocus={!params.q && Platform.OS === 'web'} />
+      <View style={[wide ? st.wideRow : st.col, { paddingHorizontal: wide ? 28 : 12, paddingBottom: Math.max(12, insets.bottom) }]}>
+        {wide ? <View style={st.figureCol} /> : null}
+        <View style={[wide ? st.reading : { width: '100%' }, { gap: 10 }]}>
+          {streaming ? <BlockButton label={t('ask.stop')} icon="stop" variant="line" onPress={() => abort.current?.abort()} /> : null}
+          <AskDock onSubmit={(q) => void ask(q)} onFocusChange={(f) => !streaming && setFigure(f ? 'listening' : 'idle')} autoFocus={!params.q && Platform.OS === 'web'} />
+        </View>
       </View>
     </KeyboardAvoidingView>
   )
@@ -148,6 +162,11 @@ const st = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 6 },
   close: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
   col: { width: '100%', maxWidth: 760, alignSelf: 'center' },
+  // Wide: the figure keeps watch on the left while the answer reads in a ~720px column.
+  wideRow: { width: '100%', maxWidth: layout.readingMax + 200 + 40 + 56, alignSelf: 'center', flexDirection: 'row', gap: 40 },
+  figureCol: { width: 200, flexShrink: 0 },
+  figureSticky: { alignItems: 'center', paddingTop: 20, ...({ position: 'sticky', top: 0 } as object) },
+  reading: { flex: 1, minWidth: 0, maxWidth: layout.readingMax },
   examples: { backgroundColor: colors.card, boxShadow: '0px 1px 1px rgba(20, 26, 36, 0.03), 0px 8px 22px -12px rgba(20, 26, 36, 0.14)' },
   example: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingHorizontal: 16, backgroundColor: colors.card },
   turn: { gap: 16, paddingVertical: 20, borderTopWidth: 1, borderTopColor: colors.line2 },

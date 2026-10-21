@@ -7,10 +7,14 @@ import { RELINK_WORD, type Job, type WaLink } from '@/api/admin'
 import { Page, Section } from '@/components/Page'
 import { AdminGate, useAdmin } from '@/components/system/AdminGate'
 import { JobView } from '@/components/system/JobView'
-import { BlockButton, Field, Notice, Panel } from '@/components/ui'
+import { BlockButton, Field, Notice, Panel, Press, Toggle } from '@/components/ui'
+import { useRouter } from 'expo-router'
+import { getItem, setItem } from '@/state/storage'
 import { ago, errorText } from '@/i18n/format'
 import { colors, fonts } from '@/theme/tokens'
 import { type } from '@/theme/type'
+
+const ACK_KEY = 'jarvis.waAck'
 
 export default function WhatsApp() {
   const { t } = useTranslation()
@@ -26,6 +30,13 @@ export default function WhatsApp() {
 function Link() {
   const { t } = useTranslation()
   const { admin } = useAdmin()
+  const router = useRouter()
+  // null while reading, then whether the owner has already acknowledged the unofficial connection
+  const [acked, setAcked] = useState<boolean | null>(null)
+  const [tick, setTick] = useState(false)
+  useEffect(() => {
+    void getItem(ACK_KEY).then((v) => setAcked(v === '1'))
+  }, [])
   const [wa, setWa] = useState<WaLink | null>(null)
   const [phone, setPhone] = useState('')
   const [confirmWord, setConfirmWord] = useState('')
@@ -74,13 +85,31 @@ function Link() {
         {wa.error ? <Notice level="error" text={wa.error} /> : null}
       </Panel>
 
-      {wa.state === 'qr' ? (
+      {acked === false ? (
+        <Panel style={{ gap: 16 }}>
+          <Text style={type.body}>{t('wa.ackLead')}</Text>
+          <Toggle label={t('wa.ack')} value={tick} onChange={setTick} />
+          <Press onPress={() => router.push('/legal')} accessibilityRole="link" style={() => ({ alignSelf: 'flex-start' })}>
+            <Text style={[type.small, { color: colors.ink, textDecorationLine: 'underline' }]}>{t('connect.legalLink')}</Text>
+          </Press>
+          <BlockButton
+            label={t('wa.ackConfirm')}
+            disabled={!tick}
+            onPress={() => {
+              void setItem(ACK_KEY, '1')
+              setAcked(true)
+            }}
+          />
+        </Panel>
+      ) : null}
+
+      {acked && wa.state === 'qr' ? (
         <Panel style={{ gap: 14, alignItems: 'center' }}>
           {wa.qrSvg ? <SvgXml xml={wa.qrSvg} width={240} height={240} /> : null}
           <Text style={[type.body, { textAlign: 'center' }]}>{wa.expired ? t('wa.qrExpired') : t('wa.qrHelp')}</Text>
         </Panel>
       ) : null}
-      {wa.state === 'pairing' && wa.pairingCode ? (
+      {acked && wa.state === 'pairing' && wa.pairingCode ? (
         <Panel style={{ gap: 12, alignItems: 'center' }}>
           <Text style={{ fontFamily: fonts.thin, fontSize: 44, letterSpacing: 4, color: colors.ink }} selectable>
             {wa.pairingCode}
@@ -91,7 +120,7 @@ function Link() {
 
       {job ? <JobView admin={admin} job={job} onEnd={() => void load()} /> : null}
 
-      <Section title={t('wa.relink')}>
+      {acked ? <Section title={t('wa.relink')}>
         <Panel style={{ gap: 16 }}>
           <Text style={type.body}>{t('wa.relinkLead')}</Text>
           <Field label={t('wa.phone')} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="+49…" />
@@ -99,7 +128,7 @@ function Link() {
           {error ? <Notice level="error" text={error} /> : null}
           <BlockButton label={t('wa.start')} busy={busy} disabled={confirmWord.trim().toUpperCase() !== RELINK_WORD} onPress={() => void relink()} />
         </Panel>
-      </Section>
+      </Section> : null}
     </>
   )
 }

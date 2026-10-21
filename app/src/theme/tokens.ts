@@ -52,6 +52,11 @@ export const layout = {
   dockHeight: 52,
   wideBreakpoint: 1024,
   railWidth: 68,
+  /** master column of the wide master-detail screens (people, memory) */
+  masterWidth: 420,
+  /** widest a detail pane or reading column grows */
+  detailMax: 760,
+  readingMax: 720,
 } as const
 
 /** Mixes a hex colour with black or white, like CSS color-mix(in srgb, c p%, other). */

@@ -49,6 +49,7 @@ function Routes() {
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.ground }} />
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
+      <Stack.Screen name="legal" />
       <Stack.Protected guard={!!session} redirectTo="/connect">
         <Stack.Screen name="(main)" />
         <Stack.Screen name="ask" options={{ animation: 'fade_from_bottom' }} />

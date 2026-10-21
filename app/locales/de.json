@@ -306,7 +306,9 @@
     "demo": "Ohne Server ausprobieren",
     "demoHelp": "Zeigt die App mit Beispieldaten. Nichts verlässt dieses Gerät.",
     "private": "Deine Daten bleiben auf deinem Server. Die App speichert nur die Adresse und einen Geräteschlüssel.",
-    "privateLabel": "Privat"
+    "privateLabel": "Privat",
+    "independent": "Jarvis ist ein unabhängiges Projekt und nicht mit WhatsApp oder Meta verbunden.",
+    "legalLink": "Rechtliche Hinweise"
   },
   "system": {
     "title": "System",
@@ -355,7 +357,9 @@
       "rolled_back": "zurückgesetzt",
       "interrupted": "abgebrochen",
       "rolledBackHelp": "Etwas ging schief. Jarvis hat die vorherigen Einstellungen wiederhergestellt."
-    }
+    },
+    "legal": "Rechtliche Hinweise",
+    "legalSub": "WhatsApp, KI-Anbieter, Datenschutz"
   },
   "settings": {
     "title": "Einstellungen",
@@ -371,7 +375,8 @@
     "secretNew": "Neuen Wert eingeben",
     "default": "Standard: {{value}}",
     "reset": "Verwerfen",
-    "rollbackNote": "Wenn ein Dienst danach nicht startet, setzt Jarvis die Einstellungen automatisch zurück."
+    "rollbackNote": "Wenn ein Dienst danach nicht startet, setzt Jarvis die Einstellungen automatisch zurück.",
+    "aiNote": "Mit aktivierter KI gehen Nachrichteninhalte an diesen Anbieter."
   },
   "wa": {
     "title": "WhatsApp",
@@ -392,7 +397,10 @@
     "relinkLead": "Trennt die bestehende Verknüpfung. Alte Nachrichten bleiben im Archiv.",
     "phone": "Telefonnummer (optional, für Kopplungscode)",
     "confirm": "Zur Bestätigung „{{word}}“ eintippen",
-    "start": "Verknüpfung starten"
+    "start": "Verknüpfung starten",
+    "ack": "Ich habe verstanden, dass das keine offizielle WhatsApp-Verbindung ist und mein Konto gesperrt werden kann.",
+    "ackConfirm": "Verstanden, weiter",
+    "ackLead": "Bevor du WhatsApp koppelst:"
   },
   "devices": {
     "title": "Geräte und Zugänge",
@@ -615,5 +623,31 @@
     "save_contact": "Übernehmen",
     "open": "Öffnen",
     "reply": "Antworten"
+  },
+  "legal": {
+    "title": "Rechtliche Hinweise",
+    "sub": "Kurz und ehrlich, was du wissen solltest.",
+    "sections": [
+      {
+        "title": "Unabhängiges Projekt",
+        "body": "Jarvis ist ein unabhängiges Open-Source-Projekt und nicht mit WhatsApp oder Meta verbunden, von ihnen unterstützt oder genehmigt. WhatsApp ist eine Marke von WhatsApp LLC."
+      },
+      {
+        "title": "Inoffizielle WhatsApp-Verbindung",
+        "body": "Jarvis verbindet sich über die Bibliothek Baileys als gekoppeltes Gerät mit deinem WhatsApp-Konto. Das ist keine offizielle Schnittstelle und kann gegen die Nutzungsbedingungen von WhatsApp verstoßen. WhatsApp kann dein Konto einschränken oder sperren, und die Verbindung kann jederzeit ausfallen. Die Nutzung geschieht auf eigenes Risiko; erwäge eine Zweitnummer."
+      },
+      {
+        "title": "KI-Anbieter",
+        "body": "Wenn du KI-Funktionen aktivierst, werden Nachrichteninhalte an den eingestellten KI-Anbieter (zum Beispiel OpenAI) gesendet, darunter Nachrichten deiner Kontakte, Sprachtranskripte und Bildbeschreibungen. Dort gelten dessen Bedingungen und Datenschutzerklärung. Ausgeschlossene Chats und die Schwärzung begrenzen das. Ohne Schlüssel bleibt die Verarbeitung lokal."
+      },
+      {
+        "title": "Nachrichten anderer Menschen",
+        "body": "Das Archiv enthält Nachrichten anderer Menschen. Du bist dafür verantwortlich, sie rechtmäßig zu behandeln, zum Beispiel nach der DSGVO."
+      },
+      {
+        "title": "Keine Gewähr",
+        "body": "Jarvis wird bereitgestellt, wie es ist, ohne jede Gewährleistung."
+      }
+    ]
   }
 }
