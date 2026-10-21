@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "Jarvis",
+    "slug": "jarvis",
+    "version": "0.1.0",
+    "scheme": "jarvis",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#E9ECEF",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.jarvis.app",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "android": {
+      "package": "dev.jarvis.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#E9ECEF",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "Jarvis",
+      "themeColor": "#E9ECEF",
+      "backgroundColor": "#E9ECEF"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Jarvis uses the camera only to scan the pairing code shown by your Jarvis server.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-secure-store",
+      "expo-font",
+      "expo-localization",
+      "expo-image",
+      "expo-splash-screen"
+    ]
+  }
+}

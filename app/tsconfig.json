@@ -1,0 +1,22 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@jarvis/contract": [
+        "../packages/contract/src/index.ts"
+      ],
+      "@jarvis/contract/fixtures": [
+        "../packages/contract/src/fixtures.ts"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ]
+}
