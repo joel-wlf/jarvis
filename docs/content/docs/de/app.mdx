@@ -1,0 +1,72 @@
+---
+title: Die App
+description: Heute, Karten, Personen, Gedächtnis, Fragen und der Systembereich.
+---
+
+Eine Expo-Codebasis läuft auf iOS, Android und im Web. Die App ist nur ein Fenster zu deinem eigenen Jarvis: Sie speichert die Serveradresse und einen Geräteschlüssel, sonst nichts.
+
+## Verbinden
+
+Beim ersten Start siehst du den Verbindungsbildschirm. Zwei Wege:
+
+| Weg | So geht's |
+|---|---|
+| **Code scannen** | Öffne in der Admin-Oberfläche **Geräte**, zeige den Kopplungscode an und scanne ihn mit der Kamera der App. Der Code gilt 10 Minuten und nur einmal. Die Kamera wird nur dafür angefragt. |
+| **Adresse und Passwort** | Gib die öffentliche Adresse deines Jarvis ein (die du als `APP_PUBLIC_URL` gesetzt hast, zum Beispiel `https://jarvis.example.com`) und das Besitzer-Passwort. Die App prüft die Adresse zuerst und zeigt Servername und Version. |
+
+Hat der Server kein Passwort, geht nur der Kopplungscode. Ist dein Jarvis neuer als die App, bittet sie dich, die App zu aktualisieren.
+
+**Ohne Server ausprobieren** zeigt Beispieldaten. Nichts verlässt dein Gerät.
+
+Jedes verbundene Gerät steht unter **System → Geräte** und lässt sich dort sperren. Falsche Passwörter und Kopplungscodes werden pro IP begrenzt: Nach 10 in 15 Minuten antwortet der Server mit 429.
+
+## Heute
+
+Der Startbildschirm zeigt Jarvis, einen Satz in seiner Stimme dazu, was gerade am wichtigsten ist, und einen Feed aus Karten.
+
+- Vier Reiter filtern nach Gruppe: **Antworten**, **Termine**, **Erledigen** und **Wissen**, dazu **Alle**, jeweils mit Anzahl.
+- Tippe eine Karte an, um sie auszuwählen. Jarvis kommentiert sie in einem Satz, und die Karte zeigt ihre **vorbereiteten nächsten Schritte**.
+- Jede Karte zeigt, woher sie kommt (Chat, Person, Zeit), damit du ihr vertrauen kannst.
+- Jede Karte lässt sich als unwichtig ausblenden oder auf später legen.
+- Der Feed aktualisiert sich live, wenn Nachrichten eintreffen.
+
+Alle 22 Typen und was sie anbieten, stehen unter [Kartentypen](./card-types.mdx).
+
+## Personen
+
+Jarvis legt Profile der Menschen an, mit denen du schreibst: Beziehung, wie nah ihr euch seid, Anrede (du, Sie, gemischt) und Ton. Die Liste ist nach Nähe sortiert. Öffne eine Person, um offene Punkte, letzte Nachrichten und das zu sehen, was Jarvis sich über sie merkt.
+
+Du kannst ein Profil **korrigieren**: echter Name, Aliase, Beziehung, Nähe, Ton oder eine Notiz. Wenn du es sperrst, ändert Jarvis das Profil nicht mehr von selbst.
+
+## Gedächtnis
+
+Was Jarvis im Kopf behält. Notizen können überall gelten oder für eine Person, einen Chat oder ein Thema. Angeheftete und allgemeine Notizen bekommt Claude bei jeder Verbindung, alles andere wird bei Bedarf nach Bedeutung gefunden. In der App kannst du Einträge anlegen, ändern, anheften, pausieren und löschen. Dasselbe Gedächtnis nutzt Claude über den Connector, und der Organizer liest es beim Sortieren mit.
+
+## Frag Jarvis
+
+Stelle eine Frage zu Terminen, Personen oder dazu, was in einem Chat gesagt wurde: „Was ist am Samstag?“ oder „Wem schulde ich noch Geld?“. Die Antwort läuft live ein, mit den Quellen, aus denen sie stammt.
+
+## System
+
+Der Reiter **System** erscheint nur, wenn die Admin-Oberfläche erreichbar ist. Die App prüft dafür `/healthz` an der Heimadresse aus dem Kopplungscode, im Web am eigenen Ursprung. Unterwegs zeigt er den Hinweis, dass die Verwaltung nur im Heimnetz erreichbar ist.
+
+Nach der Anmeldung mit dem Admin-Passwort bekommst du:
+
+- Status aller Dienste, WhatsApp, Datenbank, Speicher und KI-Nutzung
+- Einstellungen nach Gruppen, mit Vorschau der Änderungen
+- WhatsApp verknüpfen: QR oder Kopplungscode, neu verknüpfen
+- Geräte und Claude-Zugriff, mit Sperren
+- Logs, Wartung (Neustart, Backups) und den Einrichtungsassistenten
+
+Der Systembereich ist absichtlich nicht über den Cloudflare-Tunnel erreichbar. Siehe [Sicherheit](./security.mdx).
+
+## Die App selbst starten
+
+```bash
+cd app
+npm install
+npm run web:mock          # Web mit Beispieldaten, kein Server nötig
+npx expo start            # dann i / a für iOS-Simulator oder Android-Emulator
+```
+
+Das breite Web-Layout beginnt bei 1024 px. Die Sprache folgt dem Gerät (Deutsch und Englisch).

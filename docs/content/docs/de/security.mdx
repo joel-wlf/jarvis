@@ -1,0 +1,83 @@
+---
+title: Sicherheit
+description: Was erreichbar ist, was geschützt ist und was bei Diebstahl zu tun ist.
+---
+
+Jarvis verarbeitet deine privaten Chats und kann in deinem Namen senden. Behandle es entsprechend.
+
+Melde Sicherheitslücken über „Report a vulnerability“ (GitHub Security Advisories) im Repository, nicht als öffentliches Issue. Committe nie `.env`, Backups oder das Volume `wa-auth`.
+
+## Was von außen erreichbar ist
+
+Nur der MCP-Server, über den Cloudflare-Tunnel. Postgres, Whisper und `wa-ingest` veröffentlichen keine Ports.
+
+`mcp-server` lauscht auf `127.0.0.1:3000`, nur auf dem Pi selbst, nicht im Heimnetz. Der Tunnel greift unter `http://localhost:3000` zu.
+
+## Admin-Oberfläche: nur im Heimnetz
+
+Die Admin-Oberfläche steuert Docker über den Docker-Socket, das entspricht Root auf dem Pi. Deshalb:
+
+- **Nur im Heimnetz erreichbar** (Port 8080). Nie über den Cloudflare-Tunnel veröffentlichen.
+- Erstzugang nur mit dem **Einrichtungscode** aus dem Log, danach Passwort (mit scrypt gehasht).
+- Sperre nach **10 Fehlversuchen**.
+- **Geheimnisse gehen nie im Klartext an den Browser.** Anzeigen verlangt die erneute Passworteingabe.
+- Um sie auf den Pi selbst zu beschränken, setze `ADMIN_BIND` auf `127.0.0.1` und greife per `ssh -L 8080:localhost:8080 <pi>` zu.
+- Wenn du sie nicht brauchst, stoppe sie: `docker compose stop admin`.
+- Passwort vergessen: `docker compose exec admin node dist/src/cli.js reset-password`.
+
+Jede Änderung der Einstellungen wird geprüft, von Docker Compose gegengeprüft, bevor etwas geschrieben wird, gesichert, atomar geschrieben und automatisch zurückgerollt, wenn die Dienste nicht stabil starten.
+
+## Geheimnisse und Tokens
+
+- Erzeugte Werte (Datenbank-Passwörter, `MCP_TOKEN`, `ADMIN_INTERNAL_SECRET`) kommen aus dem Einrichtungsassistenten. Der `MCP_TOKEN` braucht mindestens 32 Zeichen (`openssl rand -hex 24`).
+- **OAuth-Tokens werden nur als Hash gespeichert.** Zugriffstoken gelten 1 Stunde, Refresh-Token 30 Tage und rotieren.
+- Geräte-Tokens (`jd_…`) lassen sich einzeln unter Geräte sperren.
+- **Die alte MCP-Token-URL ist ein Passwort.** Wer sie hat, kann alle Chats lesen und in deinem Namen schreiben. Nicht teilen, nicht in Screenshots. Bei Verdacht `MCP_TOKEN` ändern. Besser: mit `MCP_LEGACY_TOKEN=false` abschalten, sobald OAuth läuft.
+- Nach 10 ungültigen Versuchen pro IP in 15 Minuten antwortet der Server nur noch mit 429. Lege zusätzlich in Cloudflare eine Rate-Limit-Regel für den Hostnamen an und erwäge Cloudflare Access, falls dein Client es unterstützt.
+- Die interne API auf Port 3001 gilt nur im Docker-Netz und lehnt Anfragen mit Cloudflare-Headern ab.
+
+## Datenbank-Rollen
+
+Claudes Lesezugriff nutzt `mcp_ro`, das nur lesen kann. Aktionen nutzen `mcp_act`, das nur in die `outbox` schreiben und aus ihr lesen darf. Gedächtnis und Korrekturen nutzen `mcp_mem`, das Notizen und diese Korrekturen schreiben darf, aber keine Nachrichten ändern oder löschen und nichts senden kann. Die Rollen teilen sich `MCP_RO_PASSWORD`.
+
+## Schutz vor Fehlern
+
+- Empfänger müssen eindeutig sein. Bei mehreren Treffern wird nichts gesendet.
+- Bei eingeschaltetem `REQUIRE_CONFIRM` zeigt jede Aktion zuerst eine Vorschau und läuft erst mit `confirm=true`.
+- Höchstens `MAX_ACTIONS_PER_HOUR` Aktionen pro Stunde (Standard 30). Abfragen und harmlose Einstellungen zählen nicht mit.
+- Medien-URLs auf private Adressen (Router, Pi, Heimnetz) werden blockiert.
+- Chat-Inhalte sind Text von Dritten. Der Server weist Claude an, Anweisungen in Nachrichten nicht zu befolgen.
+- Die Gedächtnis-Tools speichern nur auf deinen ausdrücklichen Wunsch.
+
+## Daten an den KI-Anbieter
+
+Siehe das Datenschutzmodell unter [Was ist Jarvis](./index.mdx). Kurz: Telefonnummern, IBANs, E-Mail-Adressen und Link-Pfade werden standardmäßig geschwärzt (`ORGANIZER_REDACT`), ausgeschlossene Chats werden nie gesendet, Bilder und Audio gehen nicht zum Sortieren raus.
+
+## Verschlüsselter Tresor
+
+Wer den Pi samt SD-Karte stiehlt, soll weder Nachrichten lesen noch dein WhatsApp-Konto übernehmen können.
+
+**Was verschlüsselt ist.** Ein LUKS2-Container (`/srv/vault.img`, eingehängt unter `/srv/vault`) enthält das komplette Docker-Datenverzeichnis (Postgres mit allen Nachrichten, die WhatsApp-Sitzung, Container-Logs), die `.env` (API-Schlüssel, Token, Passwörter) und die Backups. `~/jarvis/.env` und `~/jarvis-backups` verweisen dorthin. Verschlüsselt wird mit Adiantum, schnell auf dem Pi 4 ohne AES-Hardware, das Passwort wird mit Argon2id abgeleitet.
+
+**Einrichtung** (einmalig, auf dem Pi): `scripts/vault-setup.sh`. Das Skript fragt interaktiv nach dem Passwort, legt den Container an, verschiebt die Daten, prüft die Nachrichtenzahl und überschreibt erst dann die alten Klartext-Dateien. Es schaltet außerdem den Zram-Writeback und die Swap-Datei ab, die Klartext aus dem Arbeitsspeicher auf die SD-Karte schreiben könnten. Bricht es in Schritt 7 ab, setzt `scripts/vault-finish.sh` fort. Mit Tresor zeigt `.env` auf `/srv/vault/secrets/.env`, und `JARVIS_SECRETS_DIR=/srv/vault/secrets` muss in der `.env` stehen.
+
+**Nach jedem Neustart oder Stromausfall.** Docker startet nur, wenn der Container eingehängt ist (systemd-Bedingung). Entsperren vom Rechner aus:
+
+```bash
+ssh -t <benutzer>@<pi-adresse> jarvis-unlock
+```
+
+Das Passwort kann niemand zurücksetzen. Bewahre es im Passwort-Manager auf.
+
+**Grenzen.**
+
+- Die alten Klartext-Daten wurden überschreibend gelöscht. Auf SD-Karten bleiben durch Wear-Leveling trotzdem unter Umständen Reste in unbenutzten Blöcken. Wer das ausschließen will, spielt die Karte neu auf und stellt aus dem Backup wieder her.
+- Läuft der Pi und ist entsperrt, schützt die Verschlüsselung nicht (Zugriff per SSH, Cold-Boot-Angriffe). SSH nur mit Schlüssel, `PasswordAuthentication no`.
+- Der Cloudflare-Tunnel-Token in `/etc/cloudflared/token` ist unverschlüsselt.
+
+**Notfallplan bei Diebstahl:**
+
+1. WhatsApp: Verknüpfte Geräte, Gerät „Jarvis“ entfernen. Das beendet die Sitzung sofort.
+2. Cloudflare Zero Trust: Tunnel löschen oder Token neu erzeugen.
+3. OpenAI-API-Schlüssel widerrufen.
+4. Neuen `MCP_TOKEN` setzen und den Connector in Claude neu einrichten.

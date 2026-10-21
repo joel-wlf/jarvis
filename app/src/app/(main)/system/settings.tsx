@@ -2,21 +2,22 @@
 // then applied as a job; the server rolls back automatically when a service fails to start.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Text, View } from 'react-native'
+import { useWide } from '@/components/useWide'
 import { useTranslation } from 'react-i18next'
 import type { Job, PreviewResponse, SettingsResponse } from '@/api/admin'
 import { Page, Section } from '@/components/Page'
 import { AdminGate, useAdmin } from '@/components/system/AdminGate'
 import { JobView } from '@/components/system/JobView'
 import { SettingInput } from '@/components/system/SettingInput'
-import { BlockButton, Choice, Micro, Notice, Panel } from '@/components/ui'
+import { BlockButton, Choice, Micro, Notice, Panel, Press } from '@/components/ui'
 import { errorText } from '@/i18n/format'
-import { colors } from '@/theme/tokens'
+import { colors, fonts } from '@/theme/tokens'
 import { type } from '@/theme/type'
 
 export default function Settings() {
   const { t } = useTranslation()
   return (
-    <Page title={t('settings.title')} back>
+    <Page title={t('settings.title')} back wideMax={1100}>
       <AdminGate>
         <SettingsForm />
       </AdminGate>
@@ -27,6 +28,7 @@ export default function Settings() {
 function SettingsForm() {
   const { t } = useTranslation()
   const { admin } = useAdmin()
+  const wide = useWide()
   const [data, setData] = useState<SettingsResponse | null>(null)
   const [group, setGroup] = useState<string>('general')
   const [changes, setChanges] = useState<Record<string, string>>({})
@@ -105,9 +107,33 @@ function SettingsForm() {
   }
 
   const group_ = data.groups.find((g) => g.id === group)
-  return (
+  const groupNav = wide ? (
+    <View style={{ width: 240, flexShrink: 0 }} accessibilityRole="tablist">
+      <Panel padded={false}>
+        {data.groups.map((g, i) => {
+          const on = g.id === group
+          const n = Object.keys(changes).filter((k) => data.fields.find((f) => f.key === k)?.group === g.id).length
+          return (
+            <Press
+              key={g.id}
+              onPress={() => setGroup(g.id)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on }}
+              style={({ hovered }) => [{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48, paddingHorizontal: 16, backgroundColor: on ? colors.block : hovered ? colors.ground2 : colors.card }, i > 0 && { borderTopWidth: 1, borderTopColor: on ? colors.block : colors.line }]}
+            >
+              <Text style={{ fontFamily: fonts.italic, fontSize: 15, color: on ? colors.blockInk : colors.ink }}>{g.label}</Text>
+              {n ? <Text style={{ fontFamily: fonts.medium, fontSize: 12, color: on ? colors.blockInk : colors.ink2 }}>{n}</Text> : null}
+            </Press>
+          )
+        })}
+      </Panel>
+    </View>
+  ) : (
+    <Choice label={t('settings.title')} options={data.groups.map((g) => ({ value: g.id, label: g.label }))} value={group} onChange={setGroup} />
+  )
+
+  const form = (
     <>
-      <Choice label={t('settings.title')} options={data.groups.map((g) => ({ value: g.id, label: g.label }))} value={group} onChange={setGroup} />
       {group_ ? <Text style={type.body}>{group_.help}</Text> : null}
       <Panel style={{ gap: 18 }}>
         {fields.map((f) => (
@@ -152,6 +178,22 @@ function SettingsForm() {
           )}
         </Section>
       ) : null}
+    </>
+  )
+
+  // Wide: group navigation left, fields right at a readable width.
+  if (wide) {
+    return (
+      <View style={{ flexDirection: 'row', gap: 32, alignItems: 'flex-start' }}>
+        {groupNav}
+        <View style={{ flex: 1, minWidth: 0, maxWidth: 680, gap: 22 }}>{form}</View>
+      </View>
+    )
+  }
+  return (
+    <>
+      {groupNav}
+      {form}
     </>
   )
 }

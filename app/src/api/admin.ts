@@ -141,6 +141,8 @@ export interface AdminApi {
   restart(service: string): Promise<Job>
   rebuild(): Promise<Job>
   estimate(): Promise<Job>
+  pairing(): Promise<PairingCode>
+  ownerPassword(adminPassword: string, newPassword: string): Promise<void>
 }
 
 export function createHttpAdmin(homeUrl: string, token?: string): AdminApi {
@@ -183,5 +185,7 @@ export function createHttpAdmin(homeUrl: string, token?: string): AdminApi {
     restart: (service) => job(call('/api/maintenance/restart', 'POST', { service })),
     rebuild: () => job(call('/api/maintenance/rebuild', 'POST')),
     estimate: () => job(call('/api/maintenance/estimate', 'POST')),
+    pairing: () => call('/api/pairing', 'POST'),
+    ownerPassword: async (adminPassword, newPassword) => void (await call('/api/owner-password', 'POST', { password: adminPassword, newPassword })),
   }
 }

@@ -8,7 +8,7 @@ import { FakeDb } from '../src/db.js'
 import { FakeDocker } from '../src/docker.js'
 import { listBackups, serializeEnv } from '../src/envfile.js'
 import { BusyError, JobRunner } from '../src/jobs.js'
-import { startApply, startRelink, startRestore, startRotate } from '../src/ops.js'
+import { startApply, startRebuild, startRelink, startRestore, startRotate } from '../src/ops.js'
 
 const base = { POSTGRES_PASSWORD: 'a'.repeat(48), MCP_RO_PASSWORD: 'b'.repeat(48), MCP_TOKEN: 'c'.repeat(64), TRANSCRIBE_PROVIDER: 'off' }
 

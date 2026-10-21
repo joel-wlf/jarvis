@@ -27,6 +27,7 @@ export function useToday(wide: boolean) {
   const [lastSource, setLastSource] = useState<string | undefined>()
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const revert = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const speakUntil = useRef(0)
   const cardsRef = useRef<Card[]>([])
   cardsRef.current = cards ?? []
 
@@ -118,16 +119,19 @@ export function useToday(wide: boolean) {
       }
       setFigure('speaking')
       setSay(card.say || card.title)
+      // The sprites run at 2 fps: keep speaking for about the sentence's reading time, not the typing time.
+      speakUntil.current = Date.now() + Math.min(6000, Math.max(2000, (card.say || card.title).length * 45))
       setAfterSay(card.urgency >= 3 ? 'notify' : 'idle')
     },
     [selected, wide, summary],
   )
 
   const onSayDone = useCallback(() => {
-    if (afterSay) {
-      setFigure(afterSay)
-      setAfterSay(null)
-    }
+    if (!afterSay) return
+    const next = afterSay
+    setAfterSay(null)
+    clearTimeout(revert.current)
+    revert.current = setTimeout(() => setFigure(next), Math.max(0, speakUntil.current - Date.now()))
   }, [afterSay])
 
   const act = useCallback(

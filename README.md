@@ -1,20 +1,29 @@
-# Jarvis: persönlicher Kontext-Manager
+<p align="center">
+  <img src="app/assets/jarvis/idle_a.png" width="220" alt="Jarvis, a round white companion in a hat with a dark visor">
+</p>
 
-Jarvis ist als persönlicher Kontext-Manager gedacht: ein privates System, das über die Zeit alles zusammenführt, was für dich Kontext ist, es nach Themen, Personen und Fristen ordnet, sich merkt, was du korrigierst, und Claude als Agent damit arbeiten lässt (suchen, erinnern, vorbereiten, antworten, handeln).
+<h1 align="center">Jarvis</h1>
 
-**Heute** ist WhatsApp die erste Quelle (Nachrichten, Sprachnachrichten, Bilder, Umfragen, Reaktionen, Gruppen). Weitere Quellen wie Mail, Kalender, Dokumente und Notizen sollen dazukommen. Die Architektur trennt dafür drei Dinge:
+<p align="center"><em>A private context manager that turns your messages into decisions.<br>Self-hosted. Your data stays on your hardware.</em></p>
 
-- **Erfassung** (Quellen-Adapter wie `wa-ingest`) schreiben normalisiert in Postgres.
-- **Auswertung** (`embedder`, `organizer`) ist quellenunabhängig: Vektoren, Threads, Topics, Personenprofile.
-- **Zugriff** (`mcp-server`, Watch, Zentrale-Seite) arbeitet auf dem gemeinsamen Datenmodell, nicht auf einer Quelle.
+<p align="center">
+  <a href="https://github.com/joel-wlf/jarvis/actions/workflows/ci.yml"><img src="https://github.com/joel-wlf/jarvis/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-121416" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/runs%20on-Raspberry%20Pi%20%C2%B7%20arm64%20%C2%B7%20amd64-121416" alt="Runs on Raspberry Pi, arm64 and amd64">
+  <img src="https://img.shields.io/badge/app-iOS%20%C2%B7%20Android%20%C2%B7%20Web-121416" alt="App for iOS, Android and web">
+</p>
 
 Dein Archiv liegt auf deinem eigenen Linux-Rechner (auch Raspberry Pi). Externe KI-Aufrufe bleiben bei der Einrichtung zunächst ausgeschaltet. Aktivierst du sie, werden je nach Funktion Texte, Audios oder Bilder an den gewählten Anbieter übertragen.
 
-## Überblick (aktueller Stand mit WhatsApp)
+> **Important**
+>
+> - Jarvis is an independent open-source project. It is **not affiliated with, endorsed by or connected to WhatsApp or Meta**. WhatsApp is a trademark of WhatsApp LLC.
+> - The WhatsApp connection is **unofficial** (the open-source [Baileys](https://github.com/WhiskeySockets/Baileys) library, acting as a linked device). It may violate WhatsApp's Terms of Service, **WhatsApp can restrict or ban accounts** that use unofficial clients, and the connection can stop working at any time. Use at your own risk; consider a secondary number.
+> - If you enable AI features, **message content is sent to the AI provider you configure** (for example OpenAI): text, voice message transcripts, image descriptions and surrounding context, including messages from your contacts. That provider's terms and privacy policy apply. Excluded chats and redaction limit what is sent; without an API key, processing stays local with fewer features.
+> - Your archive contains **other people's messages**. You are responsible for handling their data lawfully (for example under the GDPR).
+> - Provided as is, without warranty. See [LICENSE](LICENSE) and the [disclaimer](https://joel-wlf.github.io/jarvis/en/docs/disclaimer).
 
-```
-WhatsApp ──QR──> wa-ingest ──> postgres (pgvector) <── mcp-server <── cloudflared <── Claude
-```
+## What it is
 
 | Container | Aufgabe |
 |---|---|
@@ -207,22 +216,27 @@ Wer den Pi samt SD-Karte stiehlt, soll weder Nachrichten lesen noch dein WhatsAp
 **Nach jedem Neustart oder Stromausfall:** Docker startet nur, wenn der Container eingehängt ist (systemd-Bedingung). Entsperren vom Rechner aus:
 
 ```bash
-ssh -t <benutzer>@<pi-adresse> jarvis-unlock
+# server side (Node 22)
+cd mcp-server && npm ci && npm test        # OAuth, pairing, cards, API
+cd organizer  && npm ci && npm test
+cd admin      && npm ci && npm test
+
+# shared types
+cd packages/contract && npm ci && npm run check
+
+# app (Expo), runs with sample data and no server
+cd app && npm ci && npm run web:mock
+
+# docs (Fumadocs)
+cd docs && npm ci && npm run dev
 ```
 
-Das Passwort kann niemand zurücksetzen. Im Passwort-Manager aufbewahren.
+Changes to the API shape start in `packages/contract`; the server, the organizer and the app all build against it. More in [Contributing](CONTRIBUTING.md).
 
-**Grenzen:**
-- Die alten Klartext-Daten wurden überschreibend gelöscht. Auf SD-Karten bleiben durch Wear-Leveling trotzdem unter Umständen Reste in unbenutzten Blöcken. Wer das ausschließen will, spielt die Karte neu auf und stellt aus dem Backup wieder her.
-- Läuft der Pi und ist entsperrt, schützt die Verschlüsselung nicht (Zugriff per SSH, Cold-Boot-Angriffe). SSH nur mit Schlüssel, `PasswordAuthentication no`.
-- Der Cloudflare-Tunnel-Token liegt in `/etc/cloudflared/token` unverschlüsselt.
+## Contributing
 
-**Notfallplan bei Diebstahl:**
-1. WhatsApp: Verknüpfte Geräte, Gerät "Jarvis" entfernen (beendet die Sitzung sofort).
-2. Cloudflare Zero Trust: Tunnel löschen oder Token neu erzeugen.
-3. OpenAI: API-Schlüssel widerrufen.
-4. Neuen `MCP_TOKEN` setzen und den Connector in Claude neu einrichten.
+Issues and pull requests are welcome, in English or German. Please read the [disclaimer](https://joel-wlf.github.io/jarvis/en/docs/disclaimer) first, and never include real chats, tokens or keys in issues or tests; the repository ships synthetic fixtures for that.
 
-## Mitwirken und Lizenz
+## License
 
-Siehe [CONTRIBUTING.md](CONTRIBUTING.md) und [SECURITY.md](SECURITY.md). Lizenz: [MIT](LICENSE). Jarvis ist ein inoffizielles Projekt und nicht mit WhatsApp/Meta verbunden; die Nutzung von Baileys erfolgt auf eigenes Risiko und kann gegen die WhatsApp-Nutzungsbedingungen verstoßen.
+[MIT](LICENSE). Jarvis is not affiliated with WhatsApp, Meta, OpenAI, Anthropic or Cloudflare; all trademarks belong to their owners.

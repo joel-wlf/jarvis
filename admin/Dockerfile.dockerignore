@@ -1,0 +1,15 @@
+# Used instead of a root .dockerignore when building admin/Dockerfile from the repository root (BuildKit).
+# Allowlist: only the contract, the Expo app and the admin sources go into the build context, never .env or data.
+*
+!packages/contract/src
+!app
+app/node_modules
+app/.expo
+app/dist
+app/web-build
+!admin/package.json
+!admin/package-lock.json
+!admin/tsconfig.json
+!admin/src
+!admin/test
+!admin/scripts

@@ -88,15 +88,59 @@ export function startRestart(ctx: Ctx, service: string) {
   })
 }
 
-/** Alles neu bauen (z.B. nach git pull). Die laufenden Container bleiben, bis die neuen Images fertig sind. */
+/** Image ID and reference each running container was started from, so a failed update can put the old images back. */
+async function snapshotImages(ctx: Ctx, services: string[]) {
+  const snap: { service: string; id: string; ref: string }[] = []
+  for (const service of services) {
+    const q = await ctx.docker.compose(['ps', '-q', service], { timeoutMs: 30_000 })
+    const cid = q.out.trim().split('\n')[0]?.trim()
+    if (q.code !== 0 || !cid) continue
+    const i = await ctx.docker.docker(['inspect', '--format', '{{.Image}} {{.Config.Image}}', cid], { timeoutMs: 30_000 })
+    const [id, ref] = i.out.trim().split(/\s+/)
+    if (i.code === 0 && id && ref) snap.push({ service, id, ref })
+  }
+  return snap
+}
+
+/**
+ * Update to the current images and restart. Prefers the prebuilt images (`compose pull`), builds from source when
+ * they cannot be pulled. The running services stay up until the new images are there; if the new state does not come
+ * up healthy, the previous images are tagged back and started again.
+ */
 export function startRebuild(ctx: Ctx) {
   const env = needEnv(ctx)
-  return ctx.jobs.start('rebuild', 'Alle Dienste neu bauen', async (log) => {
-    const targets = (await activeServices(ctx.docker)).filter((s) => s !== 'admin')
-    log('info', 'Baue Images (die laufenden Dienste bleiben so lange aktiv) …')
-    const b = await ctx.docker.compose(['build', ...targets], { timeoutMs: 90 * 60_000, onLine: (l) => log('out', l) })
-    if (b.code !== 0) throw new Error('Bauen fehlgeschlagen; es läuft weiter der bisherige Stand.')
-    return applyEnv(ctx, log, env)
+  return ctx.jobs.start('rebuild', 'Alle Dienste aktualisieren', async (log) => {
+    const all = await activeServices(ctx.docker)
+    const targets = all.filter((s) => s !== 'admin')
+    const ref = `${env.JARVIS_REGISTRY || 'Standard-Registry'}, Version ${env.JARVIS_VERSION || 'latest'}`
+    const before = await snapshotImages(ctx, targets)
+
+    log('info', `Lade vorgebaute Images (${ref}); die laufenden Dienste bleiben so lange aktiv …`)
+    const pull = await ctx.docker.compose(['pull', ...all], { timeoutMs: 30 * 60_000, onLine: (l) => log('out', l) })
+    if (pull.code === 0) {
+      log('ok', 'Images geladen.')
+    } else {
+      log('warn', 'Die vorgebauten Images sind nicht erreichbar; baue stattdessen aus dem Quellcode (das kann auf einem Raspberry Pi lange dauern) …')
+      const b = await ctx.docker.compose(['build', ...targets], { timeoutMs: 90 * 60_000, onLine: (l) => log('out', l) })
+      if (b.code !== 0) throw new Error('Aktualisierung fehlgeschlagen (weder Laden noch Bauen); es läuft weiter der bisherige Stand.')
+    }
+
+    const r = await applyEnv(ctx, log, env)
+    if (r.status === 'ok') {
+      if (pull.code === 0) await recreateSelf(ctx, log)
+      return r
+    }
+    if (!before.length) {
+      log('warn', 'Der vorherige Image-Stand ist nicht bekannt, ein automatisches Zurücksetzen ist nicht möglich.')
+      return r
+    }
+    log('warn', 'Setze die Dienste auf die vorherigen Images zurück …')
+    for (const b of before) await ctx.docker.docker(['tag', b.id, b.ref], { timeoutMs: 30_000 })
+    const up = await ctx.docker.compose(['up', '-d', '--no-build', '--pull', 'never', ...before.map((b) => b.service)], { timeoutMs: 20 * 60_000, onLine: (l) => log('out', l) })
+    const err = up.code !== 0 ? 'docker compose up fehlgeschlagen' : await waitHealthy(ctx, log, before.map((b) => b.service), ctx.healthTimeoutMs)
+    if (err) log('error', `Auch der vorherige Stand läuft nicht sauber: ${err}`)
+    else log('ok', 'Vorheriger Stand ist wiederhergestellt und läuft.')
+    return { status: 'rolled_back' as const }
   })
 }
 

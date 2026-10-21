@@ -1,0 +1,86 @@
+---
+title: Kartentypen
+description: Die 22 Arten von Karten, die Jarvis dir vorlegen kann.
+---
+
+Jede Karte ist eine Entscheidung für dich: was passiert ist, woher es kommt und welche nächsten Schritte vorbereitet sind. Die Typen sind in `packages/contract/src/cards.ts` definiert.
+
+## Gemeinsame Bestandteile
+
+| Teil | Bedeutung |
+|---|---|
+| Gruppe | `reply`, `schedule`, `todo` oder `know`. In der App ein Reiter pro Gruppe. |
+| Dringlichkeit | 1 kann warten, 2 bald, 3 braucht jetzt Aufmerksamkeit. |
+| Zustand | `new`, `notified` oder `scheduled`, wie beim Wachdienst. |
+| Quelle | Chat und Zeit, aus denen die Karte stammt. |
+| Satz | Ein Satz in Jarvis' Stimme, sichtbar bei ausgewählter Karte. |
+| Kontext | Zusätzliches aus anderen Chats oder dem Gedächtnis, etwa eine Überschneidung mit einem anderen Plan. |
+| Vorschläge | Vorbereitete nächste Schritte. Einer ist der primäre. |
+
+### Was ein Tipp auslöst
+
+Ein Vorschlag trägt eine **Aktion**, ausgeführt über `POST /api/v1/cards/:key/act`:
+
+| Aktion | Wirkung |
+|---|---|
+| `send` | Sendet eine WhatsApp-Nachricht in den Chat der Karte (über die Outbox). |
+| `react` | Reagiert mit einem Emoji auf eine Nachricht. |
+| `vote` | Stimmt in einer Umfrage ab. |
+| `done` | Markiert den Punkt als erledigt. |
+| `snooze` | Blendet ihn bis zu einer gewählten Zeit aus. |
+| `dismiss` | Blendet ihn dauerhaft als unwichtig aus. |
+| `remind` | Legt eine Erinnerung zu einer Zeit an. |
+| `save_contact` | Speichert Angaben in den Kontakten (in der App behandelt). |
+| `open` | Öffnet einen Link (in der App behandelt). |
+
+Senden, Reagieren und Abstimmen teilen sich das Stundenlimit und die Offline-Prüfung mit den Tools von Claude. Erledigt, Verwerfen und Später verhalten sich genau wie über `watch_feedback` in Claude.
+
+## Antworten
+
+| Typ | Was es ist | Bietet an |
+|---|---|---|
+| `question` | Jemand hat dich etwas gefragt und wartet. Zeigt das Zitat und die Wartezeit. | Mehrere Antworten zum Senden |
+| `voice` | Eine Sprachnachricht, aus dem Transkript zusammengefasst, mit Dauer. | Antworten |
+| `reaction` | Eine Nachricht, die eine Reaktion verdient, etwa gute Neuigkeiten in einer Gruppe. | Emojis zum Reagieren |
+| `followup` | Ein Versprechen („ich melde mich“) ohne spätere eigene Nachricht in diesem Chat. | Jetzt melden oder Zwischenstand senden |
+
+## Termine
+
+| Typ | Was es ist | Bietet an |
+|---|---|---|
+| `event` | Ein Termin aus einem Chat mit Ort, Teilnehmern und Zusagen. | Zusagen, später, absagen |
+| `conflict` | Zwei Termine überschneiden sich. Zeigt beide auf einer Zeitachse und den freien Slot. | Änderung vorschlagen |
+| `birthday` | Ein Geburtstag mit Alter und Geschenkideen aus Chats. | Erinnerung zum Gratulieren |
+| `reminder` | Deine eigene Erinnerung für heute. | Erledigt oder auf eine Zeit verschieben |
+| `trip` | Eine Zugfahrt: Abfahrt, Ankunft, Gleis, Verspätung, Umstieg. | Mit Mitreisenden abstimmen |
+| `place` | Ein Treffpunkt aus einem Chat mit Details. | Antwort zu Mitfahrt oder Ankunft |
+| `routine` | Eine wiederkehrende Gewohnheit („sonntags Oma anrufen“) mit erledigten Wochen und Serie. | Erinnerung setzen |
+
+## Erledigen
+
+| Typ | Was es ist | Bietet an |
+|---|---|---|
+| `task` | Eine Aufgabe mit Betrag, Empfänger und verbleibenden Tagen. | Erledigt, später erinnern |
+| `poll` | Eine Umfrage, in der du noch nicht abgestimmt hast. Zeigt Stimmen und die Option, die in deinen Kalender passt. | Abstimmen |
+| `shopping` | Eine aus Gruppennachrichten zusammengestellte Einkaufsliste, mit Zuständigen. | Liste in die Gruppe schicken |
+| `parcel` | Ein Paket mit Stationen von bestellt bis zugestellt und dem Zeitfenster. | Erledigt |
+| `money` | Geld, das jemand schuldet: von, an, Betrag. | Beglichen oder später erinnern |
+
+## Wissen
+
+| Typ | Was es ist | Bietet an |
+|---|---|---|
+| `insight` | Kontext von anderswo, der jemandem jetzt hilft, mit Quellen. | Im Chat teilen |
+| `digest` | Ein lebhafter Chat in Stichpunkten, und was dich betrifft. | Als gelesen markieren |
+| `person` | Eine Person, mit der du länger keinen Kontakt hattest, mit Fakten, die Jarvis kennt. | Melden |
+| `address` | Eine neue Adresse aus einem Chat. | In den Kontakten speichern |
+| `link` | Ein geteilter Link mit Domain und Lesezeit. | Später lesen |
+| `photos` | Fotos, die an einem Tag in einem Chat geteilt wurden, und wie viele dich zeigen. | Gesehen |
+
+## Woher die Karten kommen
+
+- **Live per SQL abgeleitet** von der API: `question`, `voice`, `reaction`, `event`, `conflict`, `reminder`, `task`, `poll`, `digest`, `person`, `routine`.
+- **Vom Organizer geschrieben** in die Tabelle `cards`, im selben Aufruf, der einen Thread einem Thema zuordnet, ohne zusätzliche Kosten: `shopping`, `parcel`, `money`, `trip`, `place`, `address`, `birthday`, `insight`. Meist keine, höchstens drei pro Aufruf.
+- **Per Regel geschrieben**, alle 10 Minuten und ohne KI: `followup` (offene Versprechen), `link` (geteilte Links) und `photos` (je Chat und Tag). Einstellbar mit `CARDS_FOLLOWUP_MIN_HOURS`, `CARDS_FOLLOWUP_MAX_DAYS`, `CARDS_LINK_DAYS`, `CARDS_PHOTOS_MIN` und `CARDS_PHOTOS_DAYS`.
+
+Erledigte und verworfene Karten kommen nie zurück, ausgeschlossene Chats erzeugen keine Karten. Kartenschlüssel sind stabil (`card:<typ>:<chat>:<slug>`), eine umformulierte Modellantwort erzeugt also keine Dublette.

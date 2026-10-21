@@ -1,0 +1,83 @@
+---
+title: Security
+description: What is exposed, what is protected, and what to do if something is stolen.
+---
+
+Jarvis handles your private chats and can send messages in your name. Treat it accordingly.
+
+Report vulnerabilities through "Report a vulnerability" (GitHub Security Advisories) in the repository, not as a public issue. Never commit `.env`, backups or the `wa-auth` volume.
+
+## What is reachable from outside
+
+Only the MCP server, through the Cloudflare tunnel. Postgres, whisper and `wa-ingest` publish no ports.
+
+`mcp-server` listens on `127.0.0.1:3000`, on the Pi only, not in your home network. The tunnel reaches it at `http://localhost:3000`.
+
+## Admin interface: home network only
+
+The admin interface controls Docker through the Docker socket, which is equivalent to root on the Pi. Therefore:
+
+- **Reachable only in the home network** (port 8080). Never publish it through the Cloudflare tunnel.
+- First access needs the **setup code** from the log, then a password (hashed with scrypt).
+- Locked after **10 failed attempts**.
+- **Secrets never reach the browser in clear text.** Showing one requires entering the password again.
+- To restrict it to the Pi itself, set `ADMIN_BIND` to `127.0.0.1` and use `ssh -L 8080:localhost:8080 <pi>`.
+- If you do not need it, stop it: `docker compose stop admin`.
+- Forgot the password: `docker compose exec admin node dist/src/cli.js reset-password`.
+
+Every settings change is validated, cross-checked by Docker Compose before anything is written, backed up, written atomically, and rolled back automatically if the services do not come up healthy.
+
+## Secrets and tokens
+
+- Generated values (database passwords, `MCP_TOKEN`, `ADMIN_INTERNAL_SECRET`) come from the setup wizard. The `MCP_TOKEN` needs at least 32 characters (`openssl rand -hex 24`).
+- **OAuth tokens are stored only as hashes.** Access tokens live 1 hour, refresh tokens 30 days and rotate.
+- Device tokens (`jd_…`) can be revoked individually under Devices.
+- **The legacy MCP token URL is a password.** Anyone with it can read all chats and write in your name. Do not share it or put it in screenshots. If it leaks, change `MCP_TOKEN`. Prefer to disable it with `MCP_LEGACY_TOKEN=false` once OAuth works.
+- After 10 invalid attempts per IP in 15 minutes the server answers only 429. Add a rate limit rule for the hostname in Cloudflare as well, and consider Cloudflare Access if your client supports it.
+- The internal API on port 3001 is only valid inside the Docker network and refuses requests that carry Cloudflare headers.
+
+## Database roles
+
+Claude's read access uses `mcp_ro`, which can only read. Actions use `mcp_act`, which can only insert into and select from the `outbox`. Memory and corrections use `mcp_mem`, which may write notes and these corrections, but cannot change or delete messages and cannot send. The roles share `MCP_RO_PASSWORD`.
+
+## Protection against mistakes
+
+- Recipients must be unambiguous. With several matches nothing is sent.
+- With `REQUIRE_CONFIRM` on, every action shows a preview first and runs only with `confirm=true`.
+- At most `MAX_ACTIONS_PER_HOUR` actions (default 30) per hour. Queries and harmless settings do not count.
+- Media URLs that point to private addresses (router, Pi, home network) are blocked.
+- Chat content is third-party text. The server tells Claude not to follow instructions found inside messages.
+- Memory tools store only on your explicit request.
+
+## Data sent to the AI provider
+
+See the privacy model in [What is Jarvis](./index.mdx). In short: redaction of phone numbers, IBANs, email addresses and link paths by default (`ORGANIZER_REDACT`), excluded chats never sent, no images or audio for sorting.
+
+## Encrypted vault
+
+Whoever steals the Pi with its SD card should neither read messages nor take over your WhatsApp account.
+
+**What is encrypted.** A LUKS2 container (`/srv/vault.img`, mounted at `/srv/vault`) holds the whole Docker data directory (Postgres with all messages, the WhatsApp session, container logs), the `.env` (API keys, tokens, passwords) and the backups. `~/jarvis/.env` and `~/jarvis-backups` point into it. It uses Adiantum, which is fast on a Pi 4 without AES hardware, with the passphrase derived by Argon2id.
+
+**Set up** (once, on the Pi): run `scripts/vault-setup.sh`. It asks for the passphrase interactively, creates the container, moves the data, verifies the message count, and only then overwrites the old plaintext files. It also disables zram writeback and the swap file, which could write plaintext from memory to the SD card. If it stops at step 7, `scripts/vault-finish.sh` continues. With the vault, `.env` points to `/srv/vault/secrets/.env`, and `JARVIS_SECRETS_DIR=/srv/vault/secrets` must be in `.env`.
+
+**After every reboot or power cut.** Docker starts only when the container is mounted (a systemd condition). Unlock from your computer:
+
+```bash
+ssh -t <user>@<pi-address> jarvis-unlock
+```
+
+Nobody can reset the passphrase. Keep it in a password manager.
+
+**Limits.**
+
+- The old plaintext was overwritten, but wear levelling on SD cards may leave remains in unused blocks. To rule that out, re-flash the card and restore from backup.
+- While the Pi runs and is unlocked, encryption does not help (SSH access, cold-boot attacks). Use SSH keys only, with `PasswordAuthentication no`.
+- The Cloudflare tunnel token in `/etc/cloudflared/token` is not encrypted.
+
+**If the Pi is stolen:**
+
+1. WhatsApp: Linked devices, remove the device "Jarvis". This ends the session immediately.
+2. Cloudflare Zero Trust: delete the tunnel or regenerate its token.
+3. Revoke the OpenAI API key.
+4. Set a new `MCP_TOKEN` and reconnect Claude.

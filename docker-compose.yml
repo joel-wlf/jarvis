@@ -1,5 +1,9 @@
 name: jarvis
 
+# Every Jarvis service has an image: line next to its build: section. `docker compose pull` fetches the prebuilt
+# multi-arch images (built by .github/workflows/images.yml); `docker compose build` still builds from source.
+# The default registry prefix is defined by JARVIS_REGISTRY in admin/src/schema.ts (a test keeps every line here in sync).
+
 # Logs begrenzen (SD-Karte schonen)
 x-logging: &logging
   driver: json-file
@@ -51,6 +55,7 @@ services:
 
   # Berechnet Embeddings (multilingual-e5-small) für die Bedeutungssuche; füllt fehlende Vektoren im Hintergrund auf
   embedder:
+    image: ${JARVIS_REGISTRY:-ghcr.io/joel-wlf/jarvis}-embedder:${JARVIS_VERSION:-latest}
     build: ./embedder
     restart: unless-stopped
     logging: *logging
@@ -78,6 +83,7 @@ services:
     networks: [internal]
 
   wa-ingest:
+    image: ${JARVIS_REGISTRY:-ghcr.io/joel-wlf/jarvis}-wa-ingest:${JARVIS_VERSION:-latest}
     build: ./wa-ingest
     restart: unless-stopped
     logging: *logging
@@ -114,6 +120,7 @@ services:
     networks: [internal]
 
   mcp-server:
+    image: ${JARVIS_REGISTRY:-ghcr.io/joel-wlf/jarvis}-mcp-server:${JARVIS_VERSION:-latest}
     # Built from the repository root so the shared contract (packages/contract) is in the build context;
     # mcp-server/Dockerfile.dockerignore keeps everything else out.
     build:
@@ -169,6 +176,7 @@ services:
   #   docker compose --profile organizer run --rm organizer node dist/index.js --estimate
   organizer:
     profiles: ["organizer"]
+    image: ${JARVIS_REGISTRY:-ghcr.io/joel-wlf/jarvis}-organizer:${JARVIS_VERSION:-latest}
     build: ./organizer
     restart: unless-stopped
     logging: *logging
@@ -227,7 +235,12 @@ services:
 
   # Verwaltung mit Docker-Zugriff. Kein eigener Host-Port; geschützt über app-web erreichbar.
   admin:
-    build: ./admin
+    image: ${JARVIS_REGISTRY:-ghcr.io/joel-wlf/jarvis}-admin:${JARVIS_VERSION:-latest}
+    # Built from the repository root: the image contains the Expo web app (app/) as its interface.
+    # admin/Dockerfile.dockerignore keeps everything else out.
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
     restart: unless-stopped
     logging: *logging
     mem_limit: 192m

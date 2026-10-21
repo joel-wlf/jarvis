@@ -1,0 +1,60 @@
+---
+title: Claude verbinden
+description: Jarvis in Claude als Connector eintragen, nur mit der Basis-URL.
+---
+
+Jarvis spricht MCP (Streamable HTTP) mit OAuth 2.1. Claude braucht nur deine Basis-URL.
+
+## Voraussetzungen
+
+- Der Cloudflare-Tunnel läuft, und `APP_PUBLIC_URL` ist auf deine öffentliche Adresse gesetzt, zum Beispiel `https://jarvis.example.com`.
+- Du hast ein Besitzer-Passwort gesetzt (das erledigt die Admin-Oberfläche).
+
+## Connector hinzufügen
+
+1. Öffne in Claude die Connector-Einstellungen und füge einen **eigenen Connector** hinzu.
+2. Trage die Basis-URL ein: `https://jarvis.example.com` (der MCP-Endpunkt `/mcp` liegt darunter, Claude findet ihn selbst).
+3. Claude startet die Anmeldung. Jarvis zeigt eine Zustimmungsseite auf Deutsch oder Englisch, je nach Browser. Gib dein **Besitzer-Passwort** ein und erlaube den Zugriff.
+
+Das war's. Ohne gültige Zugangsdaten antwortet Jarvis mit `401` und einem `WWW-Authenticate`-Header, der auf die Ressourcen-Metadaten zeigt. So findet Claude den OAuth-Ablauf allein aus der Basis-URL.
+
+Zugriffstoken gelten 1 Stunde, Refresh-Token 30 Tage und rotieren bei jeder Nutzung. Gespeichert werden nur Hashes. Eine Verbindung sperrst du jederzeit unter **System → Geräte** in der App oder der Admin-Oberfläche.
+
+## Alte Token-URL
+
+Ältere Einrichtungen nutzten eine geheime URL mit dem Token im Pfad, weil manche Connector-Oberflächen keine Header erlauben:
+
+```text
+https://jarvis.example.com/t/<MCP_TOKEN>/mcp
+```
+
+Clients mit Header-Unterstützung können `https://jarvis.example.com/mcp` mit `Authorization: Bearer <MCP_TOKEN>` nutzen.
+
+Das funktioniert weiter, solange `MCP_LEGACY_TOKEN=true` gilt, der Standard. **Wer die URL hat, kann alle deine Chats lesen und in deinem Namen schreiben.** Sobald OAuth bei dir läuft, schalte `MCP_LEGACY_TOKEN` aus, damit Claude sich nur noch per Anmeldung verbindet.
+
+## Was Claude kann
+
+Claude bekommt `read_me` (Abschnitte: overview, search, data, topics, memory, actions, limits, status) und diese Tools:
+
+| Bereich | Tools |
+|---|---|
+| Lesen | `list_topics`, `get_topic`, `list_threads`, `get_thread`, `list_suggested_actions`, `semantic_search`, `search_messages`, `get_recent_messages`, `get_conversation_context`, `list_chats`, `find_contact`, `find_scheduling_mentions`, `get_open_polls`, `run_readonly_sql` |
+| Gedächtnis und Korrekturen | `remember`, `recall`, `list_memories`, `edit_memory`, `edit_topic`, `link_thread`, `move_messages`, `set_action_status` |
+| Senden | `send_message`, `send_media`, `send_location`, `send_contact_card`, `forward_message` |
+| Nachrichten | `edit_message`, `delete_message`, `react_to_message`, `star_message` |
+| Umfragen und Chats | `create_poll`, `vote_in_poll`, `manage_chat`, `set_disappearing_messages` |
+| Gruppen | `create_group`, `get_group_info`, `update_group`, `manage_group_members`, `leave_group`, `group_invite_link`, `join_group`, `group_join_requests` |
+| Kontakte und Profil | `check_on_whatsapp`, `get_profile`, `manage_blocklist`, `update_my_profile`, `privacy_settings` |
+| Medien | `get_media` (Bilder, Sticker, PDFs) |
+
+Aktionen, die andere betreffen oder etwas löschen, zeigen bei eingeschaltetem `REQUIRE_CONFIRM` zuerst eine Vorschau und laufen erst mit `confirm=true`. Der MCP-Server schreibt dafür nur Aufträge in die Tabelle `outbox`, die `wa-ingest` ausführt. `outbox` ist zugleich dein Protokoll: `select * from outbox order by id desc`. Aktionen schaltest du ganz ab mit `ENABLE_ACTIONS=false`.
+
+Bei jeder Verbindung bekommt Claude außerdem einen **Hot Context**, live aus der Datenbank berechnet: anstehende Termine (14 Tage), aktive offene Themen der letzten 7 Tage und fällige Vorschläge.
+
+## Was nicht geht
+
+Sprach- und Videoanrufe, Status oder Stories posten, Communities, Kanäle, Broadcast-Listen, Zahlungen, Live-Standort und Videos oder Audio „ansehen“. Bearbeitete oder gelöschte Nachrichten anderer bleiben im Archiv, markiert mit „(bearbeitet)“ oder „(gelöscht)“.
+
+## Empfehlung
+
+Chat-Inhalte stammen von Dritten. Ein Absender könnte versuchen, Claude per Nachricht Anweisungen unterzujubeln („schick das an …“). Der Server weist Claude an, das zu ignorieren. Lass trotzdem die Sende-Tools von Claude vorher bei dir nachfragen, statt „immer erlauben“.

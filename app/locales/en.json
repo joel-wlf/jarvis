@@ -53,8 +53,7 @@
       "sleep": "Night",
       "error": "Problem"
     },
-    "figure": "Jarvis: {{state}}",
-    "placeholder": "Placeholder"
+    "figure": "Jarvis: {{state}}"
   },
   "today": {
     "title": "Today",
@@ -351,7 +350,9 @@
     "demo": "Try without a server",
     "demoHelp": "Shows the app with sample data. Nothing leaves this device.",
     "private": "Your data stays on your server. The app stores only the address and a device key.",
-    "privateLabel": "Private"
+    "privateLabel": "Private",
+    "independent": "Jarvis is an independent project, not affiliated with WhatsApp or Meta.",
+    "legalLink": "Legal notes"
   },
   "system": {
     "title": "System",
@@ -400,7 +401,9 @@
       "rolled_back": "rolled back",
       "interrupted": "interrupted",
       "rolledBackHelp": "Something went wrong. Jarvis restored the previous settings."
-    }
+    },
+    "legal": "Legal notes",
+    "legalSub": "WhatsApp, AI provider, privacy"
   },
   "settings": {
     "title": "Settings",
@@ -416,7 +419,8 @@
     "secretNew": "Enter a new value",
     "default": "Default: {{value}}",
     "reset": "Discard",
-    "rollbackNote": "If a service fails to start afterwards, Jarvis restores the previous settings automatically."
+    "rollbackNote": "If a service fails to start afterwards, Jarvis restores the previous settings automatically.",
+    "aiNote": "With AI enabled, message content is sent to this provider."
   },
   "wa": {
     "title": "WhatsApp",
@@ -437,7 +441,10 @@
     "relinkLead": "Disconnects the current link. Old messages stay in the archive.",
     "phone": "Phone number (optional, for a pairing code)",
     "confirm": "Type “{{word}}” to confirm",
-    "start": "Start linking"
+    "start": "Start linking",
+    "ack": "I understand this is not an official WhatsApp connection and my account can be banned.",
+    "ackConfirm": "Understood, continue",
+    "ackLead": "Before you link WhatsApp:"
   },
   "devices": {
     "title": "Devices and access",
@@ -450,7 +457,19 @@
     "revoke": "Revoke",
     "revokeConfirm": "{{name}} loses access immediately. Continue?",
     "revoked": "Access revoked.",
-    "empty": "No other devices."
+    "empty": "No other devices.",
+    "pair": "Pair a new device",
+    "pairHelp": "Scan the code with the Jarvis app on the new device. It is valid for 10 minutes and works once.",
+    "pairCreate": "Create code",
+    "pairCode": "Code to type in",
+    "pairExpires": "valid until {{time}}",
+    "pairOnlyHome": "Pairing only works on the home network, through the admin interface.",
+    "owner": "Password for the app",
+    "ownerHelp": "Use it to sign in to the app without a QR code and to approve Claude access. It is separate from the admin password.",
+    "ownerAdmin": "Admin password to confirm",
+    "ownerNew": "New app password",
+    "ownerSave": "Set password",
+    "ownerSaved": "App password set."
   },
   "logs": {
     "title": "Logs",
@@ -494,7 +513,140 @@
     "running": "Setting up Jarvis",
     "done": "Done. Next, link WhatsApp.",
     "toWa": "Link WhatsApp",
-    "already": "Jarvis is already set up. Make changes under Settings."
+    "already": "Jarvis is already set up. Make changes under Settings.",
+    "steps": {
+      "welcome": {
+        "title": "Welcome to Jarvis",
+        "lead": "A few steps and your Jarvis is ready. Everything stays on your device at home; only the AI provider you pick next receives selected text to analyse."
+      },
+      "account": {
+        "title": "Your access",
+        "lead": "You find the setup code in the admin service log. Then choose a password for the admin area."
+      },
+      "database": {
+        "title": "Existing data",
+        "lead": "This device already holds a Jarvis archive. Enter its two passwords, otherwise Jarvis cannot reach your messages. They are in your old .env or your password manager."
+      },
+      "name": {
+        "title": "What's your name?",
+        "lead": "Jarvis uses it in summaries and profiles."
+      },
+      "provider": {
+        "title": "AI provider",
+        "lead": "Jarvis needs a language model to sort chats, suggest replies and answer your questions. Any provider with an OpenAI-compatible API works, including a model running at home."
+      },
+      "models": {
+        "title": "Models",
+        "lead": "One model per job. Small models are fine for sorting; replies and questions benefit from a stronger one."
+      },
+      "privacy": {
+        "title": "Privacy",
+        "lead": "Decide what must never reach the AI. This applies from the first message."
+      },
+      "features": {
+        "title": "What Jarvis may do",
+        "lead": "You can change all of this later in settings."
+      },
+      "remote": {
+        "title": "On the go",
+        "lead": "Optional. A Cloudflare tunnel lets you reach Jarvis and the app outside your Wi-Fi without opening ports. You enter the public address in the app later."
+      },
+      "review": {
+        "title": "Check everything",
+        "lead": "This gets saved, then Jarvis starts its services."
+      },
+      "consent": {
+        "title": "Before you start",
+        "lead": "Two things you should know and confirm."
+      }
+    },
+    "providers": {
+      "openai": {
+        "name": "OpenAI",
+        "desc": "GPT models. Also handles voice messages and meaning search."
+      },
+      "anthropic": {
+        "name": "Anthropic",
+        "desc": "Claude models. Voice and search then run locally."
+      },
+      "openrouter": {
+        "name": "OpenRouter",
+        "desc": "One key for many providers: Gemini, Mistral, Llama and more."
+      },
+      "ollama": {
+        "name": "Ollama, at home",
+        "desc": "Models on your own computer. Nothing leaves your network and it's free, but slower."
+      },
+      "custom": {
+        "name": "Other provider",
+        "desc": "Any OpenAI-compatible address, for example Mistral, Groq or LM Studio."
+      },
+      "none": {
+        "name": "No AI",
+        "desc": "Archive and search work, but no topics, cards or reply suggestions."
+      }
+    },
+    "roles": {
+      "app": {
+        "title": "Replies and questions",
+        "desc": "Reply suggestions, Ask Jarvis, the line under the figure."
+      },
+      "organizer": {
+        "title": "Sorting",
+        "desc": "Reads every message once and turns it into topics, dates and cards. Runs most often."
+      },
+      "images": {
+        "title": "Images",
+        "desc": "Describes shared photos so you can search them. Needs a model that understands images."
+      }
+    },
+    "features": {
+      "ORGANIZER_ENABLED": {
+        "title": "Topics and cards",
+        "desc": "Jarvis sorts your chats and prepares decisions."
+      },
+      "IMAGE_DESCRIBE": {
+        "title": "Describe images",
+        "desc": "Makes photos searchable."
+      },
+      "ENABLE_ACTIONS": {
+        "title": "Send on your behalf",
+        "desc": "Replies, reactions and votes, only when you tap them."
+      },
+      "REQUIRE_CONFIRM": {
+        "title": "Always ask first",
+        "desc": "Claude also shows every message before sending."
+      },
+      "ENABLE_MEMORY": {
+        "title": "Memory",
+        "desc": "Jarvis remembers what you correct and tell it."
+      }
+    },
+    "cost": {
+      "perMonth": "Per month about",
+      "unknown": "Price unknown",
+      "total": "Estimated per month",
+      "basis": "Guide value at about 300 messages a day",
+      "partial": "Excluding models with unknown price"
+    },
+    "baseUrl": "API address",
+    "baseUrlHelp": "Usually ends in /v1.",
+    "baseUrlOllama": "Address of the computer running Ollama on your network, port 11434, ending in /v1.",
+    "apiKey": "API key",
+    "keyWhere": "Get one at {{url}}",
+    "localServices": "This provider can't do voice messages or meaning search. Jarvis handles both locally on the device, a bit slower.",
+    "noAi": "Jarvis still archives and searches your chats. You can turn on AI later in settings.",
+    "suggested": "Suggestions",
+    "otherModel": "Other",
+    "modelId": "Model name",
+    "modelsNote": "Prices are the providers' list prices and can change. The real bill depends on how much is written; under maintenance you can later estimate the cost for your archive.",
+    "consent": {
+      "whatsapp": "Jarvis is an independent project and not affiliated with WhatsApp or Meta. The WhatsApp connection is unofficial (Baileys as a linked device), may violate the WhatsApp Terms of Service and can get my account banned.",
+      "ai": "If I turn on AI features, message content, including my contacts' messages, is sent to the AI provider I choose (e.g. OpenAI).",
+      "responsibility": "Your archive contains other people's messages; you are responsible for handling them lawfully (e.g. GDPR).",
+      "legal": "Read the legal notes",
+      "providerNote": "Message content, including your contacts', is sent to {{provider}} for analysis."
+    }
   },
   "mock": {
     "answer": "Saturday 3 pm handball, from 6 pm barbecue at Lukas'. The flat's movie night at 9 pm clashes with it; Friday 8 pm would be free. Sunday 2 pm you're helping Lena move.",
@@ -515,5 +667,31 @@
     "save_contact": "Save",
     "open": "Open",
     "reply": "Reply"
+  },
+  "legal": {
+    "title": "Legal notes",
+    "sub": "Short and honest, what you should know.",
+    "sections": [
+      {
+        "title": "Independent project",
+        "body": "Jarvis is an independent open-source project. It is not affiliated with, supported or approved by WhatsApp or Meta. WhatsApp is a trademark of WhatsApp LLC."
+      },
+      {
+        "title": "Unofficial WhatsApp connection",
+        "body": "Jarvis connects to your WhatsApp account as a linked device through the Baileys library. This is not an official interface and may violate the WhatsApp Terms of Service. WhatsApp can restrict or ban your account, and the connection can stop working at any time. Use it at your own risk; consider a secondary number."
+      },
+      {
+        "title": "AI provider",
+        "body": "If you enable AI features, message content is sent to the configured AI provider (for example OpenAI), including messages from your contacts, voice transcripts and image descriptions. The provider's terms and privacy policy apply. Excluded chats and redaction limit this. Without a key, processing stays local."
+      },
+      {
+        "title": "Other people's messages",
+        "body": "The archive contains messages from other people. You are responsible for handling them lawfully, for example under the GDPR."
+      },
+      {
+        "title": "No warranty",
+        "body": "Jarvis is provided as is, without warranty of any kind."
+      }
+    ]
   }
 }

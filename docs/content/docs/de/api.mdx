@@ -1,0 +1,166 @@
+---
+title: App-API-Referenz
+description: Die Schnittstelle /api/v1, die die Jarvis-App nutzt, mit den gemeinsamen Typen.
+---
+
+Die App spricht mit `mcp-server` auf Port 3000 unter `/api/v1`. Die Anfrage- und Antworttypen stehen in `packages/contract/src/api.ts` und `cards.ts` (Paket `@jarvis/contract`) und werden von Server, Organizer und App gemeinsam genutzt. Alles hier steht auch in `mcp-server/API.md`.
+
+## Authentifizierung
+
+| Endpunkt | Auth |
+|---|---|
+| `GET /info`, `POST /pair`, `POST /login` | Keine |
+| Alles andere | `Authorization: Bearer <token>` mit einem Geräte-Token (`jd_…`) oder einem OAuth-Zugriffstoken |
+
+Falsche Passwörter, Kopplungscodes und Bearer-Tokens werden pro Client-IP gezählt: Nach 10 in 15 Minuten antwortet der Server mit `429`. Ein gültiges Token mit hoher Entropie wird nie gesperrt.
+
+### Fehler
+
+Jede Antwort außerhalb von 2xx hat diesen Body:
+
+```ts
+interface ApiError {
+  error: {
+    code: 'unauthorized' | 'forbidden' | 'not_found' | 'invalid' | 'rate_limited' | 'unavailable' | 'internal'
+    message: string
+    fields?: Record<string, string> // Feld -> Meldung, für Formulare
+  }
+}
+```
+
+`code` ist stabil. Verzweige darauf, nicht auf die Meldung.
+
+## Server und Kopplung
+
+| Methode und Pfad | Beschreibung |
+|---|---|
+| `GET /info` | `ServerInfo`: `name`, `apiVersion`, `version`, `ownerName?`, `passwordLogin`, `oauthMetadata` |
+| `POST /pair` | Body `{ code, deviceName, platform }`. Liefert `AuthResponse` `{ token, deviceId, ownerName? }` |
+| `POST /login` | Body `{ password, deviceName, platform }`. Liefert `AuthResponse` |
+| `GET /devices` | `{ devices: Device[] }`, auch OAuth-Clients (`kind: 'oauth'`) |
+| `DELETE /devices/:id` | 204. Eine Geräte-ID oder eine OAuth-Client-ID (sperrt alle ihre Tokens) |
+
+`platform` ist `ios`, `android` oder `web`. Der Kopplungs-QR-Code enthält `jarvis:` gefolgt von JSON `{ v: 1, url, homeUrl?, code }`.
+
+## Start und Karten
+
+| Methode und Pfad | Beschreibung |
+|---|---|
+| `GET /home` | `HomeResponse`: Jarvis-Zustand und Satz, Kennzahlen, Nachrichtenfluss, Woche, Systemzustand und `counts` je Gruppe |
+| `GET /cards?group=` | `{ cards: Card[] }`, optional gefiltert nach `reply`, `schedule`, `todo` oder `know` |
+| `POST /cards/:key/act` | Body `{ action: CardAction }`. Liefert `{ ok: true, message, removed }` |
+| `POST /cards/:key/suggest` | Frische Antwortvorschläge, je Karte zwischengespeichert. `?refresh=1` überspringt den Cache. Liefert `{ suggestions, cached }` |
+
+Kartenschlüssel enthalten `:` und `@`, kodiere sie also URL-gerecht. Es sind die Schlüssel des Wachdienstes (`frage:<jid>:<ts>`, `umfrage:<id>`, `event:<id>:<stage>`, `konflikt:<a>:<b>`, `reminder:<id>`, `aktion:<id>`, `digest:<jid>:<date>`, `person:<jid>`) plus Organizer-Schlüssel aus der Tabelle `cards`. Verwerfen oder Verschieben in der App und per `watch_feedback` in Claude ist daher dasselbe.
+
+`source.when` und `say` werden anhand von `Accept-Language` lokalisiert (Standard Deutsch, sonst Englisch).
+
+### CardAction
+
+```ts
+type CardAction =
+  | { kind: 'send'; text: string }
+  | { kind: 'react'; emoji: string; messageId: string }
+  | { kind: 'vote'; option: string; pollId: string }
+  | { kind: 'done' }
+  | { kind: 'snooze'; until: string } // ISO-Zeitstempel
+  | { kind: 'dismiss' }
+  | { kind: 'remind'; at: string; text: string }
+  | { kind: 'save_contact'; name: string; lines: string[] }
+  | { kind: 'open'; url: string }
+```
+
+`done`, `dismiss` und `snooze` schreiben in `watch_state` (oder `reminders`, `suggested_actions`, `cards.status` bei diesen Kartenarten). `remind` legt eine Erinnerung an. `send`, `react` und `vote` gehen in die `outbox`, mit denselben Limits und derselben Offline-Prüfung wie die MCP-Tools. `open` und `save_contact` behandelt die App; der Server antwortet mit `400`.
+
+### Card
+
+```ts
+interface CardBase<T, D> {
+  key: string
+  type: T
+  group: 'reply' | 'schedule' | 'todo' | 'know'
+  urgency: 1 | 2 | 3
+  state: 'new' | 'notified' | 'scheduled'
+  title: string
+  source: { chat: string; chatJid?: string; when: string; at?: string }
+  say: string
+  context?: string
+  suggestions: { id: string; label: string; action: CardAction; primary?: boolean }[]
+  data: D
+}
+```
+
+`Card` ist die Union aller 22 Typen, jeder mit eigenem `data`. Siehe [Kartentypen](./card-types.mdx).
+
+## Personen
+
+| Methode und Pfad | Beschreibung |
+|---|---|
+| `GET /people?q=` | `{ people: PersonSummary[] }`: `jid`, `name`, `initials`, `relationship?`, `closeness?`, `lastContactAt?`, `openCards` |
+| `GET /people/:jid` | `PersonDetail`: ergänzt `realName?`, `aliases`, `formality?`, `tone?`, `note?`, `locked`, `source` (`auto` oder `user`), `stats`, `memories`, `recent` |
+| `PATCH /people/:jid` | Body `PersonPatch`: beliebige von `realName`, `aliases`, `relationship`, `closeness`, `formality`, `tone`, `note`, `locked` |
+
+`relationship` ist eines von `family`, `partner`, `close_friend`, `friend`, `acquaintance`, `colleague`, `club`, `service`, `other`. Der Server speichert `club` als `community` (der Wert der MCP-Tools) und bildet in beide Richtungen ab.
+
+## Gedächtnis
+
+| Methode und Pfad | Beschreibung |
+|---|---|
+| `GET /memories?q=&scope=&active=all` | `{ memories: Memory[] }`. `active=all` schließt pausierte Einträge ein |
+| `POST /memories` | Body `MemoryCreate`: `content`, `scope` und je nach Bedarf `chatJid`, `contactJid`, `topicId`, `pinned` |
+| `PATCH /memories/:id` | Body `MemoryPatch` |
+| `DELETE /memories/:id` | 204 |
+
+`scope` ist `global`, `chat`, `topic`, `thread` oder `contact`. Der Bereich `thread` lässt sich aus der App nicht anlegen oder setzen (der Vertrag hat keine Thread-ID); solche Einträge werden nur aufgelistet.
+
+## Fragen und Live-Ereignisse
+
+Beides sind Server-Sent Events.
+
+`POST /ask` nimmt `{ question, conversationId? }` und streamt `AskEvent`:
+
+```ts
+type AskEvent =
+  | { type: 'state'; state: JarvisState }
+  | { type: 'delta'; text: string }
+  | { type: 'source'; label: string; chatJid?: string; at?: string }
+  | { type: 'done'; conversationId: string }
+  | { type: 'error'; message: string }
+```
+
+`GET /events` streamt `LiveEvent`:
+
+```ts
+type LiveEvent =
+  | { type: 'message'; source: string; at: string; todayCount: number }
+  | { type: 'cards'; counts: HomeResponse['counts'] }
+  | { type: 'health'; ok: boolean; whatsapp: string }
+```
+
+## OAuth und MCP
+
+Diese liegen an der Wurzel, nicht unter `/api/v1`:
+
+| Endpunkt | Beschreibung |
+|---|---|
+| `GET /.well-known/oauth-authorization-server` | Metadaten. Aussteller ist `APP_PUBLIC_URL` |
+| `GET /.well-known/oauth-protected-resource[/mcp]` | Ressourcen-Metadaten; die Ressource ist `<APP_PUBLIC_URL>/mcp` |
+| `POST /register` | Dynamische Client-Registrierung (öffentliche Clients mit PKCE oder mit Secret) |
+| `GET /authorize` | Zustimmungsseite (Besitzer-Passwort) |
+| `POST /oauth/decision` | Formular-Post der Zustimmungsseite, begrenzt wie die Anmeldung |
+| `POST /token` | `authorization_code` (PKCE S256) und rotierendes `refresh_token` |
+| `POST /revoke` | Zugriffs- oder Refresh-Token widerrufen |
+| `POST /mcp` | MCP über Streamable HTTP mit Bearer-Token |
+
+## Interne API
+
+Auf Port 3001 im Docker-Netz, mit dem Header `x-jarvis-internal-secret: <ADMIN_INTERNAL_SECRET>`. Anfragen mit Cloudflare-Headern werden abgelehnt, sie ist also nie über den Tunnel erreichbar.
+
+- `POST /internal/pairing-codes` mit `{ homeUrl? }` liefert `{ code, expiresAt, payload, qr }`. 10 Minuten gültig, einmal verwendbar.
+- `PUT /internal/owner-password` mit `{ password }` (10 bis 200 Zeichen) liefert 204.
+
+## Wo der Server vom Vertrag abweicht
+
+- `PollData.voted` enthält die bisherige Stimmenzahl als String. Umfragekarten gibt es nur, solange du nicht abgestimmt hast.
+- Das Verschieben einer Erinnerungskarte verschiebt die Erinnerung (`removed: false`, sie bleibt `scheduled`).
+- Nicht im Vertrag: `?refresh=1` bei suggest, `?active=all` bei memories und die internen Endpunkte.

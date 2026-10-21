@@ -1,0 +1,68 @@
+---
+title: What is Jarvis
+description: A private context manager that runs on your own hardware and works with Claude.
+---
+
+<Callout type="warn" title="Unofficial and independent">
+Jarvis is not affiliated with WhatsApp or Meta and connects through an unofficial method that may violate WhatsApp's Terms of Service. Use at your own risk. Read the full [disclaimer](./disclaimer.mdx).
+</Callout>
+
+
+Jarvis collects what is context for you, orders it by topics, people and deadlines, remembers what you correct, and lets Claude work with it as an agent: search, remind, prepare, answer, act.
+
+**Today, WhatsApp is the first source.** Messages, voice messages, images, polls, reactions and groups flow in. Mail, calendar, documents and notes are planned. Jarvis is built so that new sources slot in without rebuilding the rest.
+
+## What you get
+
+- **An app** (iOS, Android, web) that shows what needs you today: a question someone asked, a date coming up, a poll, a task that fell out of a group chat. Every item arrives with prepared next steps, so deciding takes one or two taps. See [The app](./app.mdx) and [Card types](./card-types.mdx).
+- **A Claude connector.** Add one URL in Claude and it can search your archive, recall your corrections and, if you allow it, send messages in your name. See [Connect Claude](./connect-claude.mdx).
+- **An admin interface** on your home network for setup, settings, logs and maintenance.
+
+## Privacy model
+
+Everything is stored on your hardware, in a Postgres database on your own Raspberry Pi. There is no Jarvis cloud.
+
+Only the AI steps leave the device, and only to the provider you configure:
+
+| Step | What goes out | Can it stay local? |
+|---|---|---|
+| Voice transcription | The audio file of a voice message (it is not stored afterwards) | Yes, with local whisper.cpp (slow on a Pi) |
+| Embeddings (meaning search) | Message text | Yes, with the local multilingual-e5-small model |
+| Image descriptions | The image | Switch off with `IMAGE_DESCRIBE=false` |
+| Topic sorting (organizer) | Message text, sender name and time, with phone numbers, IBANs, email addresses and link paths redacted first | Optional, off by default |
+| Reply suggestions and Ask Jarvis in the app | The relevant snippets for the question | Needs an AI provider |
+
+Chats you exclude by name (`ORGANIZER_EXCLUDE_NAMES`) never reach the embedding or sorting API. Images, audio and files are never uploaded for sorting; voice messages go only as a transcript. Without any AI key, Jarvis still archives and searches, locally and more slowly, and the organizer stays off.
+
+Claude itself talks to your server through the connector. What Claude sees is decided by your tool permissions in Claude, and by the safeguards in [Security](./security.mdx).
+
+## How it fits together
+
+```
+WhatsApp ──QR──> wa-ingest ──> postgres (pgvector) <── mcp-server <── cloudflared <── Claude and the app
+```
+
+The architecture separates three things:
+
+- **Capture.** Source adapters such as `wa-ingest` write normalised data into Postgres.
+- **Evaluation.** `embedder` and `organizer` work independently of the source: vectors, threads, topics, people profiles.
+- **Access.** `mcp-server`, the watch service and the admin interface work on the shared data model, not on one source.
+
+| Container | Job |
+|---|---|
+| `postgres` | Postgres 16 with pgvector. Contacts, chats, messages, polls, cards. Not reachable from outside the Docker network. |
+| `wa-ingest` | The WhatsApp client (Baileys). Linking by QR code, history import, live messages, voice transcription, and the `outbox` that executes sends, votes and reactions. |
+| `embedder` | Computes the vectors for meaning search in the background. |
+| `organizer` | Optional. Sorts messages into topics with summaries, dates and tasks, and writes the app's cards. |
+| `whisper` | Optional local transcription (whisper.cpp). |
+| `mcp-server` | The MCP endpoint for Claude, OAuth, and the app API under `/api/v1`. |
+| `cloudflared` | Optional Cloudflare tunnel that makes `mcp-server` reachable from outside. |
+| `admin` | Web interface for setup, settings, status, logs and maintenance. Home network only. |
+
+## Know before you start
+
+- WhatsApp access uses Baileys, an unofficial library. WhatsApp's terms do not explicitly allow it. The risk of a ban is low for read-only use and higher when Jarvis sends messages. Consider not using your main number until you have tested it.
+- Jarvis is an unofficial project and is not affiliated with WhatsApp or Meta.
+- Only texts and metadata are stored, no media files. Images appear as `[image]` with a searchable description.
+
+Ready? Continue with the [Quickstart](./quickstart.mdx).

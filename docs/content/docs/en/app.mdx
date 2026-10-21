@@ -1,0 +1,72 @@
+---
+title: The app
+description: Today, cards, people, memory, ask, and the system area.
+---
+
+One Expo codebase runs on iOS, Android and the web. It is only a window to your own Jarvis: the app stores the server address and a device key, nothing else.
+
+## Connect
+
+On first launch you see the connect screen. Two ways in:
+
+| Way | How |
+|---|---|
+| **Scan a code** | In the admin interface open **Devices**, show the pairing code, and scan it with the app's camera. The code is valid for 10 minutes and works once. The camera is requested only for this. |
+| **Address and password** | Enter the public address of your Jarvis (the one you set as `APP_PUBLIC_URL`, for example `https://jarvis.example.com`) and the owner password. The app checks the address first and shows the server name and version. |
+
+If the server has no password set, only the pairing code works. A Jarvis newer than the app asks you to update the app.
+
+**Try without a server** shows sample data. Nothing leaves your device.
+
+Each connected device appears under **System → Devices**, where you can revoke it. Failed passwords and pairing codes are rate limited per IP: after 10 in 15 minutes the server answers 429.
+
+## Today
+
+The home screen shows Jarvis, a line in his voice about what matters most, and a feed of cards.
+
+- Four tabs filter the feed by group: **Reply**, **Dates**, **To do** and **Good to know**, plus **All** with counts.
+- Tap a card to select it. Jarvis comments on it in one sentence, and the card shows its **prepared next steps**.
+- Every card shows where it comes from (chat, person, time) so you can trust it.
+- Each card can also be hidden as unimportant or snoozed.
+- The feed updates live when messages arrive.
+
+All 22 types and what they offer are described in [Card types](./card-types.mdx).
+
+## People
+
+Jarvis builds a profile of the people you write with: relationship, how close you are, form of address (informal, formal, mixed) and tone. People are sorted by closeness. Open a person to see open items, recent messages and what Jarvis remembers about them.
+
+You can **correct** a profile. Set a real name, aliases, relationship, closeness, tone or a note. Optionally lock it: Jarvis then stops changing that profile on its own.
+
+## Memory
+
+What Jarvis keeps in mind. Notes can apply everywhere, or to a person, a chat or a topic. Pinned notes and general notes are given to Claude at every connection; the rest is found by meaning when relevant. In the app you can add, edit, pin, pause and delete entries. The same memory is used by Claude through the connector, and the organizer reads it when sorting.
+
+## Ask Jarvis
+
+Type a question about dates, people or what was said in a chat: "What's on Saturday?" or "Who do I still owe money?". The answer streams in, with the sources it came from.
+
+## System
+
+The **System** tab appears only when the admin interface is reachable. The app checks `/healthz` at the home address from the pairing code, or the page's own origin on the web. Away from home it shows that administration is only reachable on your home network.
+
+After signing in with the admin password you get:
+
+- status of all services, WhatsApp, database, storage and AI use
+- settings by group, with a preview of what changes
+- WhatsApp linking: QR or pairing code, relink
+- devices and Claude access, with revoke
+- logs, maintenance (restart, backups) and the setup wizard
+
+The system area is intentionally not reachable through the Cloudflare tunnel. See [Security](./security.mdx).
+
+## Run the app yourself
+
+```bash
+cd app
+npm install
+npm run web:mock          # web with sample data, no server needed
+npx expo start            # then press i / a for the iOS simulator or Android emulator
+```
+
+The wide web layout starts at 1024 px. The UI language follows the device (German and English).

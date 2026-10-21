@@ -18,8 +18,13 @@ import {
 } from './ops.js'
 import { FIELDS, GROUPS } from './schema.js'
 import { linkView } from './wa.js'
+import { appProxy, fakePairing, InternalApi } from './appbridge.js'
 
-const PUBLIC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../public')
+// The Expo web build (app/, exported in the Docker image). ADMIN_WEB_DIR overrides it for development.
+const WEB = process.env.ADMIN_WEB_DIR ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web')
+const APP_API_URL = process.env.APP_API_URL ?? 'http://mcp-server:3000'
+const APP_INTERNAL_URL = process.env.APP_INTERNAL_URL ?? 'http://mcp-server:3001'
+const NO_WEB = '<!doctype html><meta charset="utf-8"><title>Jarvis</title><p style="font-family:system-ui;padding:2rem">The web app is not built. Run <code>npm run export:web</code> in <code>app/</code> and set <code>ADMIN_WEB_DIR</code>, or use the Docker image.</p>'
 const SECRET_KEYS = new Set(FIELDS.filter((f) => f.type === 'secret').map((f) => f.key))
 
 const hint = (v: string) => (v.length > 12 ? `…${v.slice(-4)}` : '••••')
@@ -50,7 +55,7 @@ export function createApp(ctx: Ctx, auth: Auth) {
   const redact = makeRedactor(() => secretValues(ctx))
 
   app.use((_req, res, next) => {
-    res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+    res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
     res.setHeader('X-Content-Type-Options', 'nosniff')
     res.setHeader('Referrer-Policy', 'no-referrer')
     res.setHeader('X-Frame-Options', 'DENY')
@@ -59,7 +64,9 @@ export function createApp(ctx: Ctx, auth: Auth) {
   })
 
   app.get('/healthz', (_req, res) => void res.send('ok'))
-  app.use(express.static(PUBLIC, { index: 'index.html', maxAge: 0 }))
+  // App API and OAuth live in mcp-server; the web app reaches them on this origin
+  app.use(appProxy(APP_API_URL))
+  app.use(express.static(WEB, { index: 'index.html', maxAge: 0 }))
   app.use('/api', express.json({ limit: '256kb' }), csrfGuard)
 
   const ip = (req: Request) => req.ip ?? req.socket.remoteAddress ?? 'unknown'
@@ -375,9 +382,31 @@ export function createApp(ctx: Ctx, auth: Auth) {
   app.post('/api/maintenance/rebuild', requireAuth, wrap((_req, res) => void res.json({ job: jobView(startRebuild(ctx)) })))
   app.post('/api/maintenance/estimate', requireAuth, wrap((_req, res) => void res.json({ job: jobView(startEstimate(ctx)) })))
 
+  // --- App: pairing and owner password (via mcp-server's internal API) -------------------------
+  const internalApi = new InternalApi(APP_INTERNAL_URL, () => readCurrent(ctx).env.ADMIN_INTERNAL_SECRET || undefined)
+  const homeUrl = (req: Request) => `${req.secure ? 'https' : 'http'}://${req.headers.host}`
+
+  /** New pairing code with QR for a phone or another browser (10 minutes, single use). */
+  app.post('/api/pairing', requireAuth, wrap(async (req, res) => {
+    res.json(ctx.fake ? await fakePairing(homeUrl(req)) : await internalApi.createPairing(homeUrl(req)))
+  }))
+
+  /** Owner password for the app login and the OAuth consent page (separate from the admin password). */
+  app.post('/api/owner-password', requireAuth, wrap(async (req, res) => {
+    if (!confirmPassword(req, res)) return
+    const pw = String(req.body?.newPassword ?? '')
+    if (pw.length < 10) throw new ApplyError('Das Passwort braucht mindestens 10 Zeichen.')
+    if (!ctx.fake) await internalApi.setOwnerPassword(pw)
+    res.json({ ok: true })
+  }))
+
   app.use('/api', (_req, res) => void res.status(404).json({ error: 'Unbekannter Endpunkt.' }))
-  // Single-Page-App: alle anderen Pfade liefern die Oberfläche
-  app.get('*', (_req, res) => res.sendFile(path.join(PUBLIC, 'index.html')))
+  // Single-page app: every other path serves the web app
+  app.get('*', (_req, res) => {
+    const index = path.join(WEB, 'index.html')
+    if (fs.existsSync(index)) res.sendFile(index)
+    else res.status(503).type('html').send(NO_WEB)
+  })
   return app
 }
 

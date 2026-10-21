@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import type { PersonDetail, PersonPatch, Relationship } from '@jarvis/contract'
 import { Page, Section } from '@/components/Page'
+import { useWide } from '@/components/useWide'
 import { Avatar, BlockButton, Choice, Closeness, Field, Meta, Micro, Notice, Panel, Toggle } from '@/components/ui'
 import { ago, errorText } from '@/i18n/format'
 import { useSession } from '@/state/session'
@@ -30,6 +31,7 @@ export default function PersonScreen() {
   const { api } = useSession()
   const toast = useToast()
   const router = useRouter()
+  const wide = useWide()
   const [p, setP] = useState<PersonDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
@@ -46,6 +48,8 @@ export default function PersonScreen() {
   }, [api, jid])
 
   useEffect(() => {
+    setP(null)
+    setEditing(false)
     void load()
   }, [load])
 
@@ -72,22 +76,45 @@ export default function PersonScreen() {
   }
 
   if (!p) {
-    return (
+    const state = error ? (
+      <View style={{ gap: 12 }}>
+        <Text style={type.body}>{error}</Text>
+        <BlockButton label={t('common.retry')} variant="line" onPress={() => void load()} />
+      </View>
+    ) : (
+      <Text style={type.sub}>{t('common.loading')}</Text>
+    )
+    // Wide: the master-detail shell in people/_layout already frames this.
+    return wide ? state : (
       <Page title={t('people.title')} back>
-        {error ? (
-          <View style={{ gap: 12 }}>
-            <Text style={type.body}>{error}</Text>
-            <BlockButton label={t('common.retry')} variant="line" onPress={() => void load()} />
-          </View>
-        ) : (
-          <Text style={type.sub}>{t('common.loading')}</Text>
-        )}
+        {state}
       </Page>
     )
   }
 
-  return (
-    <Page title={p.name} sub={p.realName && p.realName !== p.name ? p.realName : p.relationship ? t(`people.relationship.${p.relationship}`) : undefined} back right={<Avatar initials={p.initials} size={54} />}>
+  const subtitle = p.realName && p.realName !== p.name ? p.realName : p.relationship ? t(`people.relationship.${p.relationship}`) : undefined
+  const frame = (children: React.ReactNode) =>
+    wide ? (
+      <>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={type.h1} accessibilityRole="header">
+              {p.name}
+            </Text>
+            {subtitle ? <Text style={[type.sub, { marginTop: 6 }]}>{subtitle}</Text> : null}
+          </View>
+          <Avatar initials={p.initials} size={54} />
+        </View>
+        {children}
+      </>
+    ) : (
+      <Page title={p.name} sub={subtitle} back right={<Avatar initials={p.initials} size={54} />}>
+        {children}
+      </Page>
+    )
+
+  return frame(
+    <>
       {p.stats.length ? (
         <Panel>
           <Meta stats={p.stats} />
@@ -152,6 +179,6 @@ export default function PersonScreen() {
           </Panel>
         </Section>
       ) : null}
-    </Page>
+    </>,
   )
 }

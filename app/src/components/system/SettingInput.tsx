@@ -1,11 +1,35 @@
 import { Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import type { SettingsField } from '@/api/admin'
 import { type } from '@/theme/type'
-import { Choice, Field, Toggle } from '../ui'
+import { colors } from '@/theme/tokens'
+import { Choice, Field, Press, Toggle } from '../ui'
 
 /** One field, rendered by its schema type. Secrets are never shown, only replaced. */
-export function SettingInput({ f, value, secret, onChange, error }: { f: SettingsField; value: string; secret?: { set: boolean; hint?: string }; onChange: (v: string) => void; error?: string }) {
+/** Where message content leaves the Pi: the key and provider fields carry a one-line note and the legal link. */
+const sendsContent = (f: SettingsField) => f.group === 'ai' && (f.type === 'secret' || /PROVIDER/i.test(f.key))
+
+export function SettingInput(props: Props) {
+  const { t } = useTranslation()
+  const router = useRouter()
+  const input = <SettingField {...props} />
+  if (!sendsContent(props.f)) return input
+  return (
+    <View style={{ gap: 6 }}>
+      {input}
+      <Press onPress={() => router.push('/legal')} accessibilityRole="link" style={() => ({ alignSelf: 'flex-start' })}>
+        <Text style={type.small}>
+          {t('settings.aiNote')} <Text style={{ color: colors.ink, textDecorationLine: 'underline' }}>{t('connect.legalLink')}</Text>
+        </Text>
+      </Press>
+    </View>
+  )
+}
+
+interface Props { f: SettingsField; value: string; secret?: { set: boolean; hint?: string }; onChange: (v: string) => void; error?: string }
+
+function SettingField({ f, value, secret, onChange, error }: Props) {
   const { t } = useTranslation()
   if (f.type === 'bool') return <Toggle label={f.label} help={f.help} value={(value || f.default) === 'true'} onChange={(v) => onChange(v ? 'true' : 'false')} />
   if (f.type === 'enum' && f.options) {

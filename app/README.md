@@ -31,7 +31,7 @@ npx expo-doctor
 
 ## Jarvis figure
 
-Rendered figures go to `assets/jarvis/{state}.png` (`idle`, `listening`, `thinking`, `speaking`, `notify`, `happy`, `sleep`, `error`) and are registered in `src/components/jarvis/images.ts`. Until then the pebble placeholder from the prototype is drawn.
+A stop-motion sprite set in `assets/jarvis/` (768² transparent PNGs on one master, plus `shadow.png`). `src/components/jarvis/sprites.ts` holds the frame loop per state, the per-frame counter-offsets and the transition bridges; `JarvisFigure.tsx` plays them at 2 fps with hard cuts over a slow hover (off with Reduce Motion).
 
 ## System area
 

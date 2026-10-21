@@ -12,7 +12,7 @@ import { fetchInfo, login } from '@/api/client'
 import { JarvisError, normalizeUrl } from '@/api/http'
 import { parsePairing } from '@/api/pairing'
 import { JarvisFigure } from '@/components/jarvis/JarvisFigure'
-import { BlockButton, Field, Micro, Notice, Seg } from '@/components/ui'
+import { BlockButton, Field, Micro, Notice, Press, Seg } from '@/components/ui'
 import { errorText } from '@/i18n/format'
 import { useSession } from '@/state/session'
 import { colors, layout } from '@/theme/tokens'
@@ -27,6 +27,7 @@ export default function Connect() {
   const webOrigin = platform === 'web' && typeof window !== 'undefined' ? window.location.origin : undefined
   const { signIn } = useSession()
   const insets = useSafeAreaInsets()
+  const router = useRouter()
   const [mode, setMode] = useState<'scan' | 'manual'>(platform === 'web' ? 'manual' : 'scan')
   const [url, setUrl] = useState(webOrigin ?? '')
   const [password, setPassword] = useState('')
@@ -219,6 +220,10 @@ export default function Connect() {
           <View style={{ gap: 6 }}>
             <Micro>{t('connect.privateLabel')}</Micro>
             <Text style={type.small}>{t('connect.private')}</Text>
+            <Text style={type.small}>{t('connect.independent')}</Text>
+            <Press onPress={() => router.push('/legal')} accessibilityRole="link" hitSlop={8} style={({ hovered }) => [{ alignSelf: 'flex-start', paddingVertical: 4 }, hovered && { opacity: 0.7 }]}>
+              <Text style={[type.small, { color: colors.ink, textDecorationLine: 'underline' }]}>{t('connect.legalLink')}</Text>
+            </Press>
           </View>
         </View>
       </ScrollView>

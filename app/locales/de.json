@@ -53,8 +53,7 @@
       "sleep": "Nacht",
       "error": "Störung"
     },
-    "figure": "Jarvis: {{state}}",
-    "placeholder": "Platzhalter"
+    "figure": "Jarvis: {{state}}"
   },
   "today": {
     "title": "Heute",
@@ -351,7 +350,9 @@
     "demo": "Ohne Server ausprobieren",
     "demoHelp": "Zeigt die App mit Beispieldaten. Nichts verlässt dieses Gerät.",
     "private": "Deine Daten bleiben auf deinem Server. Die App speichert nur die Adresse und einen Geräteschlüssel.",
-    "privateLabel": "Privat"
+    "privateLabel": "Privat",
+    "independent": "Jarvis ist ein unabhängiges Projekt und nicht mit WhatsApp oder Meta verbunden.",
+    "legalLink": "Rechtliche Hinweise"
   },
   "system": {
     "title": "System",
@@ -400,7 +401,9 @@
       "rolled_back": "zurückgesetzt",
       "interrupted": "abgebrochen",
       "rolledBackHelp": "Etwas ging schief. Jarvis hat die vorherigen Einstellungen wiederhergestellt."
-    }
+    },
+    "legal": "Rechtliche Hinweise",
+    "legalSub": "WhatsApp, KI-Anbieter, Datenschutz"
   },
   "settings": {
     "title": "Einstellungen",
@@ -416,7 +419,8 @@
     "secretNew": "Neuen Wert eingeben",
     "default": "Standard: {{value}}",
     "reset": "Verwerfen",
-    "rollbackNote": "Wenn ein Dienst danach nicht startet, setzt Jarvis die Einstellungen automatisch zurück."
+    "rollbackNote": "Wenn ein Dienst danach nicht startet, setzt Jarvis die Einstellungen automatisch zurück.",
+    "aiNote": "Mit aktivierter KI gehen Nachrichteninhalte an diesen Anbieter."
   },
   "wa": {
     "title": "WhatsApp",
@@ -437,7 +441,10 @@
     "relinkLead": "Trennt die bestehende Verknüpfung. Alte Nachrichten bleiben im Archiv.",
     "phone": "Telefonnummer (optional, für Kopplungscode)",
     "confirm": "Zur Bestätigung „{{word}}“ eintippen",
-    "start": "Verknüpfung starten"
+    "start": "Verknüpfung starten",
+    "ack": "Ich habe verstanden, dass das keine offizielle WhatsApp-Verbindung ist und mein Konto gesperrt werden kann.",
+    "ackConfirm": "Verstanden, weiter",
+    "ackLead": "Bevor du WhatsApp koppelst:"
   },
   "devices": {
     "title": "Geräte und Zugänge",
@@ -450,7 +457,19 @@
     "revoke": "Entziehen",
     "revokeConfirm": "{{name}} verliert sofort den Zugriff. Fortfahren?",
     "revoked": "Zugriff entzogen.",
-    "empty": "Keine weiteren Geräte."
+    "empty": "Keine weiteren Geräte.",
+    "pair": "Neues Gerät koppeln",
+    "pairHelp": "Scanne den Code mit der Jarvis-App auf dem neuen Gerät. Er gilt 10 Minuten und nur einmal.",
+    "pairCreate": "Code erzeugen",
+    "pairCode": "Code zum Eintippen",
+    "pairExpires": "gilt bis {{time}}",
+    "pairOnlyHome": "Koppeln geht nur im Heimnetz, über die Verwaltung.",
+    "owner": "Passwort für die App",
+    "ownerHelp": "Damit meldest du dich in der App ohne QR-Code an und bestätigst Claude-Zugänge. Es ist getrennt vom Admin-Passwort.",
+    "ownerAdmin": "Admin-Passwort zur Bestätigung",
+    "ownerNew": "Neues App-Passwort",
+    "ownerSave": "Passwort setzen",
+    "ownerSaved": "App-Passwort gesetzt."
   },
   "logs": {
     "title": "Protokolle",
@@ -494,7 +513,140 @@
     "running": "Jarvis wird eingerichtet",
     "done": "Fertig. Als Nächstes verknüpfst du WhatsApp.",
     "toWa": "WhatsApp verknüpfen",
-    "already": "Jarvis ist schon eingerichtet. Änderungen machst du unter Einstellungen."
+    "already": "Jarvis ist schon eingerichtet. Änderungen machst du unter Einstellungen.",
+    "steps": {
+      "welcome": {
+        "title": "Willkommen bei Jarvis",
+        "lead": "In ein paar Schritten richtest du deinen Jarvis ein. Alles bleibt auf deinem Gerät zu Hause; nur der KI-Anbieter, den du gleich wählst, bekommt ausgewählte Texte zur Auswertung."
+      },
+      "account": {
+        "title": "Dein Zugang",
+        "lead": "Den Einrichtungscode findest du im Protokoll des Admin-Dienstes. Danach vergibst du ein Passwort für die Verwaltung."
+      },
+      "database": {
+        "title": "Vorhandene Daten",
+        "lead": "Auf diesem Gerät liegt schon ein Jarvis-Archiv. Trag die beiden Passwörter von damals ein, sonst kommt Jarvis nicht an deine Nachrichten. Du findest sie in deiner alten .env oder deinem Passwort-Manager."
+      },
+      "name": {
+        "title": "Wie heißt du?",
+        "lead": "So spricht Jarvis von dir in Zusammenfassungen und Profilen."
+      },
+      "provider": {
+        "title": "KI-Anbieter",
+        "lead": "Jarvis braucht ein Sprachmodell, um Chats zu sortieren, Antworten vorzuschlagen und deine Fragen zu beantworten. Du kannst jeden Anbieter mit OpenAI-kompatibler Schnittstelle nehmen, auch ein Modell bei dir zu Hause."
+      },
+      "models": {
+        "title": "Modelle",
+        "lead": "Für jede Aufgabe ein Modell. Kleine Modelle reichen fürs Sortieren; für Antworten und Fragen lohnt sich ein stärkeres."
+      },
+      "privacy": {
+        "title": "Datenschutz",
+        "lead": "Lege fest, was nie an die KI gehen darf. Das gilt ab der ersten Nachricht."
+      },
+      "features": {
+        "title": "Was Jarvis darf",
+        "lead": "Alles lässt sich später unter Einstellungen ändern."
+      },
+      "remote": {
+        "title": "Von unterwegs",
+        "lead": "Optional. Mit einem Cloudflare-Tunnel erreichst du Jarvis und die App auch außerhalb deines WLANs, ohne Ports zu öffnen. Die öffentliche Adresse trägst du später in der App ein."
+      },
+      "review": {
+        "title": "Alles prüfen",
+        "lead": "Das wird gespeichert. Danach startet Jarvis seine Dienste."
+      },
+      "consent": {
+        "title": "Bevor es losgeht",
+        "lead": "Zwei Dinge solltest du wissen und bestätigen."
+      }
+    },
+    "providers": {
+      "openai": {
+        "name": "OpenAI",
+        "desc": "GPT-Modelle. Kann auch Sprachnachrichten und Bedeutungssuche."
+      },
+      "anthropic": {
+        "name": "Anthropic",
+        "desc": "Claude-Modelle. Sprache und Suche laufen dann lokal."
+      },
+      "openrouter": {
+        "name": "OpenRouter",
+        "desc": "Ein Schlüssel für viele Anbieter: Gemini, Mistral, Llama und mehr."
+      },
+      "ollama": {
+        "name": "Ollama, bei dir zu Hause",
+        "desc": "Modelle auf einem eigenen Rechner. Nichts verlässt dein Netz, kostet nichts, ist aber langsamer."
+      },
+      "custom": {
+        "name": "Anderer Anbieter",
+        "desc": "Jede OpenAI-kompatible Adresse, zum Beispiel Mistral, Groq oder LM Studio."
+      },
+      "none": {
+        "name": "Ohne KI",
+        "desc": "Archiv und Suche funktionieren, aber keine Themen, Karten oder Antwortvorschläge."
+      }
+    },
+    "roles": {
+      "app": {
+        "title": "Antworten und Fragen",
+        "desc": "Antwortvorschläge, Frag Jarvis, Sätze unter der Figur."
+      },
+      "organizer": {
+        "title": "Sortieren",
+        "desc": "Liest jede Nachricht einmal und macht Themen, Termine und Karten daraus. Läuft am häufigsten."
+      },
+      "images": {
+        "title": "Bilder",
+        "desc": "Beschreibt geteilte Fotos, damit du sie suchen kannst. Braucht ein Modell, das Bilder versteht."
+      }
+    },
+    "features": {
+      "ORGANIZER_ENABLED": {
+        "title": "Themen und Karten",
+        "desc": "Jarvis sortiert deine Chats und bereitet Entscheidungen vor."
+      },
+      "IMAGE_DESCRIBE": {
+        "title": "Bilder beschreiben",
+        "desc": "Fotos werden durchsuchbar."
+      },
+      "ENABLE_ACTIONS": {
+        "title": "In deinem Namen senden",
+        "desc": "Antworten, Reaktionen und Abstimmungen, nur wenn du sie antippst."
+      },
+      "REQUIRE_CONFIRM": {
+        "title": "Immer erst nachfragen",
+        "desc": "Auch Claude zeigt jede Nachricht vor dem Senden."
+      },
+      "ENABLE_MEMORY": {
+        "title": "Gedächtnis",
+        "desc": "Jarvis merkt sich, was du korrigierst und ihm sagst."
+      }
+    },
+    "cost": {
+      "perMonth": "Pro Monat etwa",
+      "unknown": "Preis unbekannt",
+      "total": "Geschätzt pro Monat",
+      "basis": "Richtwert bei rund 300 Nachrichten am Tag",
+      "partial": "Ohne Modelle mit unbekanntem Preis"
+    },
+    "baseUrl": "API-Adresse",
+    "baseUrlHelp": "Endet meist auf /v1.",
+    "baseUrlOllama": "Adresse des Rechners mit Ollama im Heimnetz, Port 11434, endet auf /v1.",
+    "apiKey": "API-Schlüssel",
+    "keyWhere": "Bekommst du unter {{url}}",
+    "localServices": "Dieser Anbieter kann keine Sprachnachrichten und keine Bedeutungssuche. Jarvis erledigt beides lokal auf dem Gerät, etwas langsamer.",
+    "noAi": "Jarvis archiviert und durchsucht deine Chats trotzdem. KI kannst du später unter Einstellungen dazuschalten.",
+    "suggested": "Vorschläge",
+    "otherModel": "Anderes",
+    "modelId": "Modell-Name",
+    "modelsNote": "Preise sind Listenpreise der Anbieter und können sich ändern. Die genaue Rechnung hängt davon ab, wie viel geschrieben wird; unter Wartung kannst du später die Kosten für dein Archiv schätzen lassen.",
+    "consent": {
+      "whatsapp": "Jarvis ist ein unabhängiges Projekt und nicht mit WhatsApp oder Meta verbunden. Die WhatsApp-Verbindung ist inoffiziell (Baileys als verknüpftes Gerät), kann gegen die WhatsApp-Nutzungsbedingungen verstoßen und zur Sperrung meines Kontos führen.",
+      "ai": "Wenn ich KI-Funktionen einschalte, gehen Nachrichteninhalte, auch die meiner Kontakte, an den von mir gewählten KI-Anbieter (z. B. OpenAI).",
+      "responsibility": "Dein Archiv enthält Nachrichten anderer Menschen; du bist für einen rechtmäßigen Umgang damit verantwortlich (z. B. DSGVO).",
+      "legal": "Rechtliche Hinweise lesen",
+      "providerNote": "Nachrichteninhalte, auch die deiner Kontakte, gehen zur Auswertung an {{provider}}."
+    }
   },
   "mock": {
     "answer": "Samstag 15 Uhr Handball, ab 18 Uhr Grillen bei Lukas. Das WG-Kino um 21 Uhr überschneidet sich damit, Freitag 20 Uhr wäre frei. Sonntag 14 Uhr hilfst du Lena beim Umzug.",
@@ -515,5 +667,31 @@
     "save_contact": "Übernehmen",
     "open": "Öffnen",
     "reply": "Antworten"
+  },
+  "legal": {
+    "title": "Rechtliche Hinweise",
+    "sub": "Kurz und ehrlich, was du wissen solltest.",
+    "sections": [
+      {
+        "title": "Unabhängiges Projekt",
+        "body": "Jarvis ist ein unabhängiges Open-Source-Projekt und nicht mit WhatsApp oder Meta verbunden, von ihnen unterstützt oder genehmigt. WhatsApp ist eine Marke von WhatsApp LLC."
+      },
+      {
+        "title": "Inoffizielle WhatsApp-Verbindung",
+        "body": "Jarvis verbindet sich über die Bibliothek Baileys als gekoppeltes Gerät mit deinem WhatsApp-Konto. Das ist keine offizielle Schnittstelle und kann gegen die Nutzungsbedingungen von WhatsApp verstoßen. WhatsApp kann dein Konto einschränken oder sperren, und die Verbindung kann jederzeit ausfallen. Die Nutzung geschieht auf eigenes Risiko; erwäge eine Zweitnummer."
+      },
+      {
+        "title": "KI-Anbieter",
+        "body": "Wenn du KI-Funktionen aktivierst, werden Nachrichteninhalte an den eingestellten KI-Anbieter (zum Beispiel OpenAI) gesendet, darunter Nachrichten deiner Kontakte, Sprachtranskripte und Bildbeschreibungen. Dort gelten dessen Bedingungen und Datenschutzerklärung. Ausgeschlossene Chats und die Schwärzung begrenzen das. Ohne Schlüssel bleibt die Verarbeitung lokal."
+      },
+      {
+        "title": "Nachrichten anderer Menschen",
+        "body": "Das Archiv enthält Nachrichten anderer Menschen. Du bist dafür verantwortlich, sie rechtmäßig zu behandeln, zum Beispiel nach der DSGVO."
+      },
+      {
+        "title": "Keine Gewähr",
+        "body": "Jarvis wird bereitgestellt, wie es ist, ohne jede Gewährleistung."
+      }
+    ]
   }
 }

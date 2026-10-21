@@ -384,6 +384,16 @@ export const FIELDS: Field[] = [
     key: 'BAILEYS_LOG_LEVEL', group: 'expert', type: 'enum', default: 'warn', label: 'Log-Stufe WhatsApp-Bibliothek',
     help: 'Sehr gesprächig ab info.', options: LOG_LEVELS, advanced: true, services: ['wa-ingest'],
   },
+  {
+    key: 'JARVIS_VERSION', group: 'expert', type: 'text', default: 'latest', label: 'Image-Version',
+    help: 'Welche vorgebauten Images gezogen werden: latest, eine Version wie 1.2.0 oder ein Commit (sha-abc1234). Wirkt bei der nächsten Aktualisierung.',
+    pattern: '^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$', patternHelp: 'Tag, z.B. latest oder 1.2.0', advanced: true, adminOnly: true, services: [],
+  },
+  {
+    key: 'JARVIS_REGISTRY', group: 'expert', type: 'text', default: 'ghcr.io/joel-wlf/jarvis', label: 'Image-Registry',
+    help: 'Präfix der Images (<Präfix>-<dienst>). Nur für eigene Forks oder einen Spiegel ändern. Einzige Stelle für den Standardwert; docker-compose.yml muss übereinstimmen.',
+    pattern: '^[a-z0-9][a-z0-9._:/-]{0,200}$', patternHelp: 'Kleingeschrieben, z.B. ghcr.io/besitzer/jarvis', advanced: true, adminOnly: true, services: [],
+  },
 
   // Von der Oberfläche berechnet
   {

@@ -6,7 +6,7 @@ umask 077
 usage() {
   cat <<'HELP'
 Jarvis für Linux installieren
-  bash install.sh [--version REF] [--dir PATH] [--port PORT]
+  bash install.sh [--version REF] [--dir PATH] [--port PORT] [--accept-risks]
 
 Das Skript lädt eine feste GitHub-Commit-Version und startet denselben
 Browser-Assistenten wie: docker compose up -d --build admin app-web
@@ -17,9 +17,11 @@ HELP
 ref=main
 install_dir="${JARVIS_INSTALL_DIR:-$HOME/jarvis}"
 port="${APP_WEB_PORT:-8081}"
+accept=0
 while (($#)); do
   case "$1" in
     --help|-h) usage; exit 0 ;;
+    --accept-risks) accept=1; shift ;;
     --version|--dir|--port)
       (($# >= 2)) || { usage >&2; exit 2; }
       case "$1" in --version) ref=$2 ;; --dir) install_dir=$2 ;; --port) port=$2 ;; esac
@@ -40,6 +42,15 @@ ask() {
   read -r answer </dev/tty
   [[ $answer == j || $answer == J || $answer == ja ]]
 }
+disclaimer_url="${JARVIS_DISCLAIMER_URL:-https://joel-wlf.github.io/jarvis/docs/disclaimer}"
+printf '\nWichtige Hinweise, bitte vor der Installation lesen:\n\n'
+printf '%s\n\n' 'Jarvis ist ein unabhängiges Projekt und steht in keiner Verbindung zu WhatsApp oder Meta und wird von ihnen nicht unterstützt.'
+printf '%s\n\n' 'Jarvis verbindet sich über ein inoffizielles Verfahren (Baileys, als verknüpftes Gerät) mit WhatsApp. Das kann gegen die Nutzungsbedingungen von WhatsApp verstoßen; WhatsApp kann dein Konto einschränken oder sperren, und die Verbindung kann jederzeit nicht mehr funktionieren. Nutzung auf eigenes Risiko; erwäge eine Zweitnummer.'
+printf '%s\n\n' 'Wenn du KI-Funktionen aktivierst, werden Nachrichteninhalte (auch Nachrichten deiner Kontakte, Sprachtranskripte und Bildbeschreibungen) an den von dir eingestellten KI-Anbieter gesendet, z.B. OpenAI. Dessen Bedingungen und Datenschutzerklärung gelten.'
+printf 'Mehr dazu: %s\n\n' "$disclaimer_url"
+if ((accept == 0)); then
+  ask 'Hast du das gelesen und möchtest du fortfahren?' || { printf 'Abgebrochen. Es wurde nichts installiert.\n' >&2; exit 1; }
+fi
 privilege=()
 if ((EUID != 0)); then privilege=(sudo); fi
 if ! command -v docker >/dev/null; then

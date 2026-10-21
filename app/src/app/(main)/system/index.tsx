@@ -1,6 +1,7 @@
 // System overview: services, WhatsApp, database and storage at a glance, then the admin areas.
 import { useCallback, useEffect, useState } from 'react'
 import { Text, View } from 'react-native'
+import { useWide } from '@/components/useWide'
 import Constants from 'expo-constants'
 import { useRouter, type Href } from 'expo-router'
 import { useTranslation } from 'react-i18next'
@@ -18,7 +19,7 @@ import { type } from '@/theme/type'
 export default function System() {
   const { t } = useTranslation()
   return (
-    <Page title={t('system.title')} sub={t('system.sub')}>
+    <Page title={t('system.title')} sub={t('system.sub')} wideMax={1180}>
       <AdminGate>
         <Overview />
       </AdminGate>
@@ -44,6 +45,7 @@ function Overview() {
   const router = useRouter()
   const { admin } = useAdmin()
   const { session, signOut } = useSession()
+  const wide = useWide()
   const [status, setStatus] = useState<StatusResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<ServerInfo | null>(null)
@@ -74,11 +76,11 @@ function Overview() {
     { href: '/system/devices', title: t('system.devices'), sub: t('system.devicesSub') },
     { href: '/system/logs', title: t('system.logs'), sub: t('system.logsSub') },
     { href: '/system/maintenance', title: t('system.maintenance'), sub: t('system.maintenanceSub') },
+    { href: '/legal', title: t('system.legal'), sub: t('system.legalSub') },
     { href: '/setup', title: t('system.setup'), sub: t('system.setupSub') },
   ]
 
-  return (
-    <>
+  const statusSection = (
       <Section title={t('system.status')}>
         {error ? <Notice level="error" text={error} /> : null}
         {!status ? (
@@ -109,7 +111,9 @@ function Overview() {
           </>
         )}
       </Section>
+  )
 
+  const areasSection = (
       <Section title={t('system.areas')}>
         <Panel padded={false}>
           {areas.map((a, i) => (
@@ -117,7 +121,9 @@ function Overview() {
           ))}
         </Panel>
       </Section>
+  )
 
+  const versionsSection = (
       <Section title={t('system.versions')}>
         <Panel>
           <Meta
@@ -129,7 +135,9 @@ function Overview() {
           />
         </Panel>
       </Section>
+  )
 
+  const buttons = (
       <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
         <BlockButton
           label={t('system.logout')}
@@ -143,6 +151,27 @@ function Overview() {
         />
         <BlockButton label={t('common.signOut')} variant="line" onPress={() => void signOut()} />
       </View>
+  )
+
+  // Wide: what is happening (status, services) on the left, where to go (areas) on the right.
+  if (wide) {
+    return (
+      <View style={{ flexDirection: 'row', gap: 40, alignItems: 'flex-start' }}>
+        <View style={{ flex: 1, minWidth: 0 }}>{statusSection}</View>
+        <View style={{ flex: 1, minWidth: 0, gap: 22 }}>
+          {areasSection}
+          {versionsSection}
+          {buttons}
+        </View>
+      </View>
+    )
+  }
+  return (
+    <>
+      {statusSection}
+      {areasSection}
+      {versionsSection}
+      {buttons}
     </>
   )
 }
