@@ -1,12 +1,13 @@
 // App endpoints under /api/v1 (all behind requireAppAuth). Types: packages/contract/src/api.ts.
 import express, { type Request, type Response } from 'express'
 import type {
-  ActResponse, CardGroup, CardsResponse, HomeResponse, JarvisState, LiveEvent, Memory, MemoriesResponse, PeopleResponse, PersonDetail,
+  ActResponse, CardGroup, CardsResponse, PriorityResponse, HomeResponse, JarvisState, LiveEvent, Memory, MemoriesResponse, PeopleResponse, PersonDetail,
   PersonSummary, Relationship, Stat, SuggestResponse, Suggestion,
 } from '@jarvis/contract'
 import { likeEscape, memDb, pool } from '../db.js'
 import { OWNER } from '../config.js'
 import { updatePerson } from '../person.js'
+import { priorityKey, setPriority, type Priority } from '../watch.js'
 import { writingStyle } from '../style.js'
 import { act, countCards, findCard, listCards, type Built } from './cards.js'
 import { berlinParts, initials } from './fmt.js'
@@ -43,6 +44,16 @@ export function appRoutes() {
     const b = await findCard(String(req.params.key), l)
     const result = await act(b, req.body?.action, l)
     const out: ActResponse = { ok: true, ...result }
+    res.json(out)
+  })
+
+  r.put('/cards/:key/priority', async (req, res) => {
+    const l = lang(req)
+    const b = await findCard(String(req.params.key), l)
+    const v = req.body?.priority
+    if (v !== null && v !== 1 && v !== 2 && v !== 3) throw fail('invalid', 'priority must be 1 (later), 2 (normal), 3 (important) or null', { priority: '1 | 2 | 3 | null' })
+    await setPriority(priorityKey(b.card.key), v as Priority | null)
+    const out: PriorityResponse = { ok: true, priority: v }
     res.json(out)
   })
 

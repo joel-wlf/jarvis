@@ -8,6 +8,8 @@ export interface StateRow {
   snoozed_until: Date | null
   dismissed: boolean
   note: string | null
+  /** owner-set importance: 1 later, 2 normal, 3 important; null = Jarvis decides */
+  priority: number | null
 }
 
 export type ItemState = 'new' | 'notified' | 'snoozed' | 'dismissed' | 'scheduled'
@@ -37,7 +39,7 @@ export function resolveState(key: string, rows: StateRow[], opts: { renotifyMs?:
 
 export async function loadWatchState(): Promise<StateRow[]> {
   const r = await pool
-    .query<StateRow>(`SELECT key, last_notified_at, snoozed_until, dismissed, note FROM watch_state`)
+    .query<StateRow>(`SELECT key, last_notified_at, snoozed_until, dismissed, note, priority FROM watch_state`)
     .catch(() => ({ rows: [] as StateRow[] }))
   return r.rows.map((x) => ({ ...x, last_notified_at: toDate(x.last_notified_at), snoozed_until: toDate(x.snoozed_until) }))
 }
@@ -53,8 +55,33 @@ export async function setWatchFeedback(key: string, action: 'dismiss' | 'snooze'
   )
 }
 
+/** Undo dismiss, snooze and notified. A priority the owner set stays. */
 export async function resetWatchFeedback(key: string) {
-  await memDb.query(`DELETE FROM watch_state WHERE key = $1`, [key])
+  await memDb.query(`UPDATE watch_state SET snoozed_until = NULL, dismissed = false, note = NULL, last_notified_at = NULL, updated_at = now() WHERE key = $1`, [key])
+  await memDb.query(`DELETE FROM watch_state WHERE key = $1 AND priority IS NULL`, [key])
+}
+
+export type Priority = 1 | 2 | 3
+
+/** Importance the owner set for this key, or undefined. The most specific entry wins ("event:12:vortag" before "event:12"). */
+export function priorityOf(key: string, rows: StateRow[]): Priority | undefined {
+  const hit = rows.filter((r) => r.priority != null && covers(r.key, key)).sort((a, b) => b.key.length - a.key.length)[0]
+  return hit ? (hit.priority as Priority) : undefined
+}
+
+/** Events change their key with the stage ("event:12:vortag" -> "event:12:kurz"); the importance belongs to the event. */
+export const priorityKey = (key: string) => key.replace(/^(event:\d+):.+$/, '$1')
+
+/** Set the owner's importance for a key (null = back to Jarvis' guess). Does not touch dismiss, snooze or notified. */
+export async function setPriority(key: string, level: Priority | null) {
+  await memDb.query(
+    `INSERT INTO watch_state (key, priority) VALUES ($1,$2)
+     ON CONFLICT (key) DO UPDATE SET priority = excluded.priority, updated_at = now()`,
+    [key, level],
+  )
+  if (level === null) {
+    await memDb.query(`DELETE FROM watch_state WHERE key = $1 AND priority IS NULL AND NOT dismissed AND snoozed_until IS NULL AND last_notified_at IS NULL AND note IS NULL`, [key])
+  }
 }
 
 export async function markNotified(keys: string[], reminderIds: number[] = []) {

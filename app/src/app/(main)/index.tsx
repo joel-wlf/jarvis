@@ -87,7 +87,7 @@ export default function Today() {
         ) : s.visible.length === 0 ? (
           <Text style={[type.body, { paddingVertical: 12 }]}>{s.counts.all ? t('today.emptyGroup') : t('today.emptyAll')}</Text>
         ) : (
-          s.visible.map((c) => <CardView key={c.key} card={c} selected={s.selected === c.key} onSelect={s.select} act={s.act} />)
+          s.visible.map((c) => <CardView key={c.key} card={c} selected={s.selected === c.key} onSelect={s.select} act={s.act} priority={s.priorityOf(c)} onPriority={s.setPriority} />)
         )}
       </View>
     </View>

@@ -1,11 +1,13 @@
 // One decision card: head (mark, title, source), a lean type-specific middle, micro stats,
 // and a black action slab or a segmented row. The selected card shows the other suggestions.
-import { memo, type ReactNode } from 'react'
+import { memo, useState, type ReactNode } from 'react'
 import { Platform, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
+import i18n from '@/i18n'
 import type { TFunction } from 'i18next'
-import type { Card, CardAction, Suggestion } from '@jarvis/contract'
+import type { Card, CardAction, Suggestion, Urgency } from '@jarvis/contract'
 import { colors, groupColor, shadow } from '@/theme/tokens'
+import { clock, weekday } from '@/i18n/format'
 import { type } from '@/theme/type'
 import { Icon } from '../Icon'
 import { Mark, Meta, Micro, Press, Route, Seg, Slab, type SegItem } from '../ui'
@@ -23,7 +25,13 @@ interface Spec {
   seg?: SegItem[]
   /** no footer at all (reaction cards act through their emoji row) */
   bare?: boolean
+  /** slab button text when the primary suggestion's label is not the verb to show */
+  button?: string
 }
+
+/** Cards where the owner picks one line (a car, a sign-up line); the suggestion ids are `<prefix>:<choice>`. */
+const CHOICE_PREFIX: Partial<Record<Card['type'], string>> = { ride: 'ride', signup: 'need' }
+const isChoice = (card: Card, s: Suggestion) => { const pre = CHOICE_PREFIX[card.type]; return !!pre && s.id.startsWith(`${pre}:`) }
 
 const primaryOf = (c: Card): Suggestion | undefined => c.suggestions.find((s) => s.primary) ?? c.suggestions[0]
 
@@ -38,7 +46,7 @@ function segFor(card: Card, act: ActFn, extra: { key: string; label: string; act
   ]
 }
 
-function spec(card: Card, act: ActFn, t: TFunction): Spec {
+function spec(card: Card, act: ActFn, t: TFunction, pick: Suggestion | undefined, setPick: (id: string) => void): Spec {
   const c = groupColor[card.group]
   switch (card.type) {
     case 'question': {
@@ -255,6 +263,125 @@ function spec(card: Card, act: ActFn, t: TFunction): Spec {
         ),
       }
     }
+    case 'mention': {
+      const d = card.data
+      return {
+        body: (
+          <>
+            <P.Chat data={d} color={c} />
+            <Meta stats={d.stats} />
+          </>
+        ),
+        headline: t('card.askedDirectly'),
+      }
+    }
+    case 'waiting': {
+      const d = card.data
+      const asked = new Date(d.askedAt)
+      const due = d.dueAt ? new Date(d.dueAt) : null
+      return {
+        body: (
+          <>
+            <Route
+              a={d.person.name}
+              aSub={t('card.askedAt', { when: `${weekday(asked)} ${clock(asked)}` })}
+              b={due ? t('card.appointment') : t('card.nowLabel')}
+              bSub={due ? `${weekday(due)} ${clock(due)}` : weekday(new Date())}
+              mid={t('card.noReply')}
+              color={c}
+            />
+            <P.Quote text={`„${d.quote}“`} />
+            <Meta stats={d.stats} />
+          </>
+        ),
+        headline: t('card.nudgePrepared'),
+      }
+    }
+    case 'ride': {
+      const d = card.data
+      const car = pick ? Number(pick.id.split(':')[1]) : null
+      const driver = car !== null ? d.cars[car]?.driver.name : undefined
+      return {
+        body: (
+          <>
+            <P.Cars data={d} picked={car} onPick={(i) => setPick(`ride:${i}`)} color={c} />
+            {d.stats.length ? <Meta stats={d.stats} /> : null}
+          </>
+        ),
+        headline: driver ? t('card.youRide', { name: driver }) : t('card.noSeatYet'),
+        button: t('card.ride'),
+      }
+    }
+    case 'signup': {
+      const d = card.data
+      const need = pick ? d.needs.find((n) => `need:${n.id}` === pick.id) : undefined
+      return {
+        body: (
+          <>
+            <P.Needs data={d} picked={pick ? pick.id.split(':')[1] ?? null : null} onPick={(id) => setPick(`need:${id}`)} color={c} />
+            <Meta stats={d.stats} />
+          </>
+        ),
+        headline: need ? t('card.signupAs', { what: need.label }) : undefined,
+        button: t('card.signup'),
+      }
+    }
+    case 'levy': {
+      const d = card.data
+      return { body: <P.Levy data={d} />, headline: t('card.youOwe', { name: d.payee.name, amount: d.amount }) }
+    }
+    case 'code': {
+      const d = card.data
+      return {
+        body: (
+          <>
+            <P.Digits data={d} />
+            <Meta stats={d.stats} />
+          </>
+        ),
+        seg: segFor(card, act, [{ key: 'dismiss', label: t('card.dontKeep'), action: { kind: 'dismiss' } }]),
+      }
+    }
+    case 'material': {
+      const d = card.data
+      return {
+        body: (
+          <>
+            <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
+              <P.Sheet ext={d.ext} />
+              <View style={{ flex: 1 }}>
+                <Text style={[type.cardTitle, { fontSize: 17, lineHeight: 22 }]}>{d.fileName}</Text>
+                <Text style={[type.small, { marginTop: 3 }]}>{d.detail}</Text>
+              </View>
+            </View>
+            <Route a={t('card.file')} aSub={t('card.inChat')} b={d.event.title} bSub={d.event.when} mid={t('card.belongsTo')} color={c} dotted />
+          </>
+        ),
+        seg: segFor(card, act, [{ key: 'dismiss', label: t('card.notNeeded'), action: { kind: 'dismiss' } }]),
+      }
+    }
+    case 'throwback': {
+      const d = card.data
+      const at = new Date(d.at)
+      const years = Math.max(1, Math.round((Date.now() - at.getTime()) / (365.25 * 86400_000)))
+      return {
+        body: (
+          <>
+            <Route
+              a={at.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' })}
+              aSub={weekday(at, 'long')}
+              b={t('card.nowLabel')}
+              bSub={weekday(new Date())}
+              mid={t('card.yearsAgo', { count: years })}
+              color={c}
+            />
+            <P.Promise_ text={d.quote} caption={d.quoteBy} />
+            {d.photos > 0 ? <P.Thumbs count={d.photos} /> : null}
+          </>
+        ),
+        seg: segFor(card, act, [{ key: 'dismiss', label: t('card.stopThrowbacks'), action: { kind: 'dismiss' } }]),
+      }
+    }
     case 'photos': {
       const d = card.data
       return {
@@ -281,14 +408,21 @@ interface Props {
   selected: boolean
   onSelect: (key: string) => void
   act: ActFn
+  /** the owner's importance for this card (or Jarvis' guess) */
+  priority: Urgency
+  onPriority: (key: string, level: Urgency) => void
 }
 
-export const CardView = memo(function CardView({ card, selected, onSelect, act }: Props) {
+export const CardView = memo(function CardView({ card, selected, onSelect, act, priority, onPriority }: Props) {
   const { t } = useTranslation()
   const c = groupColor[card.group]
-  const sp = spec(card, act, t)
-  const primary = primaryOf(card)
-  const others = sp.seg || sp.bare ? [] : card.suggestions.filter((s) => s !== primary)
+  const [pickId, setPickId] = useState<string | null>(null)
+  // Picking a car or a sign-up line swaps the primary suggestion; the owner's own pick wins over Jarvis' recommendation.
+  const choices = card.suggestions.filter((x) => isChoice(card, x))
+  const picked = choices.find((x) => x.id === pickId) ?? choices.find((x) => x.primary) ?? choices[0]
+  const sp = spec(card, act, t, picked, setPickId)
+  const primary = picked ?? primaryOf(card)
+  const others = sp.seg || sp.bare ? [] : card.suggestions.filter((x) => x !== primary && !isChoice(card, x))
   const label = t(`cardType.${card.type}`)
 
   const head =
@@ -347,9 +481,10 @@ export const CardView = memo(function CardView({ card, selected, onSelect, act }
           ))}
         </View>
       ) : null}
+      {selected ? <P.Priority value={priority} color={c} onChange={(u) => onPriority(card.key, u)} /> : null}
       {sp.seg ? <Seg items={sp.seg} style={{ marginBottom: 18 }} /> : null}
       {!sp.seg && !sp.bare && primary ? (
-        <Slab big={sp.headline ?? primary.label} button={sp.headline && primary.label.length <= 18 ? primary.label : verb} onPress={() => act(card, primary.action)} />
+        <Slab big={sp.headline ?? primary.label} button={sp.button ?? (sp.headline && primary.label.length <= 18 ? primary.label : verb)} onPress={() => act(card, primary.action)} />
       ) : null}
       {!sp.seg && !sp.bare && !primary ? <View style={{ height: 4 }} /> : null}
     </Press>

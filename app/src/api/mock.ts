@@ -12,6 +12,7 @@ const iso = (h: number) => new Date(Date.now() - h * 3600_000).toISOString()
 
 export function createMockApi(): JarvisApi {
   let cards: Card[] = clone(FIXTURE_CARDS)
+  const guesses = new Map<string, Card['urgency']>()
   let memories: Memory[] = clone(FIXTURE_MEMORIES)
   let nextMemoryId = 100
   let done = 12
@@ -90,6 +91,17 @@ export function createMockApi(): JarvisApi {
       }
       const detailText = action.kind === 'react' ? action.emoji : action.kind === 'vote' ? action.option : ''
       return { ok: true, message: i18n.t(`act.${action.kind}`, { detail: detailText }), removed }
+    },
+    async setPriority(key, priority) {
+      await wait(120)
+      const i = cards.findIndex((c) => c.key === key)
+      if (i < 0) throw new JarvisError('not_found', 'not found', 404)
+      // In the mock the card keeps what Jarvis guessed in `guess`, so null can restore it.
+      const c = cards[i]!
+      const guess = guesses.get(key) ?? c.urgency
+      guesses.set(key, guess)
+      cards[i] = { ...c, urgency: priority ?? guess } as Card
+      return { ok: true, priority }
     },
     async suggest(key) {
       await wait(600)

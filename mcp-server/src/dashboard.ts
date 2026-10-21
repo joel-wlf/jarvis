@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { pool } from './db.js'
-import { loadWatchState, POLL_RENOTIFY_MS, resolveState as resolve, type ItemState } from './watch.js'
+import { loadWatchState, POLL_RENOTIFY_MS, priorityOf, resolveState as resolve, type ItemState } from './watch.js'
 
 
 export function registerDashboardTool(server: McpServer) {
@@ -11,7 +11,7 @@ export function registerDashboardTool(server: McpServer) {
       description:
         'Alles, was gerade Aufmerksamkeit braucht, als JSON mit Karten: fällige und kommende Erinnerungen, Termine in den nächsten 3 Tagen, unbeantwortete Fragen in Einzelchats, offene Umfragen, fällige Vorschläge und den Zustand von Jarvis. ' +
         'Jede Karte hat einen Schlüssel (key) und einen Zustand (new, notified, scheduled); Zurückgestelltes und als unwichtig Markiertes ist bereits herausgefiltert und steht unter muted. ' +
-        '"to_notify" nennt die Schlüssel, die der Wachdienst jetzt melden sollte. Für Fragen wie "Was steht an?" oder "Gibt es etwas Offenes?" der beste Startpunkt.',
+        '"to_notify" nennt die Schlüssel, die der Watch jetzt melden sollte. Jede Karte trägt "priority" (3 wichtig, 2 normal, 1 später, null = keine Festlegung): was der Nutzer als wichtig markiert hat, steht immer in to_notify, solange es neu ist, was er auf später gestellt hat, nie. Für Fragen wie "Was steht an?" oder "Gibt es etwas Offenes?" der beste Startpunkt.',
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
@@ -23,6 +23,9 @@ export function registerDashboardTool(server: McpServer) {
         if (r.state === 'dismissed' || r.state === 'snoozed') muted.push({ key, kind: r.state, until: r.until?.toISOString(), note: r.note })
       }
       const toNotify: string[] = []
+      const prio = (key: string) => priorityOf(key, rows) ?? null
+      /** The owner's own importance beats the default rules: important is always reported while new, later never. */
+      const shouldNotify = (key: string, state: ItemState, byDefault: boolean) => state === 'new' && prio(key) !== 1 && (prio(key) === 3 || byDefault)
 
       // Zustand von Jarvis
       const meta = await pool.query<{ key: string; value: string }>(`SELECT key, value FROM meta WHERE key IN ('wa_status','wa_heartbeat','self_jid','self_lid')`)
@@ -44,8 +47,8 @@ export function registerDashboardTool(server: McpServer) {
         const due = new Date(x.due_at)
         const state: ItemState = x.status === 'fired' ? 'notified' : due <= now ? 'new' : 'scheduled'
         const key = `reminder:${x.id}`
-        if (state === 'new') toNotify.push(key)
-        return { key, id: x.id, text: x.text, due_at: due.toISOString(), overdue: due <= now, ref: x.ref, state }
+        if (shouldNotify(key, state, true)) toNotify.push(key)
+        return { key, priority: prio(key), id: x.id, text: x.text, due_at: due.toISOString(), overdue: due <= now, ref: x.ref, state }
       })
 
       // Termine
@@ -63,9 +66,9 @@ export function registerDashboardTool(server: McpServer) {
           mute(key, r)
           return []
         }
-        if (r.state === 'new' && stage !== 'info') toNotify.push(key)
+        if (shouldNotify(key, r.state, stage !== 'info')) toNotify.push(key)
         const people = ((x.facts as { people?: { name: string; state: string }[] } | null)?.people ?? []).slice(0, 12)
-        return [{ key, topic_id: x.id, title: x.title, summary: String(x.summary ?? '').replace(/\s+/g, ' ').slice(0, 220), event_at: at.toISOString(), hours_until: Math.round(h * 10) / 10, stage, people, chats: x.chat_count, state: r.state }]
+        return [{ key, priority: prio(key), topic_id: x.id, title: x.title, summary: String(x.summary ?? '').replace(/\s+/g, ' ').slice(0, 220), event_at: at.toISOString(), hours_until: Math.round(h * 10) / 10, stage, people, chats: x.chat_count, state: r.state }]
       })
 
       // Unbeantwortete Fragen in Einzelchats
@@ -87,8 +90,8 @@ export function registerDashboardTool(server: McpServer) {
           mute(key, r)
           return []
         }
-        if (r.state === 'new') toNotify.push(key)
-        return [{ key, chat_jid: x.chat_jid, chat: x.chat_name, ts: new Date(x.ts).toISOString(), relationship: x.relationship, closeness: x.closeness, type: x.type, body: x.body, state: r.state }]
+        if (shouldNotify(key, r.state, true)) toNotify.push(key)
+        return [{ key, priority: prio(key), chat_jid: x.chat_jid, chat: x.chat_name, ts: new Date(x.ts).toISOString(), relationship: x.relationship, closeness: x.closeness, type: x.type, body: x.body, state: r.state }]
       })
 
       // Offene Umfragen
@@ -111,8 +114,8 @@ export function registerDashboardTool(server: McpServer) {
           mute(key, r)
           return []
         }
-        if (r.state === 'new' && age < 3) toNotify.push(key)
-        return [{ key, id: x.id, chat_jid: x.chat_jid, chat: x.chat_name, from: x.sender_name, created: new Date(x.ts).toISOString(), age_days: Math.round(age * 10) / 10, question: String(x.question ?? '').slice(0, 200), voted: Number(x.voted), state: r.state }]
+        if (shouldNotify(key, r.state, age < 3)) toNotify.push(key)
+        return [{ key, priority: prio(key), id: x.id, chat_jid: x.chat_jid, chat: x.chat_name, from: x.sender_name, created: new Date(x.ts).toISOString(), age_days: Math.round(age * 10) / 10, question: String(x.question ?? '').slice(0, 200), voted: Number(x.voted), state: r.state }]
       })
 
       // Fällige Vorschläge
@@ -127,8 +130,8 @@ export function registerDashboardTool(server: McpServer) {
           mute(key, r)
           return []
         }
-        if (r.state === 'new') toNotify.push(key)
-        return [{ key, id: x.id, title: String(x.title).slice(0, 160), due_at: new Date(x.due_at).toISOString(), state: r.state }]
+        if (shouldNotify(key, r.state, true)) toNotify.push(key)
+        return [{ key, priority: prio(key), id: x.id, title: String(x.title).slice(0, 160), due_at: new Date(x.due_at).toISOString(), state: r.state }]
       })
 
       const out = {

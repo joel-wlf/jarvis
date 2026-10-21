@@ -1,4 +1,4 @@
--- Erinnerungen des Nutzers und Rückmeldungen an den Wachdienst (Scheduled Task).
+-- Erinnerungen des Nutzers und Rückmeldungen an den Watch (Scheduled Task).
 -- Idempotent; auf bestehenden Datenbanken manuell anwenden.
 CREATE TABLE IF NOT EXISTS reminders (
   id          serial PRIMARY KEY,
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS reminders (
 );
 CREATE INDEX IF NOT EXISTS reminders_due_idx ON reminders (due_at) WHERE status = 'open';
 
--- Pro Meldeschlüssel des Wachdienstes (z.B. "event:12:vortag", "frage:<chat_jid>:<ts>", "umfrage:<id>"):
+-- Pro Meldeschlüssel des Watch (z.B. "event:12:vortag", "frage:<chat_jid>:<ts>", "umfrage:<id>"):
 -- wann zuletzt gemeldet, bis wann zurückgestellt, ob dauerhaft als unwichtig markiert.
 -- Ein Schlüssel ohne Zusatz gilt auch als Präfix, z.B. "frage:<chat_jid>" für alle Fragen aus diesem Chat.
 CREATE TABLE IF NOT EXISTS watch_state (

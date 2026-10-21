@@ -1,10 +1,10 @@
 // Type-specific pieces of the cards, one per prototype class (.datebig, .vmsg, .tl, .poll, …).
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import Svg, { Defs, Line, Path, Pattern, Rect } from 'react-native-svg'
+import Svg, { Defs, Line, Path, Pattern, Polygon, Rect } from 'react-native-svg'
 import { useTranslation } from 'react-i18next'
-import type { ConflictData, PollData, Stat } from '@jarvis/contract'
-import { colors, fonts, groupColor, markInk, mix } from '@/theme/tokens'
+import type { Urgency, CodeData, ConflictData, LevyData, MentionData, PollData, RideData, SignupData, Stat } from '@jarvis/contract'
+import { colors, fonts, groupColor, markGround, markInk, mix } from '@/theme/tokens'
 import { type } from '@/theme/type'
 import { Icon } from '../Icon'
 import { Micro, Press } from '../ui'
@@ -382,6 +382,200 @@ export function Thumbs({ count }: { count: number }) {
   )
 }
 
+/** Importance of a card in three steps. Small and quiet so it does not compete with the black action slab. */
+export function Priority({ value, color, onChange }: { value: Urgency; color: string; onChange: (u: Urgency) => void }) {
+  const { t } = useTranslation()
+  const levels: [Urgency, string][] = [[1, t('card.priorityLow')], [2, t('card.priorityNormal')], [3, t('card.priorityHigh')]]
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 10 }} accessibilityRole="radiogroup" accessibilityLabel={t('card.priority')}>
+      <Micro>{t('card.priority')}</Micro>
+      <View style={{ flexDirection: 'row', gap: 18 }}>
+        {levels.map(([u, label]) => {
+          const on = value === u
+          return (
+            <Press key={u} onPress={() => onChange(u)} accessibilityRole="radio" accessibilityState={{ selected: on }} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }} style={() => ({ paddingBottom: 3, borderBottomWidth: 2, borderBottomColor: on ? color : 'transparent' })}>
+              <Text style={[type.small, { fontSize: 13.5, color: on ? colors.ink : colors.faint }]}>{label}</Text>
+            </Press>
+          )
+        })}
+      </View>
+    </View>
+  )
+}
+
+/** Two-letter square for a person: ink = driver or paid, soft = taken, ghost = open or unpaid, me = the owner. */
+export function Chip({ label, tone = 'soft', accent }: { label: string; tone?: 'ink' | 'soft' | 'ghost' | 'me' | 'pick'; accent?: string }) {
+  const base = { width: 24, height: 24, alignItems: 'center' as const, justifyContent: 'center' as const }
+  const look =
+    tone === 'ink' ? { backgroundColor: colors.ink }
+    : tone === 'me' ? { backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.ink }
+    : tone === 'ghost' ? { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line2 }
+    : tone === 'pick' ? { backgroundColor: markGround(accent ?? colors.ink), borderWidth: 1.5, borderColor: accent ?? colors.ink }
+    : { backgroundColor: colors.ground2 }
+  const ink = tone === 'ink' ? '#FFFFFF' : colors.ink2
+  return (
+    <View style={[base, look]}>
+      <Text style={{ fontFamily: fonts.medium, fontSize: 11, color: ink }}>{label}</Text>
+    </View>
+  )
+}
+
+/** Group chat excerpt: faded lines before, the addressed line marked with a coloured edge. */
+export function Chat({ data, color }: { data: MentionData; color: string }) {
+  const { before, hit } = data
+  const parts = hit.mention && hit.text.includes(hit.mention) ? hit.text.split(hit.mention) : [hit.text]
+  return (
+    <View style={{ borderWidth: 1, borderColor: colors.line }}>
+      {before.map((m, i) => (
+        <View key={`${m.who}-${i}`} style={[p.msg, i > 0 && p.hline]}>
+          <Text style={type.tiny}>{m.who}</Text>
+          <Text style={[type.body, { fontSize: 14, lineHeight: 19, color: colors.faint }]}>{m.text}</Text>
+        </View>
+      ))}
+      <View style={[p.msg, p.hline, { backgroundColor: colors.ground2, paddingLeft: 14 }]}>
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, backgroundColor: color }} />
+        <Text style={[type.tiny, { color: colors.muted }]}>{`${hit.who} · ${hit.time}`}</Text>
+        <Text style={[type.body, { fontSize: 15.5, lineHeight: 21, color: colors.ink }]}>
+          {parts.map((part, i) => (
+            <Text key={i}>
+              {part}
+              {i < parts.length - 1 ? <Text style={{ fontFamily: fonts.italic, backgroundColor: markGround(color), color: markInk(color) }}>{` ${hit.mention} `}</Text> : null}
+            </Text>
+          ))}
+        </Text>
+      </View>
+    </View>
+  )
+}
+
+/** Cars with their seats. Tapping a car with a free seat picks it. */
+export function Cars({ data, picked, onPick, color }: { data: RideData; picked: number | null; onPick: (i: number) => void; color: string }) {
+  const { t } = useTranslation()
+  return (
+    <View style={{ gap: 14 }}>
+      <View style={{ borderTopWidth: 1, borderTopColor: colors.line }}>
+        {data.cars.map((car, i) => {
+          const free = car.seats - car.riders.length - (picked === i ? 1 : 0)
+          const canPick = car.seats - car.riders.length > 0
+          return (
+            <Press key={car.driver.name} onPress={() => canPick && onPick(i)} disabled={!canPick} accessibilityRole="button" accessibilityState={{ selected: picked === i, disabled: !canPick }} accessibilityLabel={`${car.driver.name}, ${free > 0 ? t('card.seatsFree', { count: free }) : t('card.carFull')}`} style={({ pressed, hovered }) => [p.car, (pressed || hovered) && canPick && { backgroundColor: colors.ground2 }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[type.bodyItalic, { fontSize: 16 }]}>{car.driver.name}</Text>
+                <Text style={type.small}>{free > 0 ? t('card.seatsFree', { count: free }) : t('card.carFull')}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 3 }}>
+                <Chip label={car.driver.initials} tone="ink" />
+                {car.riders.map((r) => <Chip key={r.name} label={r.initials} />)}
+                {Array.from({ length: car.seats - car.riders.length }, (_, k) => (k === 0 && picked === i ? <Chip key={`o${k}`} label={t('card.youShort')} tone="pick" accent={color} /> : <Chip key={`o${k}`} label="" tone="ghost" />))}
+              </View>
+            </Press>
+          )
+        })}
+      </View>
+      {data.without.length ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <View style={{ flexDirection: 'row', gap: 3 }}>
+            {data.without.filter((w) => picked === null || w.initials !== 'DU').map((w) => <Chip key={w.name} label={w.initials} tone="ghost" />)}
+          </View>
+          <Text style={type.small}>{t('card.noSeat')}</Text>
+        </View>
+      ) : null}
+    </View>
+  )
+}
+
+/** Sign-up lines with filled and open places. Tapping an open line picks it. */
+export function Needs({ data, picked, onPick, color }: { data: SignupData; picked: string | null; onPick: (id: string) => void; color: string }) {
+  const { t } = useTranslation()
+  return (
+    <View style={{ borderTopWidth: 1, borderTopColor: colors.line }}>
+      {data.needs.map((n) => {
+        const full = n.have >= n.need
+        const on = picked === n.id && !full
+        const have = n.have + (on ? 1 : 0)
+        return (
+          <Press key={n.id} onPress={() => !full && onPick(n.id)} disabled={full} accessibilityRole="button" accessibilityState={{ selected: on, disabled: full }} accessibilityLabel={`${n.label}, ${full ? t('card.needFull') : t('card.haveOf', { have, need: n.need })}`} style={({ pressed, hovered }) => [p.need, on && { borderLeftWidth: 2, borderLeftColor: colors.ink, paddingLeft: 10 }, (pressed || hovered) && !full && { backgroundColor: colors.ground2 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[type.bodyItalic, { fontSize: 16 }, full && { color: colors.faint }]}>{n.label}</Text>
+              {n.hint && !full ? <Text style={[type.small, { color: markInk(color) }]}>{n.hint}</Text> : null}
+            </View>
+            <View style={{ flexDirection: 'row', gap: 3 }}>
+              {Array.from({ length: n.need }, (_, i) => {
+                const filled = i < have
+                const mine = on && i === have - 1
+                return <View key={i} style={{ width: 14, height: 14, borderWidth: 1.5, borderColor: filled && !mine ? colors.ink : mine ? color : colors.line2, backgroundColor: filled && !mine ? colors.ink : mine ? markGround(color) : colors.card }} />
+              })}
+            </View>
+            <Text style={[type.small, { width: 44, textAlign: 'right', fontSize: 13 }]}>{full ? t('card.needFull') : t('card.haveOf', { have, need: n.need })}</Text>
+          </Press>
+        )
+      })}
+    </View>
+  )
+}
+
+/** Per-head collection: the amount, how to pay, and who has paid. */
+export function Levy({ data }: { data: LevyData }) {
+  const { t } = useTranslation()
+  const paid = data.paid.filter((x) => x.paid).length
+  return (
+    <View style={{ gap: 14 }}>
+      <DateBig big={data.amount} line={t('card.to', { name: data.payee.name })} small={data.reason} />
+      <View style={p.way}>
+        <Micro style={{ width: 84, paddingTop: 3 }}>{t('card.payWay')}</Micro>
+        <Text style={[type.bodyItalic, { flex: 1 }]}>{data.way}</Text>
+      </View>
+      <View style={{ gap: 8 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text style={type.small}>{t('card.paid')}</Text>
+          <Text style={type.small}>{t('card.paidOf', { n: paid, total: data.paid.length })}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 3 }}>
+          {data.paid.map((x) => <Chip key={x.person.name} label={x.person.initials} tone={x.paid ? 'ink' : x.me ? 'me' : 'ghost'} />)}
+        </View>
+      </View>
+    </View>
+  )
+}
+
+/** Code cells with a tap-to-hide link. */
+export function Digits({ data }: { data: CodeData }) {
+  const { t } = useTranslation()
+  const [hidden, setHidden] = useState(false)
+  const chars = Array.from(data.code)
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: 'row', gap: 5 }} accessibilityLabel={hidden ? t('card.codeHidden') : data.code.split('').join(' ')}>
+        {chars.map((c, i) => (
+          <View key={i} style={p.cell}>
+            {hidden ? <View style={{ width: 10, height: 2, backgroundColor: colors.ink }} /> : <Text style={{ fontFamily: fonts.thin, fontSize: chars.length > 5 ? 34 : 44, lineHeight: 48, color: colors.ink }}>{c}</Text>}
+          </View>
+        ))}
+      </View>
+      <Press onPress={() => setHidden((h) => !h)} accessibilityRole="button" hitSlop={8} style={() => ({ alignSelf: 'flex-start' })}>
+        <Text style={[type.small, { fontSize: 13, textDecorationLine: 'underline' }]}>{hidden ? t('card.codeShow') : t('card.codeHide')}</Text>
+      </Press>
+    </View>
+  )
+}
+
+/** A sheet of paper with a folded corner and the file type. */
+export function Sheet({ ext }: { ext: string }) {
+  return (
+    <View style={{ width: 65, height: 85 }} aria-hidden>
+      <Svg width={65} height={85}>
+        <Polygon points="3,3 65,3 65,85 3,85" fill={colors.ground2} />
+        <Path d="M0.5 0.5 H44.5 L61.5 17.5 V81.5 H0.5 Z" fill={colors.card} stroke={colors.line2} />
+        <Path d="M44.5 0.5 V17.5 H61.5" fill={colors.ground2} stroke={colors.line2} />
+        <Line x1={9} x2={40} y1={26} y2={26} stroke={colors.line} strokeWidth={2} />
+        <Line x1={9} x2={52} y1={34} y2={34} stroke={colors.line} strokeWidth={2} />
+        <Line x1={9} x2={32} y1={42} y2={42} stroke={colors.line} strokeWidth={2} />
+      </Svg>
+      <Text style={{ position: 'absolute', left: 9, bottom: 6, fontFamily: fonts.medium, fontSize: 11, letterSpacing: 1.1, color: colors.faint }}>{ext}</Text>
+    </View>
+  )
+}
+
 const p = StyleSheet.create({
   datebig: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   vmsg: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -397,5 +591,10 @@ const p = StyleSheet.create({
   box: { width: 20, height: 20, borderWidth: 1.5, borderColor: colors.line2, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   checkName: { flex: 1, fontFamily: fonts.italic, fontSize: 16, color: colors.ink },
   ledgerName: { fontFamily: fonts.italic, fontSize: 17, color: colors.ink },
+  msg: { paddingVertical: 9, paddingHorizontal: 12, gap: 1 },
+  car: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: colors.card },
+  need: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: colors.card },
+  way: { flexDirection: 'row', gap: 12, paddingVertical: 9, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.line },
+  cell: { flex: 1, height: 62, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderTopWidth: 2, borderTopColor: colors.ink },
   boardTime: { fontFamily: fonts.thin, fontSize: 34, lineHeight: 36, letterSpacing: -0.7, color: colors.ink },
 })
