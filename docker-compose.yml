@@ -264,6 +264,7 @@ services:
 
   # Expo web app. Same-origin proxy keeps the app API and home-network admin API reachable.
   app-web:
+    image: ${JARVIS_REGISTRY:-ghcr.io/joel-wlf/jarvis}-app-web:${JARVIS_VERSION:-latest}
     build:
       context: .
       dockerfile: app/Dockerfile.web

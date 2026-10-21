@@ -28,6 +28,7 @@ jobs:
         include:
           # Built from the repository root (shared packages/ and app/); <service>/Dockerfile.dockerignore filters the context
           - { service: admin, context: ., file: admin/Dockerfile }
+          - { service: app-web, context: ., file: app/Dockerfile.web }
           - { service: mcp-server, context: ., file: mcp-server/Dockerfile }
           - { service: wa-ingest, context: wa-ingest, file: wa-ingest/Dockerfile }
           - { service: embedder, context: embedder, file: embedder/Dockerfile }

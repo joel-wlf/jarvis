@@ -31,7 +31,7 @@ test('GitHub installer pins sources, launches the shared wizard, and resumes wit
     assert.equal(first.status, 0, first.stderr)
     assert.equal(fs.readFileSync(path.join(target, '.jarvis-install-version'), 'utf8').trim(), 'a'.repeat(40))
     assert.equal(fs.readFileSync(path.join(target, '.env'), 'utf8'), 'APP_WEB_PORT=18081\nAPP_HOME_URL=http://192.168.1.50:18081\n')
-    assert.match(fs.readFileSync(env.TEST_DOCKER_LOG, 'utf8'), /compose up -d --build admin app-web/)
+    assert.match(fs.readFileSync(env.TEST_DOCKER_LOG, 'utf8'), /compose up -d admin app-web/)
     assert.match(first.stdout, /192\.168\.1\.50:18081/)
     const saved = 'APP_WEB_PORT=18082\nMCP_TOKEN=test-secret-do-not-overwrite\n'
     fs.writeFileSync(path.join(target, '.env'), saved)

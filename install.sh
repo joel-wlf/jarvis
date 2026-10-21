@@ -116,7 +116,8 @@ fi
 cd "$install_dir"
 export APP_WEB_PORT="$port"
 "${engine[@]}" compose config -q
-"${engine[@]}" compose up -d --build admin app-web
+"${engine[@]}" compose pull admin app-web || printf 'Vorgebaute Images nicht erreichbar, baue lokal (das dauert länger).\n'
+"${engine[@]}" compose up -d admin app-web
 "${engine[@]}" compose logs --no-color admin
 host_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
 printf '\nEinrichtung: http://%s:%s\n' "${host_ip:-localhost}" "$port"

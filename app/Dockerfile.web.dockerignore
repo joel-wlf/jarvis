@@ -1,0 +1,9 @@
+# Allowlist for building app/Dockerfile.web from the repository root: only the app and the shared contract.
+*
+!packages/contract
+!app
+app/node_modules
+app/.expo
+app/dist
+app/web-build
+packages/contract/node_modules
