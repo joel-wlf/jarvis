@@ -162,10 +162,17 @@ body {
 }
 
 /* Code and tables sit on white cards with hairlines */
-figure.shiki,
-.prose pre {
+figure.shiki {
   background: #ffffff !important;
   border: 1px solid var(--jv-line-2);
+}
+figure.shiki pre {
+  background: transparent !important;
+  border: 0;
+  padding-block: 0.9rem;
+}
+.jv-install figure pre {
+  padding: 0.9rem 1rem;
 }
 .prose :not(pre) > code {
   background: #f3f5f7;
@@ -291,4 +298,8 @@ figure.shiki,
   * {
     transition: none !important;
   }
+}
+
+.prose td {
+  vertical-align: top;
 }

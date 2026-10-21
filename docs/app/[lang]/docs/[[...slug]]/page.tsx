@@ -1,4 +1,3 @@
-import { createRelativeLink } from 'fumadocs-ui/mdx'
 import {
   DocsBody,
   DocsDescription,
@@ -7,7 +6,7 @@ import {
 } from 'fumadocs-ui/layouts/docs/page'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { getMDXComponents } from '@/components/mdx'
+import { docsLink, getMDXComponents } from '@/components/mdx'
 import { source } from '@/lib/source'
 
 export default async function Page(props: { params: Promise<{ lang: string; slug?: string[] }> }) {
@@ -21,7 +20,7 @@ export default async function Page(props: { params: Promise<{ lang: string; slug
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
-        <MDX components={getMDXComponents({ a: createRelativeLink(source, page) })} />
+        <MDX components={getMDXComponents({ a: docsLink(lang) })} />
       </DocsBody>
     </DocsPage>
   )

@@ -106,7 +106,7 @@ function build(lang) {
     if (!fields.length) continue
     const [gl, gh] = lang === 'en' ? en.groups[g.id] ?? [g.label, g.help] : [g.label, g.help]
     out.push(`## ${esc(gl)}`, '', esc(gh), '')
-    out.push(`| ${t.setting} | ${t.value} | ${t.def} | ${t.desc} |`, '|---|---|---|---|')
+    out.push(`| ${t.setting} | ${t.desc} |`, '|---|---|')
     for (const f of fields) {
       let label = f.label
       let help = f.help
@@ -128,7 +128,7 @@ function build(lang) {
       const def = f.default === '' ? `_${t.none}_` : `\`${esc(f.default)}\``
       const svc = f.services.length ? ` <br/>_${t.services}: ${f.services.join(', ')}_` : ''
       out.push(
-        `| ${esc(label)} <br/>\`${f.key}\`${tagText} | ${esc(valueText(f, t, lang))} | ${def} | ${esc(help)}${note}${svc} |`,
+        `| **${esc(label)}** <br/>\`${f.key}\`${tagText} <br/>${esc(valueText(f, t, lang))} <br/>${t.def}: ${def} | ${esc(help)}${note}${svc} |`,
       )
     }
     out.push('')
