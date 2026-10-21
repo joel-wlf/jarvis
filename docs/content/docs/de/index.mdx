@@ -1,0 +1,63 @@
+---
+title: Was ist Jarvis
+description: Ein privater Kontext-Manager, der auf deiner eigenen Hardware läuft und mit Claude arbeitet.
+---
+
+Jarvis sammelt, was für dich Kontext ist, ordnet es nach Themen, Personen und Fristen, merkt sich, was du korrigierst, und lässt Claude als Agent damit arbeiten: suchen, erinnern, vorbereiten, antworten, handeln.
+
+**Heute ist WhatsApp die erste Quelle.** Nachrichten, Sprachnachrichten, Bilder, Umfragen, Reaktionen und Gruppen laufen ein. Mail, Kalender, Dokumente und Notizen sollen folgen. Jarvis ist so gebaut, dass neue Quellen dazukommen, ohne den Rest umzubauen.
+
+## Was du bekommst
+
+- **Eine App** (iOS, Android, Web), die zeigt, was dich heute braucht: eine Frage, die jemand gestellt hat, ein Termin, eine Umfrage, eine Aufgabe, die in einem Gruppenchat untergegangen ist. Jeder Eintrag kommt mit vorbereiteten nächsten Schritten, sodass du in ein, zwei Tipps entscheidest. Siehe [Die App](./app.mdx) und [Kartentypen](./card-types.mdx).
+- **Einen Claude-Connector.** Du trägst eine URL in Claude ein, und Claude kann dein Archiv durchsuchen, deine Korrekturen abrufen und, wenn du es erlaubst, in deinem Namen Nachrichten senden. Siehe [Claude verbinden](./connect-claude.mdx).
+- **Eine Admin-Oberfläche** im Heimnetz für Einrichtung, Einstellungen, Logs und Wartung.
+
+## Datenschutz
+
+Alles liegt auf deiner Hardware, in einer Postgres-Datenbank auf deinem eigenen Raspberry Pi. Es gibt keine Jarvis-Cloud.
+
+Nur die KI-Schritte verlassen das Gerät, und nur zu dem Anbieter, den du einstellst:
+
+| Schritt | Was rausgeht | Geht es auch lokal? |
+|---|---|---|
+| Transkription von Sprachnachrichten | Die Audiodatei (sie wird danach nicht gespeichert) | Ja, mit lokalem whisper.cpp (auf dem Pi langsam) |
+| Embeddings (Bedeutungssuche) | Nachrichtentext | Ja, mit dem lokalen Modell multilingual-e5-small |
+| Bildbeschreibung | Das Bild | Abschalten mit `IMAGE_DESCRIBE=false` |
+| Themen-Sortierung (Organizer) | Nachrichtentext, Absendername und Zeit; Telefonnummern, IBANs, E-Mail-Adressen und Link-Pfade werden vorher geschwärzt | Optional, standardmäßig aus |
+| Antwortvorschläge und „Frag Jarvis“ in der App | Die passenden Ausschnitte zur Frage | Braucht einen KI-Anbieter |
+
+Chats, die du per Namen ausschließt (`ORGANIZER_EXCLUDE_NAMES`), gehen nie an die Embedding- oder Sortier-API. Bilder, Audio und Dateien werden nicht zum Sortieren hochgeladen; Sprachnachrichten gehen nur als Transkript. Ganz ohne KI-Schlüssel archiviert und durchsucht Jarvis trotzdem, lokal und langsamer, und der Organizer bleibt aus.
+
+Claude selbst spricht über den Connector mit deinem Server. Was Claude sieht und tun darf, bestimmst du mit den Tool-Berechtigungen in Claude und den Schutzmaßnahmen unter [Sicherheit](./security.mdx).
+
+## Wie es zusammenhängt
+
+```
+WhatsApp ──QR──> wa-ingest ──> postgres (pgvector) <── mcp-server <── cloudflared <── Claude und die App
+```
+
+Die Architektur trennt drei Dinge:
+
+- **Erfassung.** Quellen-Adapter wie `wa-ingest` schreiben normalisiert in Postgres.
+- **Auswertung.** `embedder` und `organizer` arbeiten quellenunabhängig: Vektoren, Threads, Topics, Personenprofile.
+- **Zugriff.** `mcp-server`, Wachdienst und Admin-Oberfläche arbeiten auf dem gemeinsamen Datenmodell, nicht auf einer Quelle.
+
+| Container | Aufgabe |
+|---|---|
+| `postgres` | Postgres 16 mit pgvector. Kontakte, Chats, Nachrichten, Umfragen, Karten. Von außen nicht erreichbar. |
+| `wa-ingest` | Der WhatsApp-Client (Baileys). Verknüpfung per QR-Code, Verlaufsimport, Live-Nachrichten, Transkription und die `outbox`, die Senden, Abstimmen und Reagieren ausführt. |
+| `embedder` | Berechnet die Vektoren für die Bedeutungssuche im Hintergrund. |
+| `organizer` | Optional. Sortiert Nachrichten zu Themen mit Zusammenfassung, Terminen und Aufgaben und schreibt die Karten der App. |
+| `whisper` | Optionale lokale Transkription (whisper.cpp). |
+| `mcp-server` | Der MCP-Endpunkt für Claude, OAuth und die App-API unter `/api/v1`. |
+| `cloudflared` | Optionaler Cloudflare-Tunnel, der `mcp-server` von außen erreichbar macht. |
+| `admin` | Weboberfläche für Einrichtung, Einstellungen, Status, Logs und Wartung. Nur im Heimnetz. |
+
+## Vorher wissen
+
+- Der WhatsApp-Zugang nutzt Baileys, eine inoffizielle Bibliothek. Die WhatsApp-Nutzungsbedingungen erlauben das nicht ausdrücklich. Das Sperrrisiko ist beim reinen Mitlesen gering, beim Senden höher. Nimm im Zweifel nicht deine Hauptnummer, bevor du es getestet hast.
+- Jarvis ist ein inoffizielles Projekt und nicht mit WhatsApp oder Meta verbunden.
+- Gespeichert werden nur Texte und Metadaten, keine Mediendateien. Bilder erscheinen als `[image]` mit durchsuchbarer Beschreibung.
+
+Bereit? Weiter mit dem [Schnellstart](./quickstart.mdx).

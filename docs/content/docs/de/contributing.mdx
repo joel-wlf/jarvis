@@ -1,0 +1,72 @@
+---
+title: Mitwirken
+description: Aufbau des Repositorys, Tests je Paket und die Regeln, die alles zusammenhalten.
+---
+
+Beiträge sind willkommen. Lege ein Issue an oder kommentiere eines, bevor du größere Änderungen startest. Das Projekt steht unter der MIT-Lizenz. Telefonie, SIP und Anrufe sind bewusst nicht Teil des Projekts: Der Kern ist Erfassung (Quellen-Adapter), Auswertung (Embeddings, Organizer) und Zugriff (MCP).
+
+## Aufbau des Repositorys
+
+| Ordner | Was es ist |
+|---|---|
+| `wa-ingest/` | WhatsApp-Client (Baileys): Erfassung, Transkription, Ausführung der Outbox |
+| `embedder/` | Embedding-Dienst für die Bedeutungssuche |
+| `organizer/` | Themen, Threads, Personenprofile und der Schreiber der `cards` |
+| `mcp-server/` | MCP-Endpunkt, OAuth und die App-API `/api/v1` |
+| `admin/` | Admin-Oberfläche, Einstellungs-Schema (`src/schema.ts`), Job-Runner |
+| `app/` | Expo-App für iOS, Android und Web |
+| `packages/contract/` | Gemeinsame Typen von Server, Organizer und App |
+| `db/init/` | Nummerierte, idempotente SQL-Migrationen |
+| `scripts/` | Tresor-, Backup- und Hilfsskripte |
+| `docs/` | Diese Dokumentation (Fumadocs) |
+
+## Prüfungen je Paket
+
+Für `mcp-server`, `wa-ingest`, `organizer`, `embedder` und `admin` muss `npm ci && npm run build` fehlerfrei laufen. Das führt auch die CI aus. Tests laufen in der CI für drei davon:
+
+```bash
+cd mcp-server && npm test    # PGlite führt jede db/init/*.sql aus
+cd organizer  && npm test
+cd admin      && npm test    # prüft auch, dass Schema, Compose und .env.example zusammenpassen
+```
+
+Die App:
+
+```bash
+cd app
+npx tsc --noEmit
+npx expo-doctor
+```
+
+Die Doku:
+
+```bash
+cd docs && npm run build     # statische Seite; die Einstellungsseite wird vorher erzeugt
+```
+
+## Regeln
+
+1. **Datenbankänderungen** als neue, idempotente Datei in `db/init/` mit der nächsten Nummer. Bestehende Dateien nicht ändern.
+2. **Neue Einstellung:** in `admin/src/schema.ts` beschreiben, in `docker-compose.yml` mit gleichem Standardwert durchreichen und `cd admin && npm run gen-env-example` ausführen. Die Admin-Tests prüfen, dass alles zusammenpasst. Die [Einstellungsreferenz](./settings.mdx) wird aus dem Schema erzeugt; den englischen Text dazu ergänzt du in `docs/scripts/settings-en.json`.
+3. **Neues MCP-Tool:** auch in `mcp-server/src/readme.ts` beschreiben.
+4. **Die Vertragsregel.** Alles, was zwischen Server, Organizer und App fließt (Kartenformen, Anfrage- und Antworttypen), wird einmal in `packages/contract/src` definiert. Ändere zuerst den Vertrag, dann alle Nutzer. Die App importiert ihn direkt aus dem Quelltext, es gibt keinen Build-Schritt.
+5. **Keine persönlichen Daten** in Code, Tests, Issues oder Commits: keine Namen, Tokens oder Chat-Ausschnitte. Der eigene Name kommt aus `OWNER_NAME`; Fixtures sind synthetisch.
+
+## Admin-Oberfläche ohne Docker entwickeln
+
+```bash
+cd admin && npm ci && npm run build
+JARVIS_FAKE_DOCKER=1 JARVIS_PROJECT_DIR=/tmp/jarvis-dev ADMIN_DATA_DIR=/tmp/jarvis-dev-data PORT=8099 npm start
+```
+
+`OWNER_NAME=Fehler` lässt im Simulationsmodus den MCP-Server abstürzen, so lässt sich der automatische Rollback ausprobieren.
+
+## An der Doku arbeiten
+
+```bash
+cd docs
+npm install
+npm run dev
+```
+
+Die Seiten sind MDX unter `content/docs/en` und `content/docs/de`. Jede Seite braucht beide Sprachen. Der Installer-Befehl steht in `lib/install.ts`. Die Einstellungsseiten werden erzeugt und nicht von Hand bearbeitet.
