@@ -32,8 +32,6 @@ jobs:
           - { service: wa-ingest, context: wa-ingest, file: wa-ingest/Dockerfile }
           - { service: embedder, context: embedder, file: embedder/Dockerfile }
           - { service: organizer, context: organizer, file: organizer/Dockerfile }
-          # Ships the default model (small); other WHISPER_MODEL values need a local build
-          - { service: whisper, context: whisper, file: whisper/Dockerfile }
     steps:
       - uses: actions/checkout@v4
 
