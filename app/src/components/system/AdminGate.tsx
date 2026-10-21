@@ -79,7 +79,7 @@ export function AdminGate({ children, allowUnconfigured }: { children: ReactNode
       }
     }
     return (
-      <Panel style={{ gap: 16 }}>
+      <Panel style={{ gap: 16, width: '100%', maxWidth: 480 }}>
         <Text style={type.cardTitle}>{t('system.login')}</Text>
         <Text style={type.body}>{t('system.loginLead')}</Text>
         <Field label={t('system.adminPassword')} value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" onSubmitEditing={() => void login()} returnKeyType="go" error={error ?? undefined} />
