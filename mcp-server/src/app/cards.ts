@@ -5,7 +5,8 @@
 import {
   CARD_GROUP, type Card, type CardAction, type CardGroup, type CardState, type CardType, type Person, type Stat, type Suggestion, type Urgency,
 } from '@jarvis/contract'
-import { loadPollResults, memDb, pool } from '../db.js'
+import { attendanceKey, attendanceOf, setAttendance, type Going } from '../attendance.js'
+import { loadPollResults, memDb, pool, STILL_OPEN } from '../db.js'
 import { OWNER } from '../config.js'
 import { runJob, type Outcome } from '../outbox.js'
 import {
@@ -49,6 +50,8 @@ const S = {
     reminderSay: (t: string) => `Erinnerung: ${t}`, taskSay: (t: string) => `Offen: ${t}`, digestSay: (c: string, n: number) => `In ${c} sind ${n} neue Nachrichten.`,
     personSay: (n: string, w: string) => `Mit ${n} hattest du zuletzt ${w} Kontakt.`, conflict: 'Terminüberschneidung', people: 'Personen', chats: 'Chats',
     lastContact: 'Letzter Kontakt', messages: 'Nachrichten', reminder: 'Erinnerung', task: 'Aufgabe',
+    going: 'Ich bin dabei', notGoing: 'Bin nicht dabei', goingAfterAll: 'Doch dabei', notGoingAfterAll: 'Doch nicht dabei', you: 'Du', youIn: 'dabei', youOut: 'nicht dabei', youOpen: 'offen',
+    goingSaved: 'Gemerkt: Du bist dabei.', notGoingSaved: 'Gemerkt: Du bist nicht dabei.', resolved: 'Schon geklärt', resolvedSaved: 'Erledigt. Jarvis merkt sich, dass das geklärt ist.',
   },
   en: {
     later: 'Later', unimportant: 'Not important', done: 'Done', remindMe: 'Remind me', in1h: 'In 1 h', in3h: 'In 3 h', tomorrow: 'Tomorrow morning',
@@ -62,6 +65,8 @@ const S = {
     reminderSay: (t: string) => `Reminder: ${t}`, taskSay: (t: string) => `Open: ${t}`, digestSay: (c: string, n: number) => `${n} new messages in ${c}.`,
     personSay: (n: string, w: string) => `Your last contact with ${n} was ${w}.`, conflict: 'Overlapping events', people: 'People', chats: 'Chats',
     lastContact: 'Last contact', messages: 'Messages', reminder: 'Reminder', task: 'Task',
+    going: "I'm going", notGoing: "Not going", goingAfterAll: 'Going after all', notGoingAfterAll: 'Not going after all', you: 'You', youIn: 'going', youOut: 'not going', youOpen: 'open',
+    goingSaved: "Noted: you're going.", notGoingSaved: "Noted: you're not going.", resolved: 'Already sorted', resolvedSaved: 'Done. Jarvis remembers that this is sorted.',
   },
 }
 
@@ -88,10 +93,17 @@ function laterSuggestions(l: Lang, now: Date): Suggestion[] {
   ]
 }
 
-/** Next steps for a fixed date: the owner cannot move it, only take note or see it again closer to the day. */
-function eventSuggestions(at: Date | null, l: Lang, now: Date): Suggestion[] {
+/**
+ * Next steps for a fixed date: the owner cannot move it, only say whether they go, take note, or see it again
+ * closer to the day. Saying "not going" removes the card; "going" keeps it for the reminders before the day.
+ */
+function eventSuggestions(at: Date | null, l: Lang, now: Date, going?: Going): Suggestion[] {
   const t = S[l]
-  const out: Suggestion[] = [{ id: 'noted', label: t.noted, action: { kind: 'done' }, primary: true }]
+  const out: Suggestion[] = going === 'yes'
+    ? [{ id: 'noted', label: t.noted, action: { kind: 'done' }, primary: true }, { id: 'not-going', label: t.notGoingAfterAll, action: { kind: 'attend', going: false } }]
+    : going === 'no'
+      ? [{ id: 'noted', label: t.noted, action: { kind: 'done' }, primary: true }, { id: 'going', label: t.goingAfterAll, action: { kind: 'attend', going: true } }]
+      : [{ id: 'going', label: t.going, action: { kind: 'attend', going: true }, primary: true }, { id: 'not-going', label: t.notGoing, action: { kind: 'attend', going: false } }, { id: 'noted', label: t.noted, action: { kind: 'done' } }]
   if (at) {
     const h = (at.getTime() - now.getTime()) / 3600_000
     const p = berlinParts(at, 'en')
@@ -145,6 +157,7 @@ const q = <R extends Record<string, any>>(text: string, params: unknown[] = []) 
 export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
   const t = S[l]
   const watch = await loadWatchState()
+  const going = attendanceOf(watch)
   const out: Built[] = []
   const visible = (key: string, renotifyMs?: number): CardState | null => {
     const r = resolveState(key, watch, { renotifyMs })
@@ -161,8 +174,8 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
      SELECT l.chat_jid, l.chat_name, l.id, l.ts, l.type, l.body, p.relationship, p.closeness,
             m.media_meta->>'seconds' AS seconds, (p.stats->>'last_90_days')::int AS n90
      FROM last l LEFT JOIN contact_profiles p ON p.jid = l.chat_jid LEFT JOIN messages m ON m.chat_jid = l.chat_jid AND m.id = l.id
-     WHERE NOT l.from_me AND l.ts BETWEEN now() - interval '4 days' AND now() - interval '2 hours'
-       AND (l.body LIKE '%?%' OR l.type = 'audio')
+     WHERE NOT l.from_me AND l.ts BETWEEN now() - interval '3 days' AND now() - interval '2 hours'
+       AND (l.body LIKE '%?%' OR l.type = 'audio') ${STILL_OPEN}
      ORDER BY coalesce(p.closeness, 0) DESC, l.ts DESC LIMIT 15`,
   )
   for (const x of qs) {
@@ -177,7 +190,8 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
     const stats: Stat[] = [{ label: t.waiting, value: when(ts, l, now) }]
     if (x.relationship) stats.push({ label: t.relation, value: relLabel(x.relationship, l)! })
     if (x.closeness) stats.push({ label: t.closeness, value: `${x.closeness}/5` })
-    const common = { urgency, state, chat: x.chat_name, chatJid: x.chat_jid, at: ts, suggestions: laterSuggestions(l, now) }
+    const resolved: Suggestion = { id: 'resolved', label: t.resolved, action: { kind: 'done' } }
+    const common = { urgency, state, chat: x.chat_name, chatJid: x.chat_jid, at: ts, suggestions: [resolved, ...laterSuggestions(l, now)] }
     const ref = { chatJid: x.chat_jid, messageId: x.id }
     if (x.type === 'audio') {
       const sec = Number(x.seconds ?? 0)
@@ -229,16 +243,17 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
     const ppl = (x.facts?.people ?? []) as { name: string; state: string }[]
     const yes = ppl.filter((p) => p.state === 'yes')
     const p = berlinParts(at, l)
-    const stats: Stat[] = [{ label: t.people, value: String(ppl.length) }, { label: t.chats, value: String(x.chat_count ?? 1) }]
+    const mine = going.get(attendanceKey({ topicId: Number(x.id) }, key))
+    const stats: Stat[] = [{ label: t.people, value: String(ppl.length) }, { label: t.chats, value: String(x.chat_count ?? 1) }, { label: t.you, value: mine === 'yes' ? t.youIn : mine === 'no' ? t.youOut : t.youOpen }]
     out.push({
       at: at.getTime(), ref: { topicId: Number(x.id) },
       card: {
         ...base('event', key, {
-          urgency: h <= 3.5 ? 3 : h <= 30 ? 2 : 1, dueAt: at, state, title: x.title, chat: x.chat_count > 1 ? `${x.chat_count} ${t.chats}` : 'WhatsApp', at, whenText: when(at, l, now),
+          urgency: mine === 'no' ? 1 : h <= 3.5 ? 3 : h <= 30 ? 2 : 1, dueAt: at, state, title: x.title, chat: x.chat_count > 1 ? `${x.chat_count} ${t.chats}` : 'WhatsApp', at, whenText: when(at, l, now),
           say: t.eventSay(x.title, when(at, l, now)), context: cut(x.summary, 220) || undefined,
-          suggestions: eventSuggestions(at, l, now),
+          suggestions: eventSuggestions(at, l, now, mine),
         }, l, now),
-        data: { day: p.day, weekday: p.weekday, month: p.month, time: p.time, ...(x.facts?.place ? { place: String(x.facts.place) } : {}), attendees: yes.slice(0, 8).map((y) => person(y.name)), yes: yes.length, stats },
+        data: { day: p.day, weekday: p.weekday, month: p.month, time: p.time, ...(x.facts?.place ? { place: String(x.facts.place) } : {}), attendees: yes.slice(0, 8).map((y) => person(y.name)), yes: yes.length, ...(mine ? { going: mine } : {}), stats },
       },
     })
   }
@@ -306,18 +321,19 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
       if (due && due.getTime() < now.getTime() - 2 * 3600_000) continue
       const h = due ? (due.getTime() - now.getTime()) / 3600_000 : Infinity
       const p = due ? berlinParts(due, l) : null
+      const mine = going.get(attendanceKey({ actionId: Number(x.id) }, key))
       const place = /(?:^|·\s*)(?:Ort|Place|Where):\s*([^·]+)/i.exec(x.detail ?? '')?.[1]?.trim()
       const note = (x.detail ?? '').split('·').map((v) => v.trim()).filter((v) => v && !/^(Ort|Place|Where):/i.test(v)).join(' · ')
       out.push({
         at: (due ?? created).getTime(), ref,
         card: {
           ...base('event', key, {
-            urgency: h <= 3.5 ? 3 : h <= 30 ? 2 : 1, ...(due ? { dueAt: due } : {}), state, title: cut(kind.title, 120), chat, ...(x.chat_jid ? { chatJid: x.chat_jid } : {}),
+            urgency: mine === 'no' ? 1 : h <= 3.5 ? 3 : h <= 30 ? 2 : 1, ...(due ? { dueAt: due } : {}), state, title: cut(kind.title, 120), chat, ...(x.chat_jid ? { chatJid: x.chat_jid } : {}),
             at: due ?? created, whenText: due ? when(due, l, now) : t.dateOpen,
             say: due ? t.eventFromChat(cut(kind.title, 120), when(due, l, now)) : t.eventUndated(cut(kind.title, 120)), context: note || undefined,
-            suggestions: eventSuggestions(due, l, now), group: 'schedule',
+            suggestions: eventSuggestions(due, l, now, mine), group: 'schedule',
           }, l, now),
-          data: { day: p?.day ?? '', weekday: p?.weekday ?? t.dateOpen, month: p?.month ?? '', time: p?.time ?? '', ...(place ? { place } : {}), attendees: [], yes: 0, stats: [] },
+          data: { day: p?.day ?? '', weekday: p?.weekday ?? t.dateOpen, month: p?.month ?? '', time: p?.time ?? '', ...(place ? { place } : {}), attendees: [], yes: 0, ...(mine ? { going: mine } : {}), stats: mine ? [{ label: t.you, value: mine === 'yes' ? t.youIn : t.youOut }] : [] },
         },
       })
       continue
@@ -373,7 +389,8 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
   // --- organizer cards (cards table) ---
   const stored = await q<{ id: number; type: CardType; key: string; payload: any; due_at: Date | null; chat_jid: string | null; created_at: Date }>(
     `SELECT id, type, key, payload, due_at, chat_jid, created_at FROM cards
-     WHERE status = 'open' AND (due_at IS NULL OR due_at > now() - interval '2 days') ORDER BY coalesce(due_at, created_at) DESC LIMIT 60`,
+     WHERE status = 'open' AND (due_at > now() - interval '2 days' OR (due_at IS NULL AND updated_at > now() - interval '7 days'))
+     ORDER BY coalesce(due_at, created_at) DESC LIMIT 60`,
   )
   for (const x of stored) {
     const p = x.payload ?? {}
@@ -423,6 +440,22 @@ export async function findCard(key: string, l: Lang): Promise<Built> {
 export interface ActResult {
   message: string
   removed: boolean
+  /** the card after the action, when it stays and changed */
+  card?: Card
+}
+
+/**
+ * A question or voice message the owner marks as sorted ("Schon geklärt"): a note on the chat, so the organizer and
+ * Claude treat it as settled instead of bringing it up again.
+ */
+async function rememberResolved(card: Card, chatJid: string) {
+  const d = card.data as { person?: Person; quote?: string; summary?: string }
+  const who = d.person?.name ?? card.source.chat
+  const what = cut(d.summary || d.quote || card.title, 160)
+  const day = card.source.at ? berlinParts(new Date(card.source.at), 'de').date : ''
+  const kind = card.type === 'voice' ? 'Sprachnachricht' : 'Nachricht'
+  const content = `${OWNER} hat mit ${who} schon geklärt: ${kind}${day ? ` vom ${day}` : ''}${what ? ` („${what}“)` : ''}. Nicht mehr als offen behandeln.`
+  await memDb.query(`INSERT INTO memories (kind, content, scope, chat_jid, refs) VALUES ('fact', $1, 'chat', $2, $3::jsonb)`, [content, chatJid, JSON.stringify([{ type: 'resolved', key: card.key }])])
 }
 
 function outcome(o: Outcome, l: Lang, okText: string): ActResult {
@@ -459,7 +492,24 @@ export async function act(b: Built, a: CardAction, l: Lang): Promise<ActResult> 
       else if (ref.actionId != null) await memDb.query(`UPDATE suggested_actions SET status = 'done' WHERE id = $1`, [ref.actionId])
       else if (ref.storedId != null) await memDb.query(`UPDATE cards SET status = 'done', updated_at = now() WHERE id = $1`, [ref.storedId])
       else await setWatchFeedback(key, 'dismiss', { note: `${OWNER}: schon erledigt (App)` })
+      if ((card.type === 'question' || card.type === 'voice') && ref.chatJid) {
+        await rememberResolved(card, ref.chatJid).catch((e) => console.error('resolved note failed:', (e as Error).message))
+        return { message: S[l].resolvedSaved, removed: true }
+      }
       return { message: de ? 'Erledigt.' : 'Done.', removed: true }
+    }
+    case 'attend': {
+      if (card.type !== 'event') throw fail('invalid', 'Only event cards take an answer')
+      if (typeof a.going !== 'boolean') throw fail('invalid', 'going must be true or false', { going: 'true | false' })
+      const going: Going = a.going ? 'yes' : 'no'
+      await setAttendance(attendanceKey(ref, key), going, { title: card.title, whenText: card.source.when, ...(card.dueAt ? { at: new Date(card.dueAt) } : {}) })
+      if (going === 'no') {
+        // no reminders for an event the owner skips; the topic key covers every stage (event:<id>:vortag …)
+        await setWatchFeedback(ref.topicId != null ? `event:${ref.topicId}` : key, 'dismiss', { note: `${OWNER}: nicht dabei (App)` })
+        return { message: S[l].notGoingSaved, removed: true }
+      }
+      const now = (await listCards(l)).find((x) => x.card.key === key)?.card
+      return { message: S[l].goingSaved, removed: false, ...(now ? { card: now } : {}) }
     }
     case 'dismiss': {
       if (ref.reminderId != null) await setReminderStatus(ref.reminderId, 'cancelled')

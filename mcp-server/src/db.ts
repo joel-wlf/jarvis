@@ -243,3 +243,14 @@ export async function fmt(rows: MsgRow[], opts: { max?: number; dedupe?: boolean
   for (const [k, p] of polls) extra.set(k, [extra.get(k), pollLine(p)].filter(Boolean).join('\n  '))
   return formatMessages(rows, { ...opts, reactions: extra })
 }
+
+/**
+ * For the last message of a direct chat (alias l, with chat_jid and id): still waiting for the owner. Not when the
+ * owner reacted to it, or when the organizer found its conversation settled (thread resolved, or its topic resolved,
+ * cancelled, past or stale). Used by the app cards and get_dashboard, so both agree on what is open.
+ */
+export const STILL_OPEN = `
+  AND NOT EXISTS (SELECT 1 FROM message_reactions r WHERE r.chat_jid = l.chat_jid AND r.message_id = l.id AND r.from_me)
+  AND NOT EXISTS (SELECT 1 FROM messages mm JOIN threads th ON th.id = mm.thread_id LEFT JOIN topics tp ON tp.id = th.topic_id
+                  WHERE mm.chat_jid = l.chat_jid AND mm.id = l.id
+                    AND (th.status = 'resolved' OR tp.status IN ('resolved', 'cancelled', 'past', 'stale')))`

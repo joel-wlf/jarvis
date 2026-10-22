@@ -39,8 +39,8 @@ Sending, reacting and voting share the same hourly limit and offline check as Cl
 
 | Type | What it is | Offers |
 |---|---|---|
-| `question` | Someone asked you something and is waiting. Shows the quote and how long. | Several reply options to send |
-| `voice` | A voice message, summarised from its transcript, with duration. | Reply options |
+| `question` | Someone asked you something and is waiting. Shows the quote and how long. | Several reply options to send, already sorted |
+| `voice` | A voice message, summarised from its transcript, with duration. | Reply options, already sorted |
 | `reaction` | A message that invites a reaction, like good news in a group. | Emoji to react with |
 | `followup` | A promise you made ("I'll get back to you") with no later message from you in that chat. | Write now, or a holding reply |
 
@@ -48,7 +48,7 @@ Sending, reacting and voting share the same hourly limit and offline check as Cl
 
 | Type | What it is | Offers |
 |---|---|---|
-| `event` | A date from a chat with place, attendees and how many said yes. | Accept, later, decline |
+| `event` | A date from a chat with place, attendees and how many said yes. | I'm going, not going, later |
 | `conflict` | Two dates overlap. Shows both on a time axis and the free slot. | Propose a change |
 | `birthday` | A birthday with age and gift ideas that came up in chats. | Prepare a congratulation reminder |
 | `reminder` | Your own reminder for today. | Done, or snooze to a time |
@@ -82,5 +82,9 @@ Sending, reacting and voting share the same hourly limit and offline check as Cl
 - **Derived live from SQL** by the API: `question`, `voice`, `reaction`, `event`, `conflict`, `reminder`, `task`, `poll`, `digest`, `person`, `routine`.
 - **Written by the organizer** into the `cards` table in the same call that links a thread to a topic, with no extra cost: `shopping`, `parcel`, `money`, `trip`, `place`, `address`, `birthday`, `insight`. Usually zero, at most three per call.
 - **Written by rules** every 10 minutes, without AI: `followup` (open promises), `link` (shared links) and `photos` (per chat and day). Tune them with `CARDS_FOLLOWUP_MIN_HOURS`, `CARDS_FOLLOWUP_MAX_DAYS`, `CARDS_LINK_DAYS`, `CARDS_PHOTOS_MIN` and `CARDS_PHOTOS_DAYS`.
+
+**Stale items leave by themselves:** questions and voice messages after three days, and at once when you reacted to the message or topic sorting found the conversation settled. Organizer cards without a date leave after seven days without new activity. **"Already sorted"** also leaves a note on the chat, so neither sorting nor Claude treat it as open again.
+
+**Answers to events:** "I'm going" and "Not going" send nothing to WhatsApp. Jarvis keeps your answer as a note and shows it to Claude with the upcoming events, so Claude answers "Am I going to game night?" correctly. After "not going" there are no more reminders for that event.
 
 Done and dismissed cards never come back, and excluded chats never produce cards. Card keys are stable (`card:<type>:<chat>:<slug>`), so a reworded model answer does not create a duplicate.

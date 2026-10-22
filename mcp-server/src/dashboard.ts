@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { pool } from './db.js'
+import { pool, STILL_OPEN } from './db.js'
+import { attendanceOf } from './attendance.js'
 import { loadWatchState, POLL_RENOTIFY_MS, priorityOf, resolveState as resolve, type ItemState } from './watch.js'
 
 
@@ -68,19 +69,20 @@ export function registerDashboardTool(server: McpServer) {
         }
         if (shouldNotify(key, r.state, stage !== 'info')) toNotify.push(key)
         const people = ((x.facts as { people?: { name: string; state: string }[] } | null)?.people ?? []).slice(0, 12)
-        return [{ key, priority: prio(key), topic_id: x.id, title: x.title, summary: String(x.summary ?? '').replace(/\s+/g, ' ').slice(0, 220), event_at: at.toISOString(), hours_until: Math.round(h * 10) / 10, stage, people, chats: x.chat_count, state: r.state }]
+        const going = attendanceOf(rows).get(`zusage:topic:${x.id}`)
+        return [{ key, priority: prio(key), topic_id: x.id, title: x.title, ...(going ? { owner_going: going === 'yes' } : {}), summary: String(x.summary ?? '').replace(/\s+/g, ' ').slice(0, 220), event_at: at.toISOString(), hours_until: Math.round(h * 10) / 10, stage, people, chats: x.chat_count, state: r.state }]
       })
 
       // Unbeantwortete Fragen in Einzelchats
       const q = await pool.query(
         `WITH last AS (
-           SELECT DISTINCT ON (chat_jid) chat_jid, chat_name, from_me, ts, type, left(body, 200) AS body
+           SELECT DISTINCT ON (chat_jid) chat_jid, chat_name, from_me, ts, type, id, left(body, 200) AS body
            FROM v_messages WHERE NOT chat_is_group AND deleted_at IS NULL AND type NOT IN ('reaction','sticker')
            ORDER BY chat_jid, ts DESC)
          SELECT l.chat_jid, l.chat_name, l.ts, p.relationship, p.closeness, l.type, l.body
          FROM last l LEFT JOIN contact_profiles p ON p.jid = l.chat_jid
-         WHERE NOT l.from_me AND l.ts BETWEEN now() - interval '4 days' AND now() - interval '2 hours'
-           AND (l.body LIKE '%?%' OR l.type = 'audio')
+         WHERE NOT l.from_me AND l.ts BETWEEN now() - interval '3 days' AND now() - interval '2 hours'
+           AND (l.body LIKE '%?%' OR l.type = 'audio') ${STILL_OPEN}
          ORDER BY coalesce(p.closeness, 0) DESC, l.ts DESC LIMIT 15`,
       )
       const questions = q.rows.flatMap((x) => {

@@ -241,7 +241,11 @@
     "writingReplies": "Jarvis is writing reply suggestions …",
     "willSend": "Will be sent",
     "allFrom": "Everything from {{chat}}:",
-    "allFromSet": "All cards from {{chat}}: {{level}}"
+    "allFromSet": "All cards from {{chat}}: {{level}}",
+    "youGo": "You're going",
+    "youSkip": "You're not going",
+    "noted": "Noted",
+    "notGoingAfterAll": "Not going after all"
   },
   "act": {
     "send": "Sent.",
@@ -252,7 +256,10 @@
     "dismiss": "Hidden.",
     "remind": "Reminder set.",
     "save_contact": "Saved to contacts.",
-    "open": "Opened."
+    "open": "Opened.",
+    "attend": "Noted.",
+    "going": "Noted: you're going.",
+    "notGoing": "Noted: you're not going."
   },
   "ask": {
     "placeholder": "Ask Jarvis …",

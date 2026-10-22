@@ -241,7 +241,11 @@
     "writingReplies": "Jarvis schreibt Antwortvorschläge …",
     "willSend": "Wird gesendet",
     "allFrom": "Alles aus {{chat}}:",
-    "allFromSet": "Alle Karten aus {{chat}}: {{level}}"
+    "allFromSet": "Alle Karten aus {{chat}}: {{level}}",
+    "youGo": "Du bist dabei",
+    "youSkip": "Du bist nicht dabei",
+    "noted": "Notiert",
+    "notGoingAfterAll": "Doch nicht dabei"
   },
   "act": {
     "send": "Gesendet.",
@@ -252,7 +256,10 @@
     "dismiss": "Ausgeblendet.",
     "remind": "Erinnerung gesetzt.",
     "save_contact": "In Kontakte übernommen.",
-    "open": "Geöffnet."
+    "open": "Geöffnet.",
+    "attend": "Gemerkt.",
+    "going": "Gemerkt: Du bist dabei.",
+    "notGoing": "Gemerkt: Du bist nicht dabei."
   },
   "ask": {
     "placeholder": "Frag Jarvis …",
