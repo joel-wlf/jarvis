@@ -16,7 +16,7 @@ Alle WhatsApp-Chats von ${OWNER} liegen in einer Postgres-Datenbank (Nachrichten
 Abschnitte von read_me: overview, search, data, topics, people, memory, actions, limits, status (aktueller Zustand live). Mit section="all" alles auf einmal.
 
 Faustregel:
-- "Was steht an / wie ist der Stand bei X / was ist offen?" -> list_topics, get_topic, list_suggested_actions (Hot Context steht schon in den Anweisungen).
+- "Was steht an / was ist offen?" -> get_dashboard oder list_cards (derselbe Feed wie in der App); "worum geht es bei dieser Karte?" -> get_card; "mach das" -> act_on_card. "Wie ist der Stand bei X?" -> list_topics, get_topic, list_suggested_actions (Hot Context steht schon in den Anweisungen).
 - "Was hat X gesagt / wann ist Y?" -> semantic_search (natürliche Sprache) oder search_messages (exakte Wörter), dann get_conversation_context für den Zusammenhang.
 - "Was ist in Chat X zuletzt passiert?" -> get_recent_messages.
 - Aktionen (senden, abstimmen, Gruppen ...) und Gedächtnis nur auf ausdrücklichen Wunsch von ${OWNER}.
@@ -56,6 +56,7 @@ Ein Organizer (KI) sortiert Nachrichten laufend: Nachrichten -> Threads (je Chat
 - list_topics(query?, include_old?): Standard nur offene Themen. get_topic(id): Personen, offene Fragen, Threads je Chat. list_threads(chat?, status?, days?), get_thread(id): Nachrichten eines Threads.
 - Status: open, resolved, cancelled (abgesagt), past (Termin vorbei, automatisch 24 h nach dem Termin), stale (offen ohne Termin, 21 Tage ohne Aktivität, automatisch). Veraltete Themen sind standardmäßig ausgeblendet (include_old).
 - list_suggested_actions: Termine/Aufgaben für ${OWNER}; bei erledigten/veralteten Themen werden sie automatisch erledigt/obsolet.
+- Karten (list_cards, get_card, act_on_card): Die App zeigt aus Themen, Vorschlägen, Fragen, Umfragen und Erinnerungen einen Feed aus Karten; Claude sieht denselben. Eine Vorschlags-Karte "Termin: …" ist ein Termin (Datum, Ort), "Aufgabe: …" eine Aufgabe. Jede Karte hat vorbereitete Schritte (suggestions) mit id: act_on_card führt sie aus wie ein Tipp in der App (erledigt, zurückstellen, erinnern, unwichtig, abstimmen, vorbereitete Antwort senden). Was ${OWNER} in der App auf wichtig, später oder unwichtig gestellt hat (auch für einen ganzen Chat) und was Jarvis daraus gelernt hat, gilt für Claude genauso.
 Frische Nachrichten sind erst nach etwa 1 Stunde (ab 4 neuen Nachrichten, ruhige Chats nach spätestens 12 Stunden) in Threads eingeordnet; bis dahin direkt mit den Such- und Lese-Tools arbeiten. Zusammenfassungen können leicht daneben liegen: bei wichtigen Angaben (Uhrzeit, Ort, Zusage) die Originalnachrichten prüfen.`,
 
   people: `# Personen: Namen, Beziehung, Ton

@@ -39,6 +39,10 @@ dismissing or snoozing in the app and via Claude's `watch_feedback` is the same.
 done/dismiss/snooze → `watch_state` (or `reminders`, `suggested_actions`, `cards.status` for those card kinds),
 remind → `reminders` (ref = card key), send/react/vote → `outbox` (same limits and offline check as the MCP tools).
 
+MCP: the same feed is available to Claude as `list_cards`, `get_card` (data plus the background of `GET /cards/:key/context`)
+and `act_on_card` (runs a suggestion through the same `act` function as `POST /cards/:key/act`; steps that send or vote
+follow `REQUIRE_CONFIRM` and `ENABLE_ACTIONS`). `get_dashboard` is built from `listCards` too, in its original shape.
+
 Importance: `PUT /cards/:key/priority` stores the owner's choice in `watch_state.priority` (3 important, 2 normal, 1 later,
 `null` = Jarvis decides; migration `016_card_priority.sql`). The card list returns it as `urgency` and sorts by urgency, then by
 `dueAt`. The watch service (`get_dashboard`) follows it: important items are always in `to_notify` while new, items set to

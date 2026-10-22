@@ -12,7 +12,7 @@ import { ApiFail, lang, str } from './http.js'
 /** Read-only tools the model may call. Anything that writes or sends stays with Claude and the card actions. */
 const READ_TOOLS = new Set([
   'search_messages', 'semantic_search', 'list_topics', 'get_topic', 'list_threads', 'get_thread', 'get_recent_messages', 'get_conversation_context',
-  'list_chats', 'find_contact', 'get_person', 'list_people', 'recall', 'get_dashboard', 'get_open_polls', 'get_poll_results', 'find_scheduling_mentions',
+  'list_chats', 'find_contact', 'get_person', 'list_people', 'recall', 'get_dashboard', 'list_cards', 'get_card', 'get_open_polls', 'get_poll_results', 'find_scheduling_mentions',
   'list_suggested_actions', 'list_reminders', 'get_writing_style', 'get_chat_stats', 'read_me',
 ])
 const MAX_ROUNDS = 6
