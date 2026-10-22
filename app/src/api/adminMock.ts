@@ -113,6 +113,8 @@ export function createMockAdmin(): AdminApi {
       await wait(250)
       const svc = ['postgres', 'embedder', 'wa-ingest', 'mcp-server', 'organizer', 'cloudflared', 'admin']
       return {
+        health: [],
+        lastUpdate: { status: 'ok', at: iso(0.4), updated: [] },
         services: svc.map((s) => ({ service: s, state: 'running', health: s === 'cloudflared' ? '' : 'healthy', status: 'Up 3 days' })),
         servicesError: null,
         wa,
@@ -142,6 +144,14 @@ export function createMockAdmin(): AdminApi {
     async testOpenAi(key) {
       await wait(700)
       return key && key.length < 20 ? { ok: false, message: 'Der Anbieter lehnt den Schlüssel ab (401).' } : { ok: true, message: 'Schlüssel funktioniert.' }
+    },
+    async openRouterStart(redirect) {
+      await wait(200)
+      return { url: redirect ? '/setup?code=fake&state=demo' : 'https://openrouter.ai/auth?state=demo', state: 'demo' }
+    },
+    async openRouterFinish() {
+      await wait(500)
+      return { settings: { OPENAI_API_KEY: '@openrouter', OPENAI_BASE_URL: 'https://openrouter.ai/api/v1', APP_MODEL: 'openai/gpt-4.1-mini', ORGANIZER_MODEL: 'openai/gpt-4.1-mini', IMAGE_MODEL: 'openai/gpt-4.1-mini', EMBED_PROVIDER: 'local', TRANSCRIBE_PROVIDER: 'off' } }
     },
     async backups() {
       guard()

@@ -1,0 +1,17 @@
+#!/bin/bash
+# Announces jarvis.local in the home network even when the Raspberry Pi Imager set another host name.
+# With the host name jarvis, avahi already does this and there is nothing to add.
+set -u
+[[ $(hostname) == jarvis ]] && exit 0
+primary() { hostname -I | awk '{print $1}'; }
+while true; do
+	ip=$(primary)
+	if [[ -z $ip ]]; then sleep 5; continue; fi
+	avahi-publish -a -R jarvis.local "$ip" &
+	pub=$!
+	while sleep 30; do
+		[[ $(primary) == "$ip" ]] && kill -0 "$pub" 2>/dev/null || break
+	done
+	kill "$pub" 2>/dev/null
+	wait "$pub" 2>/dev/null
+done

@@ -158,6 +158,8 @@ export class FakeDocker implements DockerApi {
   delayMs = 0
   /** pull fails (registry unreachable) */
   pullFails = false
+  /** services whose image changes with the next pull (otherwise pull finds nothing new) */
+  newImages = new Set<string>()
   volumes = new Set(['jarvis_pgdata', 'jarvis_wa-auth'])
   /** wie bei CliDocker: ohne envFile gilt die .env des Projekts */
   defaultEnvFile?: string
@@ -240,6 +242,10 @@ export class FakeDocker implements DockerApi {
 
   async docker(args: string[]): Promise<RunResult> {
     this.calls.push(args)
+    if (args[0] === 'image' && args[1] === 'inspect') {
+      const svc = /^img-(.+):latest$/.exec(args.at(-1)!)?.[1] ?? ''
+      return { code: 0, out: `sha256:${this.newImages.has(svc) ? 'new' : 'old'}-${svc}\n` }
+    }
     if (args[0] === 'inspect') return { code: 0, out: `sha256:old-${args.at(-1)!.replace('cid-', '')} img-${args.at(-1)!.replace('cid-', '')}:latest\n` }
     if (args[0] === 'volume' && args[1] === 'inspect') return this.volumes.has(args[2]) ? { code: 0, out: '[]' } : { code: 1, out: 'no such volume' }
     if (args[0] === 'volume' && args[1] === 'rm') {

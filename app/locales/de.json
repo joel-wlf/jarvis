@@ -772,6 +772,7 @@
     "err.consent": "Bitte bestätige zuerst die Hinweise zur WhatsApp-Verbindung.",
     "err.waNotLinked": "WhatsApp ist noch nicht verbunden. Scanne den Code oder wähle „Später verbinden“.",
     "err.key": "{{name}} arbeitet mit KI. Bitte trage deinen API-Schlüssel ein.",
+    "err.openrouter": "Bitte melde dich zuerst bei OpenRouter an oder wähle einen OpenAI-Schlüssel.",
     "err.url": "Bitte gib eine vollständige Adresse ein, zum Beispiel https://jarvis.deine-domain.de.",
     "err.https": "Bitte gib eine HTTPS-Server-Adresse ohne Pfad ein.",
     "err.token": "Bitte füge den Tunnel-Token ein.",
@@ -823,10 +824,21 @@
     },
     "ai": {
       "title": "Verbinde die KI von {{name}}",
-      "lead": "{{name}} ist ein KI-Assistent: Er versteht deine Nachrichten, sortiert sie nach Themen, transkribiert Sprachnachrichten und beantwortet deine Fragen. Dafür braucht er einen KI-Anbieter. Aktuell wird OpenAI unterstützt.",
+      "lead": "{{name}} ist ein KI-Assistent: Er versteht deine Nachrichten, sortiert sie nach Themen, beschreibt Bilder und beantwortet deine Fragen. Dafür braucht er einen KI-Anbieter. Am einfachsten ist OpenRouter: anmelden, fertig.",
       "cost": "Dabei werden Texte, Audios und Bilder an den Anbieter übertragen und es entstehen API-Kosten. Chat-Ausschlüsse gelten für Suche und Themen-Sortierung, nicht automatisch für Audio und Bilder. Lege unten fest, was nie an die KI gehen darf.",
       "test": "API-Schlüssel prüfen",
-      "more": "Weitere Einstellungen wie Transkription, Bildbeschreibung und Themen-Sortierung stehen auf sinnvollen Werten und lassen sich später unter Einstellungen ändern."
+      "more": "Weitere Einstellungen wie Transkription, Bildbeschreibung und Themen-Sortierung stehen auf sinnvollen Werten und lassen sich später unter Einstellungen ändern.",
+      "orTab": "OpenRouter (empfohlen)",
+      "keyTab": "OpenAI-Schlüssel",
+      "orLead": "Melde dich bei OpenRouter an oder lege dort ein Konto an. Danach kommst du automatisch hierher zurück, den Schlüssel übernimmt {{name}} selbst. Lade bei OpenRouter etwas Guthaben auf, 5 $ reichen für den Anfang.",
+      "orLogin": "Mit OpenRouter anmelden",
+      "orAgain": "Neu anmelden",
+      "orConnected": "Mit OpenRouter verbunden.",
+      "orLimits": "Mit OpenRouter bleiben Sprachnachrichten ohne Text und die Suche läuft auf deinem Gerät. Beides geht mit einem OpenAI-Schlüssel.",
+      "orNoRedirect": "Kommst du nicht zurück? Code von Hand einfügen",
+      "orCode": "Code von OpenRouter",
+      "orCodeHelp": "OpenRouter zeigt nach dem Anmelden einen Code. Kopiere ihn hierher.",
+      "orCodeTake": "Code übernehmen"
     },
     "remote": {
       "title": "Wo möchtest du {{name}} nutzen?",
@@ -1010,5 +1022,58 @@
     "forget": "Alles Gelernte vergessen",
     "forgetConfirm": "Alle gelernten Regeln und Zähler löschen? Regeln, die du selbst festgelegt hast, bleiben.",
     "forgotten": "Gelerntes vergessen."
+  },
+  "health": {
+    "allGood": "Alles läuft",
+    "allGoodSub": "Jarvis empfängt Nachrichten und alle Teile arbeiten.",
+    "lastUpdate": "Zuletzt aktualisiert {{when}}.",
+    "services": {
+      "postgres": "Datenbank",
+      "embedder": "Suche",
+      "wa-ingest": "WhatsApp-Empfang",
+      "mcp-server": "App- und Claude-Schnittstelle",
+      "organizer": "Themen-Sortierung",
+      "cloudflared": "Fernzugriff",
+      "admin": "Verwaltung",
+      "app-web": "Weboberfläche"
+    },
+    "serviceDown": {
+      "title": "{{service}} läuft nicht",
+      "detail": "Dieser Teil von Jarvis ist stehen geblieben. Ein Neustart behebt das meistens.",
+      "action": "Neu starten"
+    },
+    "serviceUnhealthy": {
+      "title": "{{service}} hat Probleme",
+      "detail": "Dieser Teil läuft, antwortet aber nicht richtig. Versuche einen Neustart.",
+      "action": "Neu starten"
+    },
+    "waLoggedOut": {
+      "title": "WhatsApp wurde abgemeldet",
+      "detail": "Jarvis ist auf deinem Handy nicht mehr als verknüpftes Gerät eingetragen. Bis du neu koppelst, kommen keine neuen Nachrichten an.",
+      "action": "WhatsApp neu koppeln"
+    },
+    "waNotLinked": {
+      "title": "WhatsApp ist noch nicht gekoppelt",
+      "detail": "Scanne den Code mit WhatsApp auf deinem Handy, damit Jarvis Nachrichten empfängt.",
+      "action": "Jetzt koppeln"
+    },
+    "waDisconnected": {
+      "title": "WhatsApp ist gerade nicht verbunden",
+      "detail": "Jarvis versucht es von selbst weiter. Ist dein Handy länger offline, holt Jarvis die Nachrichten danach nach. Bleibt das so, koppel neu.",
+      "action": "Zu WhatsApp"
+    },
+    "diskFull": {
+      "title": "Der Speicher ist fast voll",
+      "detail": "Bald kann Jarvis keine Nachrichten mehr speichern. Nutze eine größere SD-Karte oder lösche andere Dateien auf dem Gerät."
+    },
+    "diskLow": {
+      "title": "Der Speicher wird knapp",
+      "detail": "Noch läuft alles, aber plane eine größere SD-Karte ein."
+    },
+    "updateFailed": {
+      "title": "Die letzte Aktualisierung hat nicht geklappt",
+      "detail": "Jarvis läuft weiter mit dem vorherigen Stand. In der nächsten Nacht folgt ein neuer Versuch.",
+      "action": "Details ansehen"
+    }
   }
 }

@@ -93,7 +93,17 @@ export interface DbStats {
   tokensToday: number | null
   heartbeat: string | null
 }
+/** One plain-language problem with the action that fixes it (admin/src/health.ts) */
+export interface HealthItem {
+  id: 'serviceDown' | 'serviceUnhealthy' | 'waLoggedOut' | 'waNotLinked' | 'waDisconnected' | 'diskFull' | 'diskLow' | 'updateFailed'
+  level: 'error' | 'warn'
+  params?: Record<string, string>
+  action?: { kind: 'route'; to: string } | { kind: 'restart'; service: string }
+}
 export interface StatusResponse {
+  /** missing on older servers */
+  health?: HealthItem[]
+  lastUpdate?: { status: JobStatus; at: string; updated: string[] | null } | null
   services: ServiceState[]
   servicesError: string | null
   wa: WaLink
@@ -148,6 +158,10 @@ export interface AdminApi {
   wa(): Promise<WaLink>
   relink(confirm: string, phone?: string): Promise<Job>
   testOpenAi(key?: string, baseUrl?: string): Promise<{ ok: boolean; message: string }>
+  /** Sign in with OpenRouter: redirect = come back to /setup, otherwise OpenRouter shows a code to paste */
+  openRouterStart(redirect: boolean): Promise<{ url: string; state: string }>
+  /** Swap OpenRouter's one-time code for a key. The server keeps the key; the settings to apply carry a placeholder. */
+  openRouterFinish(state: string, code: string): Promise<{ settings: Record<string, string> }>
   backups(): Promise<Backup[]>
   restore(name: string): Promise<Job>
   restart(service: string): Promise<Job>
@@ -192,6 +206,8 @@ export function createHttpAdmin(homeUrl: string, token?: string): AdminApi {
     wa: () => call('/api/wa'),
     relink: (confirm, phone) => job(call('/api/wa/relink', 'POST', { confirm, phone })),
     testOpenAi: (key, baseUrl) => call('/api/test/openai', 'POST', { key, baseUrl }, 20_000),
+    openRouterStart: (redirect) => call('/api/openrouter/start', 'POST', { redirect }),
+    openRouterFinish: (state, code) => call('/api/openrouter/finish', 'POST', { state, code }, 20_000),
     backups: async () => (await call<{ backups: Backup[] }>('/api/backups')).backups,
     restore: (name) => job(call(`/api/backups/${encodeURIComponent(name)}/restore`, 'POST')),
     restart: (service) => job(call('/api/maintenance/restart', 'POST', { service })),

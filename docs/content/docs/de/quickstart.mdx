@@ -1,52 +1,71 @@
 ---
 title: Schnellstart
-description: Vom frischen Raspberry Pi bis zur App auf dem Handy.
+description: Vom leeren Raspberry Pi bis zur App auf dem Handy.
 ---
 
 <Callout type="warn" title="Inoffiziell und unabhängig">
 Jarvis ist nicht mit WhatsApp oder Meta verbunden und nutzt einen inoffiziellen Zugang, der gegen die WhatsApp-Nutzungsbedingungen verstoßen kann. Nutzung auf eigenes Risiko. Lies die vollständigen [Rechtlichen Hinweise](./disclaimer.mdx).
 </Callout>
 
-
-Du brauchst einen Raspberry Pi (oder einen anderen 64-Bit-Linux-Rechner) mit Docker und Docker Compose. Hardware-Hinweise stehen in der [Raspberry-Pi-Anleitung](./raspberry-pi.mdx).
-
 ## 1. Installieren
 
-### Mit dem Installer
+Es gibt drei Wege. Für die meisten ist der erste der einfachste: kein Terminal, keine Befehle.
+
+### Fertiges Raspberry-Pi-Image (empfohlen)
+
+Du brauchst einen Raspberry Pi 4 oder 5 (ab 4 GB), eine microSD-Karte ab 32 GB und einen Computer mit Kartenleser. Hardware-Tipps stehen in der [Raspberry-Pi-Anleitung](./raspberry-pi.mdx).
+
+1. Lade die Image-Datei `jarvis-…-arm64.img.xz` von der [neuesten Version](https://github.com/joel-wlf/jarvis/releases/latest) herunter.
+2. Installiere den [Raspberry Pi Imager](https://www.raspberrypi.com/software/) und starte ihn.
+3. Wähle als Gerät deinen Pi, als Betriebssystem ganz unten **„Eigenes Image verwenden“** und dann die heruntergeladene Datei. Wähle deine SD-Karte.
+4. **Mit Netzwerkkabel** musst du nichts weiter einstellen. **Mit WLAN** sagst du ja, wenn der Imager fragt, ob du Einstellungen anpassen willst, und trägst dort Name und Passwort deines WLANs ein. Den Hostnamen lässt du auf `jarvis` oder leer.
+5. Schreiben lassen, Karte in den Pi stecken, Strom an.
+6. Öffne auf Handy oder Computer im selben Netz **[http://jarvis.local](http://jarvis.local)**.
+
+Beim ersten Start lädt Jarvis seine Programme aus dem Internet. Das dauert meist 5 bis 15 Minuten. Bis dahin zeigt die Seite „Jarvis wird vorbereitet“ und lädt sich von selbst neu.
+
+<Callout title="jarvis.local geht nicht?">
+Ältere Android-Geräte und manche Router kennen `.local`-Adressen nicht. Dann such in deinem Router (z.B. FRITZ!Box → Heimnetz) nach dem Gerät **jarvis** und öffne dessen Adresse, etwa `http://192.168.178.42`.
+</Callout>
+
+Fortgeschrittene können die Image-Liste auch direkt im Imager einbinden: `rpi-imager --repo https://github.com/joel-wlf/jarvis/releases/latest/download/rpi-imager.json`. Dann steht Jarvis im Menü, und der Imager bietet seine Einstellungen sicher an.
+
+### Mit dem Installer auf einem vorhandenen Linux-Rechner
+
+Für jeden 64-Bit-Linux-Rechner, auf dem du schon ein Terminal hast:
 
 <InstallCommand />
 
-Der Installer holt die fertigen Images, legt den Projektordner an und startet den Admin-Dienst.
+Das Skript prüft Docker (und installiert es auf Debian und Ubuntu nach Rückfrage), lädt die fertigen Images und zeigt am Ende die Adresse, meist `http://<adresse-des-rechners>:8081`.
 
-### Aus dem Quellcode bauen
-
-Wenn du alles selbst auf dem Gerät bauen willst:
+### Mit Docker Compose
 
 ```bash
 git clone https://github.com/joel-wlf/jarvis.git ~/jarvis && cd ~/jarvis
-docker compose up -d admin
-docker compose logs admin        # zeigt den Einrichtungscode
+docker compose up -d admin app-web
 ```
 
-Der erste Bau dauert auf einem Pi 4 eine Weile.
+Dann `http://<adresse-des-rechners>:8081` öffnen.
 
 ## 2. Einrichtungsassistent
 
-Öffne `http://<adresse-des-pi>:8080` in einem Browser im selben Netz. Gib den **Einrichtungscode** aus dem Admin-Log ein und lege ein Admin-Passwort fest.
+Der Assistent im Browser führt dich durch sieben Schritte. Du kannst jederzeit abbrechen und später weitermachen.
 
-Der Assistent fragt:
-
-1. Deinen Namen (für Zusammenfassungen und Profile).
-2. Einen KI-Anbieter samt Schlüssel (optional, mit Live-Test). Ohne läuft alles lokal und langsamer.
-3. Datenschutz-Ausschlüsse: Chats, deren Name diese Wörter enthält, gehen nie an die KI. Setze das vor dem ersten Start mit Schlüssel.
-4. Welche Funktionen laufen sollen (Themen-Sortierung, Bildbeschreibung, Aktionen).
-5. Optional einen Cloudflare-Tunnel, damit App und Claude dich auch unterwegs erreichen.
+1. **Name** deines Assistenten.
+2. **Passwort** (mindestens 15 Zeichen). Wer zuerst die Seite öffnet, legt es fest. Richte Jarvis deshalb gleich nach dem Start ein.
+3. **Quelle**: Hinweise zur WhatsApp-Verbindung bestätigen. Jarvis erzeugt jetzt alle internen Passwörter und startet die Dienste.
+4. **WhatsApp koppeln**, siehe unten.
+5. **KI**: Am einfachsten ist **„Mit OpenRouter anmelden“**. Du meldest dich bei OpenRouter an oder legst dort ein Konto an, lädst etwas Guthaben auf (5 $ reichen für den Anfang) und kommst automatisch zurück. Einen Schlüssel musst du nicht kopieren. Alternativ fügst du einen OpenAI-Schlüssel ein. Hier legst du auch fest, welche Chats nie an die KI gehen.
+6. **Fernzugriff**: nur im Heimnetz, per Cloudflare-Tunnel oder mit eigener Adresse. „Nur im Heimnetz“ ist für den Anfang völlig in Ordnung.
+7. **Fertig**: QR-Code für die App und die Adresse für Claude.
 
 <Callout type="warn">
-Mit konfiguriertem KI-Anbieter geht Nachrichteninhalt an diesen Anbieter. Ausgeschlossene Chats und Schwärzung begrenzen, was dein Gerät verlässt. Siehe die [Rechtlichen Hinweise](./disclaimer.mdx#ki-anbieter).
+Mit KI-Anbieter geht Nachrichteninhalt an diesen Anbieter. Ausgeschlossene Chats und Schwärzung begrenzen, was dein Gerät verlässt. Siehe die [Rechtlichen Hinweise](./disclaimer.mdx#ki-anbieter).
 </Callout>
 
-Danach erzeugt er alle Passwörter und Tokens selbst, baut und startet die Dienste und zeigt den nächsten Schritt.
+<Callout title="OpenRouter oder OpenAI?">
+Mit OpenRouter läuft die Suche auf deinem Gerät, und Sprachnachrichten bleiben ohne Text, weil OpenRouter keine Transkription anbietet. Mit einem OpenAI-Schlüssel geht beides über OpenAI. Wechseln kannst du später unter System → Einstellungen.
+</Callout>
 
 ## 3. WhatsApp verknüpfen
 
@@ -54,34 +73,35 @@ Danach erzeugt er alle Passwörter und Tokens selbst, baut und startet die Diens
 Das ist ein inoffizieller Zugang. WhatsApp kann Konten sperren, die inoffizielle Clients nutzen. Erwäge eine Zweitnummer. Siehe die [Rechtlichen Hinweise](./disclaimer.mdx).
 </Callout>
 
-Der Assistent endet auf der WhatsApp-Seite. Sie zeigt den **QR-Code** im Browser, oder einen **Kopplungscode**, wenn du deine Telefonnummer eingibst.
+Der Assistent zeigt einen **QR-Code** im Browser, oder einen **Kopplungscode**, wenn du deine Telefonnummer eingibst.
 
 Am Handy: WhatsApp → Einstellungen → Verknüpfte Geräte → Gerät hinzufügen → scannen.
 
 Danach schickt das Handy den Verlauf in Batches. Das kann einige Minuten dauern. Halte das Handy online und WhatsApp geöffnet. Wie viel Verlauf kommt, entscheidet WhatsApp.
 
-<Callout title="Verknüpfen im Terminal">
-Ohne Weboberfläche: `docker compose logs -f wa-ingest` zeigt den QR-Code im Log.
-</Callout>
-
 ## 4. App koppeln
 
-Installiere die Jarvis-App (oder öffne die Web-Version unter der Admin-Adresse). Auf dem Verbindungsbildschirm hast du zwei Wege:
+Öffne die Web-App unter derselben Adresse oder installiere die Jarvis-App. Auf dem Verbindungsbildschirm hast du zwei Wege:
 
-- **Code scannen.** Öffne in der Admin-Oberfläche die Geräteseite, zeige den Kopplungscode an und richte die Kamera der App darauf.
-- **Adresse und Passwort.** Gib deine öffentliche Adresse ein (zum Beispiel `https://jarvis.example.com`) und das Besitzer-Passwort, das du gewählt hast, und tippe auf Verbinden.
+- **Code scannen.** Der letzte Schritt des Assistenten (und später System → Geräte) zeigt einen QR-Code. Richte die Kamera der App darauf.
+- **Adresse und Passwort.** Gib die Adresse ein und das Passwort, das du gewählt hast.
 
 Details stehen unter [Die App](./app.mdx).
 
 ## 5. Claude verbinden
 
-Trage `https://jarvis.example.com` in Claude als eigenen Connector ein. Siehe [Claude verbinden](./connect-claude.mdx).
+Mit Fernzugriff trägst du die öffentliche Adresse in Claude als eigenen Connector ein. Siehe [Claude verbinden](./connect-claude.mdx).
 
-## Prüfen, ob es läuft
+## Danach: Updates und Zustand
+
+- **Updates kommen von selbst.** Jede Nacht um 4 Uhr lädt Jarvis neue Versionen und startet nur die Teile neu, die sich geändert haben. Läuft der neue Stand nicht sauber, kommt der alte zurück. Abschalten oder die Uhrzeit ändern kannst du unter System → Einstellungen → Oberfläche.
+- **Der Zustand steht unter System.** Läuft alles, steht dort „Alles läuft“. Sonst siehst du in Klartext, was los ist, zum Beispiel „WhatsApp wurde abgemeldet“, mit dem passenden Knopf zum Beheben.
+
+## Für Fortgeschrittene: prüfen im Terminal
 
 ```bash
 docker compose ps
 docker compose exec postgres psql -U jarvis -c "select count(*) from messages"
 ```
 
-Die Zahl wächst, solange der Verlauf importiert wird. Sprachnachrichten werden im Hintergrund transkribiert.
+Die Zahl wächst, solange der Verlauf importiert wird. Ohne Weboberfläche zeigt `docker compose logs -f wa-ingest` den WhatsApp-QR-Code im Log.

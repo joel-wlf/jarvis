@@ -18,7 +18,9 @@ Jarvis keeps your WhatsApp archive on a small Linux machine you own, searches it
 
 ## Install
 
-You need a 64-bit Linux machine with Docker (a Raspberry Pi 4 with 4 GB works).
+**Easiest, no terminal:** download the Raspberry Pi image `jarvis-…-arm64.img.xz` from the [latest release](https://github.com/joel-wlf/jarvis/releases/latest), write it to an SD card with the [Raspberry Pi Imager](https://www.raspberrypi.com/software/) (Wi-Fi in the Imager settings, nothing with a cable), put it into a Raspberry Pi 4 or 5 and open **http://jarvis.local**. The assistant in your browser does the rest, AI included: just sign in with OpenRouter. Updates then arrive every night by themselves. Step by step in the [quickstart](docs/content/docs/en/quickstart.mdx).
+
+**On an existing 64-bit Linux machine** with a terminal (a Raspberry Pi 4 with 4 GB works):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/joel-wlf/jarvis/main/install.sh -o install-jarvis.sh

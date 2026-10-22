@@ -62,7 +62,7 @@ const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace'].map((v) 
 
 export const FIELDS: Field[] = [
   {
-    key: 'APP_WEB_PORT', group: 'admin', type: 'int', default: '8081', min: 1024, max: 65535,
+    key: 'APP_WEB_PORT', group: 'admin', type: 'int', default: '8081', min: 80, max: 65535,
     label: 'Web-Port', help: 'Gemeinsamer Einstieg für Einrichtung, App und Verwaltung.', services: ['app-web'],
   },
   {
@@ -143,8 +143,8 @@ export const FIELDS: Field[] = [
 
   // KI
   {
-    key: 'OPENAI_API_KEY', group: 'ai', type: 'secret', default: '', label: 'OpenAI-API-Schlüssel',
-    help: 'Optional. Ohne Schlüssel bleiben Suche und Archiv lokal; Transkription, Themen-Sortierung und Bildbeschreibung sind ausgeschaltet.',
+    key: 'OPENAI_API_KEY', group: 'ai', type: 'secret', default: '', label: 'API-Schlüssel',
+    help: 'Schlüssel von OpenAI oder OpenRouter (bei OpenRouter auch per Anmelden im Einrichtungsassistenten). Ohne Schlüssel bleiben Suche und Archiv lokal; Transkription, Themen-Sortierung und Bildbeschreibung sind ausgeschaltet.',
     pattern: '^sk-[A-Za-z0-9_-]{20,300}$', patternHelp: 'Beginnt mit sk-', services: ['embedder', 'wa-ingest', 'organizer', 'mcp-server'],
   },
   {
@@ -395,6 +395,16 @@ export const FIELDS: Field[] = [
     key: 'JARVIS_REGISTRY', group: 'expert', type: 'text', default: 'ghcr.io/joel-wlf/jarvis', label: 'Image-Registry',
     help: 'Präfix der Images (<Präfix>-<dienst>). Nur für eigene Forks oder einen Spiegel ändern. Einzige Stelle für den Standardwert; docker-compose.yml muss übereinstimmen.',
     pattern: '^[a-z0-9][a-z0-9._:/-]{0,200}$', patternHelp: 'Kleingeschrieben, z.B. ghcr.io/besitzer/jarvis', advanced: true, adminOnly: true, services: [],
+  },
+
+  {
+    key: 'AUTO_UPDATE', group: 'admin', type: 'bool', default: 'true', label: 'Automatisch aktualisieren',
+    help: 'Lädt nachts neue Versionen und startet nur die geänderten Dienste neu. Läuft der neue Stand nicht sauber, kommt der alte zurück.',
+    adminOnly: true, services: [],
+  },
+  {
+    key: 'AUTO_UPDATE_HOUR', group: 'admin', type: 'int', default: '4', min: 0, max: 23, unit: 'Uhr', label: 'Uhrzeit der Aktualisierung',
+    help: 'Stunde (Zeitzone Europe/Berlin), in der die nächtliche Aktualisierung startet.', advanced: true, adminOnly: true, services: [],
   },
 
   // Von der Oberfläche berechnet

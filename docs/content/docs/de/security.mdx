@@ -17,11 +17,11 @@ Nur der MCP-Server, über den Cloudflare-Tunnel. Postgres, Whisper und `wa-inges
 
 Die Admin-Oberfläche steuert Docker über den Docker-Socket, das entspricht Root auf dem Pi. Deshalb:
 
-- **Nur im Heimnetz erreichbar** (Port 8080). Nie über den Cloudflare-Tunnel veröffentlichen.
-- Erstzugang nur mit dem **Einrichtungscode** aus dem Log, danach Passwort (mit scrypt gehasht).
+- **Nur im Heimnetz erreichbar** (Port 8081, beim Raspberry-Pi-Image Port 80). Nie über den Cloudflare-Tunnel veröffentlichen.
+- **Wer die Oberfläche zuerst öffnet, legt das Passwort fest** (mit scrypt gehasht). Richte Jarvis deshalb direkt nach dem ersten Start ein, solange nur du im Netz darauf zugreifst.
 - Sperre nach **10 Fehlversuchen**.
-- **Geheimnisse gehen nie im Klartext an den Browser.** Anzeigen verlangt die erneute Passworteingabe.
-- Um sie auf den Pi selbst zu beschränken, setze `ADMIN_BIND` auf `127.0.0.1` und greife per `ssh -L 8080:localhost:8080 <pi>` zu.
+- **Geheimnisse gehen nie im Klartext an den Browser.** Anzeigen verlangt die erneute Passworteingabe. Auch der Schlüssel aus der OpenRouter-Anmeldung bleibt auf dem Server; der Browser bekommt nur einen Platzhalter.
+- Um sie auf den Pi selbst zu beschränken, setze `APP_WEB_BIND` auf `127.0.0.1` und greife per `ssh -L 8081:localhost:8081 <pi>` zu.
 - Wenn du sie nicht brauchst, stoppe sie: `docker compose stop admin`.
 - Passwort vergessen: `docker compose exec admin node dist/src/cli.js reset-password`.
 

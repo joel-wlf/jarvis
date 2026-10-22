@@ -13,15 +13,16 @@ for (const [name, addresses] of interfaces) {
 }`
 let cached: { image: string; at: number; ip: string } | null = null
 
-/** A localhost URL on the server cannot connect a phone. Inspect the host's
- * network namespace with our own image, without mounts or elevated capabilities.
+/** A localhost URL on the server cannot connect a phone, and not every phone resolves jarvis.local (mDNS).
+ * Inspect the host's network namespace with our own image, without mounts or elevated capabilities.
  */
 export async function connectionAddress(ctx: Ctx, origin: string) {
   const env = readCurrent(ctx).env
   const configured = env.APP_PUBLIC_URL || env.APP_HOME_URL
   if (configured) return { url: new URL(configured).origin, localOnly: false }
   const u = new URL(origin)
-  if (!['localhost', '127.0.0.1', '[::1]'].includes(u.hostname)) return { url: u.origin, localOnly: false }
+  const mdns = u.hostname.endsWith('.local')
+  if (!mdns && !['localhost', '127.0.0.1', '[::1]'].includes(u.hostname)) return { url: u.origin, localOnly: false }
   if (ctx.self && !ctx.fake) {
     if (!cached || cached.image !== ctx.self.image || Date.now() - cached.at > 300_000) {
       const r = await ctx.docker.docker(['run', '--rm', '--network', 'host', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges:true', '--entrypoint', 'node', ctx.self.image, '-e', HOST_IP], { timeoutMs: 10_000 })
@@ -33,5 +34,5 @@ export async function connectionAddress(ctx: Ctx, origin: string) {
       return { url: u.origin, localOnly: false }
     }
   }
-  return { url: u.origin, localOnly: true }
+  return { url: u.origin, localOnly: !mdns }
 }

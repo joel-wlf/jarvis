@@ -1,52 +1,71 @@
 ---
 title: Quickstart
-description: From a fresh Raspberry Pi to the app on your phone.
+description: From a blank Raspberry Pi to the app on your phone.
 ---
 
 <Callout type="warn" title="Unofficial and independent">
 Jarvis is not affiliated with WhatsApp or Meta and connects through an unofficial method that may violate WhatsApp's Terms of Service. Use at your own risk. Read the full [disclaimer](./disclaimer.mdx).
 </Callout>
 
-
-You need a Raspberry Pi (or any 64-bit Linux machine) with Docker and Docker Compose. See the [Raspberry Pi guide](./raspberry-pi.mdx) for hardware.
-
 ## 1. Install
 
-### With the installer
+There are three ways. For most people the first is the easiest: no terminal, no commands.
+
+### Ready-made Raspberry Pi image (recommended)
+
+You need a Raspberry Pi 4 or 5 (4 GB or more), a microSD card of 32 GB or more and a computer with a card reader. Hardware tips are in the [Raspberry Pi guide](./raspberry-pi.mdx).
+
+1. Download the image file `jarvis-…-arm64.img.xz` from the [latest release](https://github.com/joel-wlf/jarvis/releases/latest).
+2. Install the [Raspberry Pi Imager](https://www.raspberrypi.com/software/) and start it.
+3. Choose your Pi as the device, **"Use custom"** at the very bottom of the operating systems, then the downloaded file. Choose your SD card.
+4. **With a network cable** there is nothing else to set. **With Wi-Fi**, say yes when the Imager asks whether to apply OS customisation and enter your Wi-Fi name and password there. Leave the host name at `jarvis` or empty.
+5. Let it write, put the card into the Pi, power on.
+6. On your phone or computer in the same network open **[http://jarvis.local](http://jarvis.local)**.
+
+On the first start Jarvis downloads its programs, usually in 5 to 15 minutes. Until then the page says "Jarvis is getting ready" and reloads by itself.
+
+<Callout title="jarvis.local does not open?">
+Older Android devices and some routers do not know `.local` addresses. Look for the device **jarvis** in your router's device list and open its address, for example `http://192.168.1.42`.
+</Callout>
+
+Advanced users can add the image list to the Imager directly: `rpi-imager --repo https://github.com/joel-wlf/jarvis/releases/latest/download/rpi-imager.json`. Jarvis then shows up in the menu, and the Imager always offers its settings.
+
+### With the installer on an existing Linux machine
+
+For any 64-bit Linux machine where you already have a terminal:
 
 <InstallCommand />
 
-The installer fetches the prebuilt images, creates the project folder and starts the admin service.
+The script checks Docker (and installs it on Debian and Ubuntu after asking), pulls the prebuilt images and prints the address at the end, usually `http://<address-of-the-machine>:8081`.
 
-### Build from source
-
-If you prefer to build everything on the machine yourself:
+### With Docker Compose
 
 ```bash
 git clone https://github.com/joel-wlf/jarvis.git ~/jarvis && cd ~/jarvis
-docker compose up -d admin
-docker compose logs admin        # shows the setup code
+docker compose up -d admin app-web
 ```
 
-The first build takes a while on a Pi 4.
+Then open `http://<address-of-the-machine>:8081`.
 
-## 2. Run the first-run wizard
+## 2. Run the setup assistant
 
-Open `http://<address-of-your-pi>:8080` in a browser on the same network. Enter the **setup code** from the admin log and choose an admin password.
+The assistant in the browser takes you through seven steps. You can stop at any time and continue later.
 
-The wizard asks for:
-
-1. Your name (used in summaries and profiles).
-2. An AI provider and key (optional, with a live test). Without one, everything runs locally and slower.
-3. Privacy exclusions: chats whose name contains these words never go to the AI. Set this before the first start with a key.
-4. Which features to turn on (topic sorting, image descriptions, actions).
-5. An optional Cloudflare tunnel, so the app and Claude can reach you away from home.
+1. **Name** of your assistant.
+2. **Password** (at least 15 characters). Whoever opens the page first sets it, so set Jarvis up right after it starts.
+3. **Source**: confirm the notes about the WhatsApp connection. Jarvis now generates all internal passwords and starts the services.
+4. **Link WhatsApp**, see below.
+5. **AI**: the easiest is **"Sign in with OpenRouter"**. Sign in to OpenRouter or create an account there, add some credit (5 $ is enough to start) and you come back automatically. There is no key to copy. Alternatively paste an OpenAI key. This is also where you choose which chats never go to the AI.
+6. **Remote access**: home network only, a Cloudflare tunnel, or your own address. Home network only is perfectly fine to start.
+7. **Done**: QR code for the app and the address for Claude.
 
 <Callout type="warn">
-With an AI provider configured, message content is sent to that provider. Excluded chats and redaction limit what leaves your device. See the [disclaimer](./disclaimer.mdx#ai-provider).
+With an AI provider, message content is sent to that provider. Excluded chats and redaction limit what leaves your device. See the [disclaimer](./disclaimer.mdx#ai-provider).
 </Callout>
 
-It then generates all passwords and tokens itself, builds and starts the services, and shows the next step.
+<Callout title="OpenRouter or OpenAI?">
+With OpenRouter, search runs on your device and voice messages stay without text, because OpenRouter offers no transcription. With an OpenAI key both go through OpenAI. You can switch later under System → Settings.
+</Callout>
 
 ## 3. Link WhatsApp
 
@@ -54,34 +73,35 @@ It then generates all passwords and tokens itself, builds and starts the service
 This uses an unofficial connection. WhatsApp can restrict or ban accounts that use unofficial clients, so consider a secondary number. See the [disclaimer](./disclaimer.mdx).
 </Callout>
 
-The wizard ends on the WhatsApp page. It shows the **QR code** in the browser, or a **pairing code** if you enter your phone number.
+The assistant shows a **QR code** in the browser, or a **pairing code** if you enter your phone number.
 
 On your phone: WhatsApp → Settings → Linked devices → Link a device → scan.
 
 Afterwards the phone sends your history in batches. This can take several minutes. Keep the phone online with WhatsApp open meanwhile. How much history you get is decided by WhatsApp.
 
-<Callout title="Linking from the terminal">
-Without the web interface: `docker compose logs -f wa-ingest` prints the QR code in the log.
-</Callout>
-
 ## 4. Pair the app
 
-Install the Jarvis app (or open the web build at the admin address). On the connect screen you have two ways:
+Open the web app at the same address, or install the Jarvis app. On the connect screen you have two ways:
 
-- **Scan a code.** In the admin interface open the devices page and show the pairing code, then point the app's camera at it.
-- **Enter the address and password.** Type your public address (for example `https://jarvis.example.com`) and the owner password you chose, and tap Connect.
+- **Scan a code.** The assistant's last step (and later System → Devices) shows a QR code. Point the app's camera at it.
+- **Address and password.** Enter the address and the password you chose.
 
 Details are in [The app](./app.mdx).
 
 ## 5. Connect Claude
 
-Add `https://jarvis.example.com` as a custom connector in Claude. See [Connect Claude](./connect-claude.mdx).
+With remote access, add your public address as a custom connector in Claude. See [Connect Claude](./connect-claude.mdx).
 
-## Check that it works
+## Afterwards: updates and state
+
+- **Updates arrive by themselves.** Every night at 4 o'clock Jarvis loads new versions and restarts only the parts that changed. If the new state does not run cleanly, the old one comes back. Turn it off or change the hour under System → Settings → Interface.
+- **The state is under System.** When all is well it says "Everything runs". Otherwise you see in plain words what is wrong, for example "WhatsApp was logged out", with the button that fixes it.
+
+## For advanced users: check from the terminal
 
 ```bash
 docker compose ps
 docker compose exec postgres psql -U jarvis -c "select count(*) from messages"
 ```
 
-The count grows while the history imports. Voice messages are transcribed in the background.
+The number grows while the history is imported. Without the web interface, `docker compose logs -f wa-ingest` prints the WhatsApp QR code in the log.

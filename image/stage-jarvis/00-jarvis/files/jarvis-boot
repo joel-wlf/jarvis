@@ -1,0 +1,22 @@
+#!/bin/bash
+# Starts Jarvis on every boot. On the first boot it loads the prebuilt images first and serves a short
+# "being prepared" page on the web port meanwhile, so http://jarvis.local never shows a browser error.
+set -u
+cd /opt/jarvis
+marker=/var/lib/jarvis/images-ready
+port=$(sed -n 's/^APP_WEB_PORT=\([0-9]*\)$/\1/p' .env 2>/dev/null)
+port=${port:-80}
+
+if [[ ! -e $marker ]]; then
+	python3 -m http.server "$port" --bind 0.0.0.0 --directory /usr/local/share/jarvis-wait >/dev/null 2>&1 &
+	wait_page=$!
+	until docker compose pull admin app-web; do
+		echo 'Images not loaded yet (no internet?), trying again in 30 s'
+		sleep 30
+	done
+	kill "$wait_page" 2>/dev/null
+	wait "$wait_page" 2>/dev/null
+	install -d -m 755 /var/lib/jarvis
+	touch "$marker"
+fi
+exec docker compose up -d admin app-web

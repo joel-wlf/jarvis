@@ -11,6 +11,9 @@ export interface Check {
 /** Profile, die die Oberfläche verwaltet. Andere Profile in COMPOSE_PROFILES bleiben unangetastet. */
 export const MANAGED_PROFILES = ['tunnel', 'organizer', 'local-whisper'] as const
 
+/** OpenRouter-Schlüssel beginnen mit sk-or- und gelten nur unter der Adresse von OpenRouter. */
+export const isOpenRouterKey = (key: string | undefined) => !!key?.startsWith('sk-or-')
+
 /** Wie Sprachnachrichten tatsächlich transkribiert werden (gleiche Logik wie wa-ingest/src/transcribe.ts). */
 export function transcribeMode(env: Env): 'openai' | 'off' {
   const p = effective(env, 'TRANSCRIBE_PROVIDER')
@@ -53,6 +56,14 @@ export function crossChecks(env: Env, prev?: Env): Check[] {
     c.push({ level: 'error', message: 'Transkription per OpenAI braucht einen OpenAI-Schlüssel.', keys: ['TRANSCRIBE_PROVIDER', 'OPENAI_API_KEY'] })
   if (effective(env, 'EMBED_PROVIDER') === 'openai' && !key)
     c.push({ level: 'error', message: 'Embeddings per OpenAI brauchen einen OpenAI-Schlüssel.', keys: ['EMBED_PROVIDER', 'OPENAI_API_KEY'] })
+  if (isOpenRouterKey(env.OPENAI_API_KEY)) {
+    if (!/^https:\/\/openrouter\.ai\/api\/v1\/?$/.test(effective(env, 'OPENAI_BASE_URL')))
+      c.push({ level: 'error', message: 'Ein OpenRouter-Schlüssel braucht die API-Adresse https://openrouter.ai/api/v1.', keys: ['OPENAI_BASE_URL'] })
+    if (effectiveEmbed(env) === 'openai')
+      c.push({ level: 'error', message: 'Mit einem OpenRouter-Schlüssel laufen die Embeddings auf dem Gerät. Bitte Embeddings auf „Lokal" stellen.', keys: ['EMBED_PROVIDER'] })
+    if (transcribeMode(env) === 'openai')
+      c.push({ level: 'error', message: 'OpenRouter bietet keine Transkription. Bitte die Transkription ausschalten.', keys: ['TRANSCRIBE_PROVIDER'] })
+  }
   if (env.POSTGRES_PASSWORD && env.POSTGRES_PASSWORD === env.MCP_RO_PASSWORD)
     c.push({ level: 'error', message: 'Datenbank-Passwort und Passwort der MCP-Rollen müssen verschieden sein.', keys: ['POSTGRES_PASSWORD', 'MCP_RO_PASSWORD'] })
 

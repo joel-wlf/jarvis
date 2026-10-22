@@ -20,6 +20,9 @@ import { FIELDS, GROUPS } from './schema.js'
 import { langOf, localizeField, localizeGroup } from './schema.en.js'
 import { linkView } from './wa.js'
 import { appProxy, fakePairing, InternalApi } from './appbridge.js'
+import { OpenRouterLogin, OPENROUTER_PENDING, OPENROUTER_SETTINGS } from './openrouter.js'
+import { readLastUpdate } from './autoupdate.js'
+import { healthItems } from './health.js'
 
 // The Expo web build (app/, exported in the Docker image). ADMIN_WEB_DIR overrides it for development.
 const WEB = process.env.ADMIN_WEB_DIR ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web')
@@ -54,6 +57,7 @@ export function createApp(ctx: Ctx, auth: Auth) {
   app.set('trust proxy', 'loopback, uniquelocal')
   const setup = new SetupStore(ctx.dataDir)
   const redact = makeRedactor(() => secretValues(ctx))
+  const openRouter = new OpenRouterLogin()
 
   app.use((_req, res, next) => {
     res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
@@ -242,7 +246,7 @@ export function createApp(ctx: Ctx, auth: Auth) {
   /** Vorschau: Fehler, Hinweise, Unterschiede und betroffene Dienste, ohne etwas zu ändern. */
   app.post('/api/settings/preview', requireAuth, wrap((req, res) => {
     const cur = readCurrent(ctx)
-    const p = prepare(cur.env, req.body?.changes ?? {}, { initial: !!req.body?.initial })
+    const p = prepare(cur.env, openRouter.resolve(req.body?.changes ?? {}), { initial: !!req.body?.initial })
     const diff = p.changed.map((k) => ({
       key: k,
       from: SECRET_KEYS.has(k) ? (cur.env[k] ? hint(cur.env[k]) : '') : (cur.env[k] ?? ''),
@@ -258,7 +262,8 @@ export function createApp(ctx: Ctx, auth: Auth) {
       if (cur.exists && cur.env.POSTGRES_PASSWORD) throw new ApplyError('Jarvis ist schon eingerichtet. Änderungen bitte unter Einstellungen.')
     }
     const wizard = setup.read(!!readCurrent(ctx).env.POSTGRES_PASSWORD)
-    const r = startApply(ctx, req.body?.changes ?? {}, { initial, verifyAll: !wizard.complete })
+    const r = startApply(ctx, openRouter.resolve(req.body?.changes ?? {}), { initial, verifyAll: !wizard.complete })
+    if (r.job) openRouter.resolve(req.body?.changes ?? {}, true)
     if (!r.job) return void res.status(422).json({ error: 'Bitte die markierten Einstellungen korrigieren.', errors: r.prepared.errors, checks: r.prepared.checks })
     if (!wizard.complete) setup.save({ ...wizard, draft: { ...wizard.draft, pendingJobId: r.job.id } }, !!readCurrent(ctx).env.POSTGRES_PASSWORD)
     res.json({ job: jobView(r.job) })
@@ -288,7 +293,11 @@ export function createApp(ctx: Ctx, auth: Auth) {
     } catch {
       disk = null
     }
+    const last = readLastUpdate(ctx)
+    const lastUpdate = last ? ctx.jobs.get(last.jobId) ?? null : null
     res.json({
+      health: healthItems({ services: Array.isArray(ps) ? ps : null, wa: wa as { state: string; at?: string }, disk, lastUpdate }),
+      lastUpdate: lastUpdate ? { status: lastUpdate.status, at: lastUpdate.endedAt ?? lastUpdate.startedAt, updated: (lastUpdate.result?.updated as string[] | undefined) ?? null } : null,
       services: Array.isArray(ps) ? ps : [],
       servicesError: Array.isArray(ps) ? null : ps.error,
       wa,
@@ -350,6 +359,24 @@ export function createApp(ctx: Ctx, auth: Auth) {
     } catch (e) {
       res.json({ ok: false, message: `Keine Verbindung zum Anbieter: ${(e as Error).message}` })
     }
+  }))
+
+  /**
+   * Sign in with OpenRouter. With redirect, OpenRouter sends the browser back to /setup with ?code=…&state=…;
+   * without, it shows the code to paste. finish keeps the key here and returns the settings to apply, with the
+   * placeholder OPENROUTER_PENDING in place of the key.
+   */
+  app.post('/api/openrouter/start', requireAuth, wrap((req, res) => {
+    const callback = req.body?.redirect ? `${req.protocol}://${req.get('host')}/setup` : undefined
+    const r = openRouter.start(callback)
+    // Development without a network: come straight back with a code the fake finish accepts
+    res.json(ctx.fake && callback ? { ...r, url: `${callback}?code=fake&state=${r.state}` } : r)
+  }))
+  app.post('/api/openrouter/finish', requireAuth, wrap(async (req, res) => {
+    const state = String(req.body?.state ?? ''), code = String(req.body?.code ?? '').trim()
+    if (ctx.fake && code === 'fake') openRouter.hold(`sk-or-v1-${'f'.repeat(64)}`)
+    else await openRouter.finish(state, code)
+    res.json({ settings: { ...OPENROUTER_SETTINGS, OPENAI_API_KEY: OPENROUTER_PENDING } })
   }))
 
   // --- Sicherungen ----------------------------------------------------------------------------
