@@ -172,7 +172,7 @@ function fsyncDir(dir: string) {
   }
 }
 
-const BACKUP_RE = /^env-(\d{8}-\d{6}-\d{3})(?:-\d+)?\.env$/
+const BACKUP_RE = /^env-(\d{8}-\d{6}-\d{3})(?:-(\d+))?\.env$/
 
 export function backupEnv(real: string, backupDir: string, keep: number, owner?: { uid: number; gid: number }): string {
   fs.mkdirSync(backupDir, { recursive: true, mode: 0o700 })
@@ -203,7 +203,13 @@ export function listBackups(backupDir: string): { name: string; at: Date; size: 
       const st = fs.statSync(path.join(backupDir, name))
       return { name, at: st.mtime, size: st.size }
     })
-    .sort((a, b) => (a.name < b.name ? 1 : -1))
+    // Newest first: by timestamp, then by the counter for backups made within the same millisecond.
+    // (Comparing whole names would put "…-1.env" before "….env", because "-" sorts before ".".)
+    .sort((a, b) => {
+      const [, sa, na] = BACKUP_RE.exec(a.name)!
+      const [, sb, nb] = BACKUP_RE.exec(b.name)!
+      return sa === sb ? Number(nb ?? 0) - Number(na ?? 0) : sa < sb ? 1 : -1
+    })
 }
 
 export function readBackup(backupDir: string, name: string): string {
