@@ -90,6 +90,17 @@ export function createMockApi(): JarvisApi {
       await wait(260)
       const card = cards.find((c) => c.key === key)
       if (!card) throw new JarvisError('not_found', 'not found', 404)
+      if (action.kind === 'attend') {
+        if (card.type !== 'event') throw new JarvisError('invalid', 'Only event cards take an answer', 400)
+        if (!action.going) {
+          cards = cards.filter((c) => c.key !== key)
+          return { ok: true, message: i18n.t('act.notGoing'), removed: true }
+        }
+        const stats = card.data.stats.map((x) => (x.label === 'Du' || x.label === 'You' ? { ...x, value: i18n.t('card.youGo') } : x))
+        const next = { ...card, data: { ...card.data, going: 'yes' as const, stats }, suggestions: [{ id: 'noted', label: i18n.t('card.noted'), action: { kind: 'done' as const }, primary: true }, { id: 'not-going', label: i18n.t('card.notGoingAfterAll'), action: { kind: 'attend' as const, going: false } }] }
+        cards = cards.map((c) => (c.key === key ? next : c))
+        return { ok: true, message: i18n.t('act.going'), removed: false, card: clone(next) }
+      }
       const removed = action.kind !== 'open'
       if (removed) {
         cards = cards.filter((c) => c.key !== key)

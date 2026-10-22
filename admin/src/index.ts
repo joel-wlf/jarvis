@@ -8,6 +8,7 @@ import { CliDocker, FakeDocker } from './docker.js'
 import { EnvLinkError } from './envfile.js'
 import { detectSelf } from './hostpaths.js'
 import { JobRunner } from './jobs.js'
+import { autoUpdateTick } from './autoupdate.js'
 import { autoClearPairing, startApply } from './ops.js'
 import { createApp, createInternalApp } from './server.js'
 
@@ -89,6 +90,15 @@ async function main() {
 
   // Kopplungsnummer nach erfolgreicher Verknüpfung automatisch entfernen
   setInterval(() => autoClearPairing(ctx), 15_000).unref()
+  // Nächtliche Aktualisierung (AUTO_UPDATE), geprüft alle 5 Minuten
+  if (!FAKE) setInterval(() => {
+    try {
+      const job = autoUpdateTick(ctx)
+      if (job) log(`Nächtliche Aktualisierung gestartet (${job.id}).`)
+    } catch (e) {
+      log(`Nächtliche Aktualisierung nicht gestartet: ${(e as Error).message}`)
+    }
+  }, 5 * 60_000).unref()
 }
 
 process.on('unhandledRejection', (e) => console.error('[admin] Unbehandelter Fehler:', e))

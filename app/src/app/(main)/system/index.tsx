@@ -12,6 +12,7 @@ import { Processing } from '@/components/today/Processing'
 import { fetchInfo } from '@/api/client'
 import { Page, Section } from '@/components/Page'
 import { AdminGate, useAdmin } from '@/components/system/AdminGate'
+import { HealthPanel } from '@/components/system/HealthPanel'
 import { BlockButton, Meta, Notice, Panel, Row, Seg } from '@/components/ui'
 import i18n, { setLanguage } from '@/i18n'
 import { ago, bytes, errorText } from '@/i18n/format'
@@ -53,7 +54,7 @@ function ServiceRow({ name, state, health, first }: { name: string; state: strin
   return (
     <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9 }, !first && { borderTopWidth: 1, borderTopColor: colors.line }]}>
       <View style={{ width: 6, height: 6, backgroundColor: ok ? colors.green : colors.warn }} />
-      <Text style={[type.bodyItalic, { flex: 1 }]}>{name}</Text>
+      <Text style={[type.bodyItalic, { flex: 1 }]}>{t(`health.services.${name}`, { defaultValue: name })}</Text>
       <Text style={[type.small, !ok && { color: colors.warn }]}>{label}</Text>
     </View>
   )
@@ -105,6 +106,7 @@ function Overview() {
   const statusSection = (
       <Section title={t('system.status')}>
         {error ? <Notice level="error" text={error} /> : null}
+        {status ? <HealthPanel admin={admin} status={status} onChanged={() => void load()} /> : null}
         {pipeline ? <Processing status={pipeline} collapsible={false} /> : null}
         {!status ? (
           <Text style={type.sub}>{t('common.loading')}</Text>

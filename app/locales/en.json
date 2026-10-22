@@ -241,7 +241,11 @@
     "writingReplies": "Jarvis is writing reply suggestions …",
     "willSend": "Will be sent",
     "allFrom": "Everything from {{chat}}:",
-    "allFromSet": "All cards from {{chat}}: {{level}}"
+    "allFromSet": "All cards from {{chat}}: {{level}}",
+    "youGo": "You're going",
+    "youSkip": "You're not going",
+    "noted": "Noted",
+    "notGoingAfterAll": "Not going after all"
   },
   "act": {
     "send": "Sent.",
@@ -252,7 +256,10 @@
     "dismiss": "Hidden.",
     "remind": "Reminder set.",
     "save_contact": "Saved to contacts.",
-    "open": "Opened."
+    "open": "Opened.",
+    "attend": "Noted.",
+    "going": "Noted: you're going.",
+    "notGoing": "Noted: you're not going."
   },
   "ask": {
     "placeholder": "Ask Jarvis …",
@@ -772,6 +779,7 @@
     "err.consent": "Please confirm the notes about the WhatsApp connection first.",
     "err.waNotLinked": "WhatsApp is not linked yet. Scan the code or choose “Link later”.",
     "err.key": "{{name}} works with AI. Please enter your API key.",
+    "err.openrouter": "Please sign in to OpenRouter first, or choose an OpenAI key.",
     "err.url": "Enter a complete address, for example https://jarvis.your-domain.com.",
     "err.https": "Enter an HTTPS server address without a path.",
     "err.token": "Paste the tunnel token.",
@@ -823,10 +831,21 @@
     },
     "ai": {
       "title": "Connect {{name}}'s AI",
-      "lead": "{{name}} is an AI assistant: it understands your messages, sorts them into topics, transcribes voice messages and answers your questions. For that it needs an AI provider. OpenAI is supported right now.",
+      "lead": "{{name}} is an AI assistant: it understands your messages, sorts them into topics, describes images and answers your questions. For that it needs an AI provider. OpenRouter is the easiest: sign in, done.",
       "cost": "Texts, audio and images are sent to the provider and API costs apply. Chat exclusions apply to search and topic sorting, not automatically to audio and images. Decide below what must never reach the AI.",
       "test": "Check API key",
-      "more": "Other settings such as transcription, image descriptions and topic sorting start with sensible values and can be changed later under Settings."
+      "more": "Other settings such as transcription, image descriptions and topic sorting start with sensible values and can be changed later under Settings.",
+      "orTab": "OpenRouter (recommended)",
+      "keyTab": "OpenAI key",
+      "orLead": "Sign in to OpenRouter or create an account there. You come back here automatically and {{name}} takes the key by itself. Add some credit at OpenRouter, 5 $ is enough to start.",
+      "orLogin": "Sign in with OpenRouter",
+      "orAgain": "Sign in again",
+      "orConnected": "Connected to OpenRouter.",
+      "orLimits": "With OpenRouter voice messages stay without text and search runs on your device. Both work with an OpenAI key.",
+      "orNoRedirect": "Not coming back? Paste the code by hand",
+      "orCode": "Code from OpenRouter",
+      "orCodeHelp": "OpenRouter shows a code after you sign in. Copy it here.",
+      "orCodeTake": "Use code"
     },
     "remote": {
       "title": "Where do you want to use {{name}}?",
@@ -1010,5 +1029,58 @@
     "forget": "Forget everything learned",
     "forgetConfirm": "Delete all learned rules and counters? Rules you set yourself stay.",
     "forgotten": "Learned rules forgotten."
+  },
+  "health": {
+    "allGood": "Everything runs",
+    "allGoodSub": "Jarvis receives messages and every part works.",
+    "lastUpdate": "Last updated {{when}}.",
+    "services": {
+      "postgres": "Database",
+      "embedder": "Search",
+      "wa-ingest": "WhatsApp receiver",
+      "mcp-server": "App and Claude interface",
+      "organizer": "Topic sorting",
+      "cloudflared": "Remote access",
+      "admin": "Administration",
+      "app-web": "Web interface"
+    },
+    "serviceDown": {
+      "title": "{{service}} is not running",
+      "detail": "This part of Jarvis has stopped. A restart usually fixes it.",
+      "action": "Restart"
+    },
+    "serviceUnhealthy": {
+      "title": "{{service}} has problems",
+      "detail": "This part runs but does not answer properly. Try a restart.",
+      "action": "Restart"
+    },
+    "waLoggedOut": {
+      "title": "WhatsApp was logged out",
+      "detail": "Jarvis is no longer a linked device on your phone. No new messages arrive until you link again.",
+      "action": "Link WhatsApp again"
+    },
+    "waNotLinked": {
+      "title": "WhatsApp is not linked yet",
+      "detail": "Scan the code with WhatsApp on your phone so Jarvis receives messages.",
+      "action": "Link now"
+    },
+    "waDisconnected": {
+      "title": "WhatsApp is not connected right now",
+      "detail": "Jarvis keeps trying by itself. If your phone was offline, Jarvis catches up afterwards. If this stays, link again.",
+      "action": "Go to WhatsApp"
+    },
+    "diskFull": {
+      "title": "Storage is almost full",
+      "detail": "Soon Jarvis cannot store messages any more. Use a larger SD card or delete other files on the device."
+    },
+    "diskLow": {
+      "title": "Storage is getting low",
+      "detail": "Everything still runs, but plan for a larger SD card."
+    },
+    "updateFailed": {
+      "title": "The last update did not work",
+      "detail": "Jarvis keeps running the previous version. It tries again next night.",
+      "action": "See details"
+    }
   }
 }

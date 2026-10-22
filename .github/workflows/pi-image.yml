@@ -1,0 +1,71 @@
+# Builds the ready-to-flash Raspberry Pi image (Raspberry Pi OS Lite, 64-bit, with Docker and Jarvis) with pi-gen on a
+# native arm64 runner. On a v* tag the image and the Raspberry Pi Imager list are attached to the release; the list is
+# then always reachable at releases/latest/download/rpi-imager.json.
+name: Raspberry Pi image
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pi-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: jarvis
+
+      - name: Fetch pi-gen
+        run: git clone --depth 1 --branch arm64 https://github.com/RPi-Distro/pi-gen.git pi-gen
+
+      - name: Add the Jarvis stage
+        run: |
+          cp -a jarvis/image/stage-jarvis pi-gen/stage-jarvis
+          mkdir -p pi-gen/stage-jarvis/00-jarvis/files/jarvis
+          git -C jarvis archive HEAD | tar -x -C pi-gen/stage-jarvis/00-jarvis/files/jarvis
+          git -C jarvis rev-parse HEAD > pi-gen/stage-jarvis/00-jarvis/files/jarvis/.jarvis-install-version
+          # Only the Jarvis stage exports an image, not the plain Lite image of stage2
+          touch pi-gen/stage2/SKIP_IMAGES
+          # A random console password nobody knows: Jarvis needs no login on the device
+          { cat jarvis/image/config; printf 'FIRST_USER_PASS=%s\n' "$(openssl rand -hex 24)"; } > pi-gen/config
+
+      - name: Build
+        working-directory: pi-gen
+        run: sudo ./build-docker.sh
+
+      - name: Collect
+        env:
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          mkdir -p dist
+          image=$(ls pi-gen/deploy/*.img.xz | head -n1)
+          name="jarvis-${TAG:-dev}-arm64.img.xz"
+          cp "$image" "dist/$name"
+          url="${{ github.server_url }}/${{ github.repository }}/releases/download/${TAG:-dev}/$name"
+          jarvis/image/imager-json.sh "dist/$name" "$url" "${TAG:-dev}" > dist/rpi-imager.json
+          (cd dist && sha256sum "$name" > "$name.sha256")
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-pi-image
+          path: dist/
+          retention-days: 14
+
+      - name: Attach to the release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # release.yml may create the release at the same time
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes || true
+          gh release upload "$TAG" dist/* -R "$GITHUB_REPOSITORY" --clobber

@@ -99,7 +99,7 @@ function spec(card: Card, act: ActFn, t: TFunction, pick: Suggestion | undefined
             {d.stats.length ? <Meta stats={d.stats} /> : null}
           </>
         ),
-        headline: d.day ? `${d.weekday} ${d.time}` : t('card.dateOpen'),
+        headline: [d.day ? `${d.weekday} ${d.time}` : t('card.dateOpen'), d.going === 'yes' ? t('card.youGo') : d.going === 'no' ? t('card.youSkip') : ''].filter(Boolean).join(' · '),
       }
     }
     case 'conflict': {

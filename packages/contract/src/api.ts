@@ -85,7 +85,8 @@ export interface CardsResponse { cards: Card[] }
 
 /** POST /api/v1/cards/:key/act */
 export interface ActRequest { action: CardAction }
-export interface ActResponse { ok: true; message: string; removed: boolean }
+/** `card`: the card as it looks now, when it stays and changed (an event after the owner's answer). */
+export interface ActResponse { ok: true; message: string; removed: boolean; card?: Card }
 
 /**
  * PUT /api/v1/cards/:key/priority. The owner's importance for a card: 3 important (always reported by the watch service),

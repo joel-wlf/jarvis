@@ -86,6 +86,7 @@ export function registerCardTools(server: McpServer) {
     {
       description:
         `Führt einen vorbereiteten Schritt einer Karte aus, genau wie ein Tipp in der App: erledigt, zurückstellen, erinnern, unwichtig, abstimmen, reagieren oder eine vorbereitete Antwort senden. ` +
+        `Bei Terminen "going" / "not-going": ${OWNER} ist dabei oder nicht, das wird nur gemerkt, in WhatsApp geht nichts raus. "resolved" bei Fragen und Sprachnachrichten: schon geklärt, mit Notiz zum Chat. ` +
         'suggestion_id steht in suggestions der Karte (list_cards, get_card). Gesendet wird genau der Text des Vorschlags; einen eigenen Text schreibst du mit send_message (vorher get_writing_style). ' +
         `Schritte, die in WhatsApp etwas senden oder abstimmen, laufen sofort, wenn ${OWNER} es verlangt hat; mit REQUIRE_CONFIRM=true auf dem Server erst als Vorschau und dann mit confirm=true. ` +
         '"Unwichtig" und "Später" lehren Jarvis, was dem Nutzer nicht wichtig ist: nur ausführen, wenn er es so gemeint hat. ' +

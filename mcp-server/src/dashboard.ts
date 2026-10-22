@@ -62,8 +62,9 @@ export function registerDashboardTool(server: McpServer) {
         notify(b, byDefault(b))
         const at = new Date(b.card.dueAt ?? now)
         const stage = /^event:\d+:(kurz|vortag|info)$/.exec(b.card.key)?.[1] ?? null
-        const d = b.card.data as { attendees?: { name: string }[]; yes?: number }
+        const d = b.card.data as { attendees?: { name: string }[]; yes?: number; going?: 'yes' | 'no' }
         return {
+          ...(d.going ? { owner_going: d.going === 'yes' } : {}),
           key: b.card.key, priority: prio(b), topic_id: b.ref.topicId ?? null, title: b.card.title, summary: (b.card.context ?? '').slice(0, 220), event_at: b.card.dueAt ? at.toISOString() : null,
           hours_until: b.card.dueAt ? Math.round(((at.getTime() - now.getTime()) / 3600_000) * 10) / 10 : null, stage, chat: b.card.source.chat, people: (d.attendees ?? []).map((p) => p.name), state: b.card.state,
         }

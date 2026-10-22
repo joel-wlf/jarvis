@@ -161,3 +161,63 @@ test('people, person patch and memories CRUD', async () => {
   assert.equal((await fetch(`${s.url}/api/v1/memories/${m.id}`, { method: 'DELETE', headers: auth(token) })).status, 204)
   assert.equal((await fetch(`${s.url}/api/v1/memories/${m.id}`, { method: 'DELETE', headers: auth(token) })).status, 404)
 })
+
+test('attend: the answer stays on the event, reaches Claude as a note, and "not going" ends the reminders', async () => {
+  await pg.query(`TRUNCATE memories, threads RESTART IDENTITY`)
+  const at = new Date(Date.now() + 2 * 86400_000)
+  await pg.query(`INSERT INTO topics (title, summary, status, event_at, facts, chat_count) VALUES ('Spieleabend', 'Bei Tim', 'open', $1, '{}'::jsonb, 1)`, [at])
+  const ev = (await cards('schedule')).find((c) => c.type === 'event' && c.title === 'Spieleabend')!
+  assert.deepEqual(ev.suggestions.slice(0, 2).map((x) => x.action), [{ kind: 'attend', going: true }, { kind: 'attend', going: false }])
+
+  const yes = await (await actOn(ev.key, { kind: 'attend', going: true })).json()
+  assert.equal(yes.removed, false)
+  assert.equal(yes.card.data.going, 'yes')
+  assert.equal((await pg.query<any>(`SELECT note FROM watch_state WHERE key = 'zusage:topic:1'`)).rows[0].note, 'yes')
+  const note = (await pg.query<any>(`SELECT content, scope, active FROM memories`)).rows
+  assert.equal(note.length, 1)
+  assert.match(note[0].content, /geht zu „Spieleabend“/)
+  assert.equal(note[0].scope, 'global')
+
+  // changing the answer rewrites the same note and hides the event with all its stages
+  const no = await (await actOn(ev.key, { kind: 'attend', going: false })).json()
+  assert.equal(no.removed, true)
+  const notes = (await pg.query<any>(`SELECT content FROM memories`)).rows
+  assert.equal(notes.length, 1)
+  assert.match(notes[0].content, /geht nicht zu „Spieleabend“/)
+  assert.equal((await pg.query<any>(`SELECT dismissed FROM watch_state WHERE key = 'event:1'`)).rows[0].dismissed, true)
+  assert.equal((await cards()).some((c) => c.title === 'Spieleabend'), false)
+
+  assert.equal((await actOn(byType(await cards(), 'question').key, { kind: 'attend', going: true })).status, 400)
+})
+
+test('"already sorted" on a question removes it and leaves a note on the chat', async () => {
+  await pg.query(`TRUNCATE memories RESTART IDENTITY`)
+  const q = byType(await cards(), 'question')
+  assert.equal(q.suggestions[0].action.kind, 'done')
+  const r = await (await actOn(q.key, { kind: 'done' })).json()
+  assert.equal(r.removed, true)
+  const m = (await pg.query<any>(`SELECT content, scope, chat_jid FROM memories`)).rows[0]
+  assert.equal(m.scope, 'chat')
+  assert.equal(m.chat_jid, ANNA)
+  assert.match(m.content, /schon geklärt.*Kommst du morgen/)
+})
+
+test('stale: a question the owner reacted to or whose conversation is settled is no longer open', async () => {
+  assert.ok((await cards()).some((c) => c.type === 'question'))
+  await pg.query(`INSERT INTO message_reactions (chat_jid, message_id, reactor_jid, emoji, from_me) VALUES ($1, 'm1', 'me', '👍', true)`, [ANNA])
+  assert.equal((await cards()).some((c) => c.type === 'question'), false)
+
+  await pg.query(`TRUNCATE message_reactions, threads RESTART IDENTITY`)
+  await pg.query(`INSERT INTO threads (chat_jid, title, status) VALUES ($1, 'Essen', 'resolved')`, [ANNA])
+  await pg.query(`UPDATE messages SET thread_id = 1 WHERE id = 'm1'`)
+  assert.equal((await cards()).some((c) => c.type === 'question'), false)
+})
+
+test('stale: an organizer card without a date leaves after a week without updates', async () => {
+  const payload = { title: 'Link lesen', source: { chat: 'Tim', when: 'vor 9 Tagen' }, say: '', suggestions: [], data: { url: 'https://x.org', domain: 'x.org', headline: 'X' } }
+  await pg.query(`INSERT INTO cards (type, key, payload, created_at, updated_at) VALUES ('link', 'link:old', $1, now() - interval '9 days', now() - interval '9 days')`, [JSON.stringify(payload)])
+  await pg.query(`INSERT INTO cards (type, key, payload) VALUES ('link', 'link:new', $1)`, [JSON.stringify(payload)])
+  const keys = (await cards()).map((c) => c.key)
+  assert.ok(keys.includes('link:new'))
+  assert.ok(!keys.includes('link:old'))
+})

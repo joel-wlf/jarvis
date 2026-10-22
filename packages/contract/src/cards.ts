@@ -19,6 +19,7 @@ export type CardAction =
   | { kind: 'snooze'; until: string } // ISO timestamp
   | { kind: 'dismiss' } // never show again
   | { kind: 'remind'; at: string; text: string } // create a reminder
+  | { kind: 'attend'; going: boolean } // event: the owner goes or not; remembered for Claude, nothing is sent
   | { kind: 'save_contact'; name: string; lines: string[] }
   | { kind: 'open'; url: string } // open a link or deep link, handled by the app
 
@@ -75,7 +76,8 @@ export interface QuestionData { person: Person; quote: string; waitingSince: str
 /** `messageId` + `person.jid` address the audio for GET /api/v1/media/:chatJid/:messageId. */
 export interface VoiceData { person: Person; durationSec: number; summary: string; transcript?: string; messageId?: string; stats: Stat[] }
 export interface ReactionData { person: Person; quote: string; messageId: string; emojis: string[] }
-export interface EventData { day: string; weekday: string; month: string; time: string; place?: string; attendees: Person[]; yes: number; stats: Stat[] }
+/** `going` is the owner's own answer from the app (attend action), missing while open. */
+export interface EventData { day: string; weekday: string; month: string; time: string; place?: string; attendees: Person[]; yes: number; going?: 'yes' | 'no'; stats: Stat[] }
 export interface ConflictData { axis: [number, number]; slots: { label: string; from: number; to: number; group: CardGroup }[]; free?: string; stats: Stat[] }
 export interface BirthdayData { person: Person; age?: number; date: string; ideas: string[]; note?: string }
 export interface ReminderData { time: string; note?: string; snoozeOptions: { label: string; until: string }[] }

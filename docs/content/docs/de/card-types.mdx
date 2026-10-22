@@ -39,8 +39,8 @@ Senden, Reagieren und Abstimmen teilen sich das Stundenlimit und die Offline-Pr�
 
 | Typ | Was es ist | Bietet an |
 |---|---|---|
-| `question` | Jemand hat dich etwas gefragt und wartet. Zeigt das Zitat und die Wartezeit. | Mehrere Antworten zum Senden |
-| `voice` | Eine Sprachnachricht, aus dem Transkript zusammengefasst, mit Dauer. | Antworten |
+| `question` | Jemand hat dich etwas gefragt und wartet. Zeigt das Zitat und die Wartezeit. | Mehrere Antworten zum Senden, schon geklärt |
+| `voice` | Eine Sprachnachricht, aus dem Transkript zusammengefasst, mit Dauer. | Antworten, schon geklärt |
 | `reaction` | Eine Nachricht, die eine Reaktion verdient, etwa gute Neuigkeiten in einer Gruppe. | Emojis zum Reagieren |
 | `followup` | Ein Versprechen („ich melde mich“) ohne spätere eigene Nachricht in diesem Chat. | Jetzt melden oder Zwischenstand senden |
 
@@ -48,7 +48,7 @@ Senden, Reagieren und Abstimmen teilen sich das Stundenlimit und die Offline-Pr�
 
 | Typ | Was es ist | Bietet an |
 |---|---|---|
-| `event` | Ein Termin aus einem Chat mit Ort, Teilnehmern und Zusagen. | Zusagen, später, absagen |
+| `event` | Ein Termin aus einem Chat mit Ort, Teilnehmern und Zusagen. | Ich bin dabei, bin nicht dabei, später |
 | `conflict` | Zwei Termine überschneiden sich. Zeigt beide auf einer Zeitachse und den freien Slot. | Änderung vorschlagen |
 | `birthday` | Ein Geburtstag mit Alter und Geschenkideen aus Chats. | Erinnerung zum Gratulieren |
 | `reminder` | Deine eigene Erinnerung für heute. | Erledigt oder auf eine Zeit verschieben |
@@ -83,4 +83,8 @@ Senden, Reagieren und Abstimmen teilen sich das Stundenlimit und die Offline-Pr�
 - **Vom Organizer geschrieben** in die Tabelle `cards`, im selben Aufruf, der einen Thread einem Thema zuordnet, ohne zusätzliche Kosten: `shopping`, `parcel`, `money`, `trip`, `place`, `address`, `birthday`, `insight`. Meist keine, höchstens drei pro Aufruf.
 - **Per Regel geschrieben**, alle 10 Minuten und ohne KI: `followup` (offene Versprechen), `link` (geteilte Links) und `photos` (je Chat und Tag). Einstellbar mit `CARDS_FOLLOWUP_MIN_HOURS`, `CARDS_FOLLOWUP_MAX_DAYS`, `CARDS_LINK_DAYS`, `CARDS_PHOTOS_MIN` und `CARDS_PHOTOS_DAYS`.
 
-Erledigte und verworfene Karten kommen nie zurück, ausgeschlossene Chats erzeugen keine Karten. Kartenschlüssel sind stabil (`card:<typ>:<chat>:<slug>`), eine umformulierte Modellantwort erzeugt also keine Dublette.
+Erledigte und verworfene Karten kommen nie zurück, ausgeschlossene Chats erzeugen keine Karten.
+
+**Veraltetes verschwindet von selbst:** Fragen und Sprachnachrichten nach drei Tagen, sofort, wenn du auf die Nachricht reagiert hast oder die Themen-Sortierung das Gespräch als geklärt erkannt hat. Organizer-Karten ohne Datum verschwinden nach sieben Tagen ohne neue Aktivität. Mit **„Schon geklärt“** legt Jarvis zusätzlich eine Notiz zum Chat an, damit weder die Sortierung noch Claude das Thema wieder als offen behandeln.
+
+**Zusagen bei Terminen:** „Ich bin dabei“ und „Bin nicht dabei“ senden nichts in WhatsApp. Jarvis merkt sich deine Antwort als Notiz und zeigt sie Claude bei den anstehenden Terminen, so beantwortet Claude „Gehe ich zum Spieleabend?“ richtig. Nach einer Absage kommen zu dem Termin keine Erinnerungen mehr. Kartenschlüssel sind stabil (`card:<typ>:<chat>:<slug>`), eine umformulierte Modellantwort erzeugt also keine Dublette.

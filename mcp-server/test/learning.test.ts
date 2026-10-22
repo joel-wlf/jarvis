@@ -49,7 +49,7 @@ test('organizer "Termin:" suggestions become dated event cards from their chat, 
   assert.equal(ev.source.chat, 'Gartenverein')
   assert.equal((ev.data as any).place, 'Bethaus')
   // a fixed date: take note or see it again before the day, never "in 3 hours"
-  assert.deepEqual(ev.suggestions.map((x) => x.id).filter((id) => !id.startsWith('snooze-')).sort(), ['dismiss', 'noted'])
+  assert.deepEqual(ev.suggestions.map((x) => x.id).filter((id) => !id.startsWith('snooze-')).sort(), ['dismiss', 'going', 'not-going', 'noted'])
   assert.ok(ev.suggestions.some((x) => x.id === 'snooze-daybefore'))
   const task = cs.find((c) => c.key === 'aktion:2')!
   assert.equal(task.type, 'task')

@@ -1,0 +1,13 @@
+[Unit]
+Description=Announce jarvis.local in the home network
+Requires=avahi-daemon.service
+After=avahi-daemon.service network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/sbin/jarvis-mdns
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

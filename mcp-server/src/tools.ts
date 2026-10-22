@@ -10,6 +10,7 @@ import { registerPersonTools } from './person.js'
 import { registerReadme } from './readme.js'
 import { embedQuery, findContacts, fmtTs, fmt, formatMessages, loadPollResults, similarNames, likeEscape, nowBerlin, pool, type MsgRow } from './db.js'
 import { OWNER, OWNER_GEN } from './config.js'
+import { attendanceOf, PAST_ATTENDANCE } from './attendance.js'
 
 const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] })
 
@@ -25,7 +26,7 @@ const TIME_HINT_REGEX =
 async function memoryNotes(): Promise<string> {
   try {
     const r = await pool.query<{ id: string; kind: string; content: string }>(
-      `SELECT id, kind, content FROM memories WHERE active AND (pinned OR scope IN ('global', 'contact'))
+      `SELECT id, kind, content FROM memories WHERE active AND (pinned OR scope IN ('global', 'contact')) AND NOT ${PAST_ATTENDANCE}
        ORDER BY pinned DESC, updated_at DESC LIMIT 25`,
     )
     if (!r.rows.length) return ''
@@ -64,10 +65,15 @@ async function hotContext(): Promise<string> {
        WHERE status = 'open' AND due_at BETWEEN now() - interval '3 days' AND now() + interval '7 days' ORDER BY due_at LIMIT 8`,
     )
     if (!upcoming.rows.length && !active.rows.length && !actions.rows.length) return ''
+    const answers = attendanceOf((await pool.query<{ key: string; note: string | null }>(`SELECT key, note FROM watch_state WHERE key LIKE 'zusage:%'`)).rows)
+    const mine = (id: number | string) => {
+      const a = answers.get(`zusage:topic:${id}`)
+      return a === 'yes' ? ` – ${OWNER}: dabei (in der App zugesagt)` : a === 'no' ? ` – ${OWNER}: NICHT dabei (in der App abgesagt)` : ''
+    }
     const lines: string[] = [`\n\nHot Context (automatisch, Stand ${nowBerlin()}; Details mit get_topic / list_topics / list_suggested_actions):`]
     if (upcoming.rows.length) {
       lines.push('Anstehende Termine:')
-      for (const t of upcoming.rows) lines.push(`- ${fmtTs(t.event_at)} ${t.title} (Thema #${t.id})${people(t.facts) ? ` – ${people(t.facts)}` : ''}: ${cut(t.summary, 140)}`)
+      for (const t of upcoming.rows) lines.push(`- ${fmtTs(t.event_at)} ${t.title} (Thema #${t.id})${mine(t.id)}${people(t.facts) ? ` – ${people(t.facts)}` : ''}: ${cut(t.summary, 140)}`)
     }
     if (active.rows.length) {
       lines.push('Aktive offene Themen (letzte 7 Tage):')
@@ -96,6 +102,7 @@ export async function buildServer(): Promise<McpServer> {
         `- Nie raten. Fehlt ein Beleg, suche weiter (andere Wörter, Abkürzungen und Synonyme, Namensvarianten, Chat- und Zeitfilter), bevor du "nichts gefunden" sagst, und nenne kurz, was du geprüft hast. Spracheingabe verfälscht Namen ("Stefan" statt "Stephan"): bei unbekanntem Namen die Vorschläge der Tools ("Meintest du ...") nutzen.\n` +
         `- Personen: find_contact / get_person (auch Spitznamen und echter Name). "Was hat X geschrieben?": get_recent_messages (chat=Name) oder search_messages (sender=Name), neueste zuerst.\n` +
         `- Termine, Orte, Zeiten: find_scheduling_mentions oder semantic_search, dann get_conversation_context lesen. Relative Angaben ("morgen") ab dem Sendedatum der Nachricht auflösen. Themen und Threads sind KI-Zusammenfassungen: bei Zeit, Ort oder Zusage immer die Originalnachricht prüfen.\n` +
+        `- "Gehe ich zu X?": Zusagen und Absagen, die ${OWNER} in der App gemacht hat, stehen in den Notizen und bei den anstehenden Terminen ("dabei" / "NICHT dabei"). Sie sind verbindlich und gelten vor allem, was in Chats dazu steht; in WhatsApp wurde dabei nichts gesendet.\n` +
         `- "Habe ich mich angemeldet / zugesagt / abgestimmt?": prüfe 1) die Ankündigung samt Reaktionen (Zeile "Reaktionen:", "Ich" = ${OWNER}), 2) ${OWNER_GEN} eigene Nachrichten im Chat danach, 3) Umfragen (get_poll_results zeigt, wer wofür gestimmt hat und wer noch fehlt; get_open_polls listet ${OWNER_GEN} offene), 4) das Thema (get_topic, Personenstatus), 5) Einzelchats zum Thema. Nenne die geprüften Quellen. Keine Spur ist kein Beweis, solange Reaktionen oder Stimmen älter als die Erfassung sein können.\n` +
         `- Überblick ("was steht an / ist offen / Stand bei X"): get_dashboard (kompakter Überblick mit to_notify) oder list_cards (die Karten der App mit vorbereiteten Schritten); beide zeigen denselben Feed wie die App, Zurückgestelltes und Unwichtiges ist schon herausgefiltert. Worum es bei einer Karte geht: get_card (Zusammenfassung, Thema, Originalnachrichten). Dann bei Bedarf list_topics, get_topic, list_suggested_actions. Stelle das Ergebnis als Karten dar, nicht als Textwand: ist ein Visualisierungs-Tool (show_widget oder ähnlich) verfügbar, zeige pro Eintrag eine Karte mit Art, Person oder Chat, Zeit und Kurztext sowie Knöpfen, die per sendPrompt einen vollständigen Auftrag mit dem Schlüssel (key) und der Vorschlags-ID auslösen (act_on_card): die vorbereiteten Schritte der Karte, "Später", "Unwichtig". Ohne solches Tool eine kurze, nach Dringlichkeit sortierte Liste mit je einer Zeile und dem Vorschlag, was zu tun ist.\n` +
         `- Senden: Empfänger eindeutig bestimmen. Ist das Ergebnis unklar (Zeitüberschreitung, "wird gerade ausgeführt"), NIE blind erneut senden: erst mit get_recent_messages prüfen, ob die Nachricht schon im Chat steht. Bei "WhatsApp nicht verbunden" wurde nichts gesendet, später erneut versuchen. Vor Nachrichten an eine Person bei Bedarf get_person (Ton, Anrede).\n` +

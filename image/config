@@ -1,0 +1,14 @@
+# pi-gen settings for the Jarvis image (arm64 branch). The build workflow appends a random FIRST_USER_PASS that is
+# never stored: the image needs no console login, everything happens in the browser.
+IMG_NAME=jarvis
+RELEASE=trixie
+TARGET_HOSTNAME=jarvis
+FIRST_USER_NAME=jarvis
+DISABLE_FIRST_BOOT_USER_RENAME=1
+ENABLE_SSH=0
+LOCALE_DEFAULT=de_DE.UTF-8
+KEYBOARD_KEYMAP=de
+KEYBOARD_LAYOUT="German"
+TIMEZONE_DEFAULT=Europe/Berlin
+DEPLOY_COMPRESSION=xz
+STAGE_LIST="stage0 stage1 stage2 stage-jarvis"

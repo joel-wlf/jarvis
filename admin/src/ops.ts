@@ -102,23 +102,45 @@ async function snapshotImages(ctx: Ctx, services: string[]) {
   return snap
 }
 
+/** Services whose freshly pulled image differs from the one their container runs. Unknown counts as changed. */
+async function changedImages(ctx: Ctx, before: { service: string; id: string; ref: string }[]) {
+  const changed: string[] = []
+  for (const b of before) {
+    const i = await ctx.docker.docker(['image', 'inspect', '--format', '{{.Id}}', b.ref], { timeoutMs: 30_000 })
+    if (i.code !== 0 || i.out.trim() !== b.id) changed.push(b.service)
+  }
+  return changed
+}
+
 /**
  * Update to the current images and restart. Prefers the prebuilt images (`compose pull`), builds from source when
  * they cannot be pulled. The running services stay up until the new images are there; if the new state does not come
  * up healthy, the previous images are tagged back and started again.
+ * auto (the nightly update): never builds from source, and restarts nothing when no image changed.
  */
-export function startRebuild(ctx: Ctx) {
+export function startRebuild(ctx: Ctx, opts: { auto?: boolean } = {}) {
   const env = needEnv(ctx)
-  return ctx.jobs.start('rebuild', 'Alle Dienste aktualisieren', async (log) => {
+  return ctx.jobs.start(opts.auto ? 'update' : 'rebuild', opts.auto ? 'Nächtliche Aktualisierung' : 'Alle Dienste aktualisieren', async (log) => {
     const all = await activeServices(ctx.docker)
     const targets = all.filter((s) => s !== 'admin')
     const ref = `${env.JARVIS_REGISTRY || 'Standard-Registry'}, Version ${env.JARVIS_VERSION || 'latest'}`
     const before = await snapshotImages(ctx, targets)
+    const adminBefore = opts.auto ? await snapshotImages(ctx, all.filter((s) => s === 'admin')) : []
 
     log('info', `Lade vorgebaute Images (${ref}); die laufenden Dienste bleiben so lange aktiv …`)
     const pull = await ctx.docker.compose(['pull', ...all], { timeoutMs: 30 * 60_000, onLine: (l) => log('out', l) })
     if (pull.code === 0) {
       log('ok', 'Images geladen.')
+      if (opts.auto && before.length === targets.length) {
+        const changed = await changedImages(ctx, [...before, ...adminBefore])
+        if (!changed.length) {
+          log('ok', 'Schon auf dem neuesten Stand, nichts neu gestartet.')
+          return { status: 'ok' as const, result: { updated: [] } }
+        }
+        log('info', `Neue Versionen für: ${changed.join(', ')}`)
+      }
+    } else if (opts.auto) {
+      throw new Error('Die neuen Versionen konnten nicht geladen werden (keine Verbindung zur Registry?). Es läuft weiter der bisherige Stand; nächster Versuch in der nächsten Nacht.')
     } else {
       log('warn', 'Die vorgebauten Images sind nicht erreichbar; baue stattdessen aus dem Quellcode (das kann auf einem Raspberry Pi lange dauern) …')
       const b = await ctx.docker.compose(['build', ...targets], { timeoutMs: 90 * 60_000, onLine: (l) => log('out', l) })

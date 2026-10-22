@@ -1,0 +1,14 @@
+[Unit]
+Description=Start Jarvis
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=infinity
+ExecStart=/usr/local/sbin/jarvis-boot
+
+[Install]
+WantedBy=multi-user.target

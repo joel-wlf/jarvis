@@ -1,7 +1,7 @@
 // One resumable first-run flow, shared by the installer and Docker Compose.
 import { useEffect, useRef, useState, type ComponentRef } from 'react'
 import { KeyboardAvoidingView, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { SvgXml } from 'react-native-svg'
 import type { AdminState, ConnectionInfo, Job, SettingsResponse, SetupProgress, WaLink } from '@/api/admin'
@@ -20,7 +20,12 @@ import { type } from '@/theme/type'
 
 const STEPS = ['name', 'account', 'source', 'whatsapp', 'settings', 'remote', 'done'] as const
 const EMPTY: SetupProgress = { revision: 0, step: 'name', furthest: 0, complete: false, draft: {} }
-const SETTINGS_KEYS = ['OWNER_NAME', 'ORGANIZER_EXCLUDE_NAMES', 'ORGANIZER_REDACT', 'OPENAI_API_KEY', 'TRANSCRIBE_PROVIDER', 'IMAGE_DESCRIBE', 'EMBED_PROVIDER', 'ORGANIZER_ENABLED']
+const SETTINGS_KEYS = ['OWNER_NAME', 'ORGANIZER_EXCLUDE_NAMES', 'ORGANIZER_REDACT', 'OPENAI_API_KEY', 'OPENAI_BASE_URL', 'APP_MODEL', 'ORGANIZER_MODEL', 'IMAGE_MODEL', 'TRANSCRIBE_PROVIDER', 'IMAGE_DESCRIBE', 'EMBED_PROVIDER', 'ORGANIZER_ENABLED']
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1'
+/** The admin replaces this with the key from the OpenRouter sign-in (admin/src/openrouter.ts) */
+const OPENROUTER_PENDING = '@openrouter'
+/** Back from OpenRouter to plain OpenAI: the defaults of these keys fit OpenAI again */
+const OPENAI_RESET = { OPENAI_BASE_URL: 'https://api.openai.com/v1', EMBED_PROVIDER: '', TRANSCRIBE_PROVIDER: '', APP_MODEL: '', ORGANIZER_MODEL: '', IMAGE_MODEL: '' }
 const REMOTE_KEYS = ['APP_HOME_URL', 'APP_PUBLIC_URL', 'CLOUDFLARE_TUNNEL_TOKEN']
 const NAME_KEY = 'jarvis.setup.name'
 
@@ -29,6 +34,7 @@ export default function Setup() {
   const LABELS = STEPS.map((x) => t(`wizard.labels.${x}`))
   const { admin, adminChecked } = useSession()
   const router = useRouter()
+  const params = useLocalSearchParams<{ code?: string; state?: string }>()
   const wide = useWide()
   const [state, setState] = useState<AdminState | null>(null)
   const [progress, setProgress] = useState<SetupProgress>(EMPTY)
@@ -52,6 +58,9 @@ export default function Setup() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [needsReload, setNeedsReload] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [ai, setAi] = useState<'openrouter' | 'openai'>('openrouter')
+  const [orState, setOrState] = useState<string | null>(null)
+  const [orCode, setOrCode] = useState('')
   const actionLock = useRef(false)
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null)
   const index = STEPS.indexOf(step)
@@ -69,6 +78,7 @@ export default function Setup() {
       setSource(p.draft.source || 'whatsapp')
       setRemote(p.draft.remote || (fields.values.APP_PUBLIC_URL ? 'existing' : 'local'))
       setSettings(fields)
+      setAi(fields.secrets.OPENAI_API_KEY?.set && !fields.values.OPENAI_BASE_URL?.startsWith(OPENROUTER_URL) ? 'openai' : 'openrouter')
       setChanges((existing) => ({ ...Object.fromEntries(Object.entries(p.draft).filter(([key]) => ['OWNER_NAME', 'ORGANIZER_EXCLUDE_NAMES', 'APP_PUBLIC_URL'].includes(key))), ...existing }))
       setJob(s.job ?? null)
       setFailedJob(null)
@@ -112,6 +122,34 @@ export default function Setup() {
       } else setError(errorText(e))
     } finally { actionLock.current = false; setBusy(false) }
   }
+  const takeOpenRouter = async (from: string, code: string) => {
+    if (!admin) return
+    const r = await admin.openRouterFinish(from, code)
+    setAi('openrouter'); setOrState(null); setOrCode('')
+    setChanges((c) => ({ ...c, ...r.settings }))
+  }
+  const openRouterLogin = async (redirect: boolean) => {
+    if (!admin) return
+    if (redirect) await save('settings')
+    const r = await admin.openRouterStart(redirect)
+    if (redirect && Platform.OS === 'web') { window.location.assign(r.url); return }
+    setOrState(r.state)
+    await Linking.openURL(r.url)
+  }
+  const orConnected = changes.OPENAI_API_KEY === OPENROUTER_PENDING || (!changes.OPENAI_API_KEY && !!settings?.secrets.OPENAI_API_KEY?.set && !!settings?.values.OPENAI_BASE_URL?.startsWith(OPENROUTER_URL))
+
+  // Back from OpenRouter's sign-in page with ?code=…&state=…
+  const returned = useRef(false)
+  useEffect(() => {
+    // Wait until the sign-in and loading are done: loading picks the provider tab, and act runs one thing at a time
+    if (!admin || !state?.loggedIn || !settings || busy || !params.code || !params.state || returned.current) return
+    returned.current = true
+    const { code, state: from } = params
+    // Drop the one-time code from the address without remounting the screen
+    router.setParams({ code: undefined, state: undefined })
+    void act(async () => { await takeOpenRouter(from, code) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [admin, state?.loggedIn, settings, busy, params.code, params.state])
   const draft = () => ({ ...progress.draft, ...Object.fromEntries(Object.entries(changes).filter(([k]) => ['OWNER_NAME', 'ORGANIZER_EXCLUDE_NAMES', 'APP_PUBLIC_URL'].includes(k))), ASSISTANT_NAME: name.trim(), source, remote, pendingJobId: '' })
   const save = async (to: SetupProgress['step'], complete = false, from = progress, overrides: Record<string, string> = {}) => {
     if (!admin) return
@@ -161,8 +199,11 @@ export default function Setup() {
       if (source === 'whatsapp' && wa?.state !== 'open') throw new Error(t('wizard.err.waNotLinked'))
       await save('settings', false, from)
     } else if (step === 'settings') {
-      if (!changes.OPENAI_API_KEY && !settings?.secrets.OPENAI_API_KEY?.set) throw new Error(t('wizard.err.key', { name }))
-      const selected = Object.fromEntries(Object.entries(changes).filter(([key]) => SETTINGS_KEYS.includes(key)))
+      if (ai === 'openrouter' && !orConnected) throw new Error(t('wizard.err.openrouter', { name }))
+      if (ai === 'openai' && !changes.OPENAI_API_KEY && !settings?.secrets.OPENAI_API_KEY?.set) throw new Error(t('wizard.err.key', { name }))
+      const wasOpenRouter = !!settings?.values.OPENAI_BASE_URL?.startsWith(OPENROUTER_URL)
+      const values = ai === 'openai' ? { ...changes, ...(wasOpenRouter || changes.OPENAI_BASE_URL ? OPENAI_RESET : {}) } : changes
+      const selected = Object.fromEntries(Object.entries(values).filter(([key]) => SETTINGS_KEYS.includes(key)))
       if (settings?.values.ORGANIZER_ENABLED !== 'true' && selected.ORGANIZER_ENABLED === undefined) selected.ORGANIZER_ENABLED = 'true'
       await apply(selected)
     } else if (step === 'remote') {
@@ -277,9 +318,21 @@ export default function Setup() {
               <Text style={type.h1} accessibilityRole="header">{t('wizard.ai.title', { name })}</Text>
               <Text style={type.body}>{t('wizard.ai.lead', { name })}</Text>
               {field('OWNER_NAME')}
+              <Seg items={[{ key: 'openrouter', label: t('wizard.ai.orTab'), on: ai === 'openrouter', onPress: () => setAi('openrouter') }, { key: 'openai', label: t('wizard.ai.keyTab'), on: ai === 'openai', onPress: () => { setAi('openai'); setChanges((c) => (c.OPENAI_API_KEY === OPENROUTER_PENDING ? Object.fromEntries(Object.entries(c).filter(([k]) => k !== 'OPENAI_API_KEY')) : c)) } }]} />
+              {ai === 'openrouter' ? <>
+                <Text style={type.body}>{t('wizard.ai.orLead', { name })}</Text>
+                {orConnected ? <Notice level="ok" text={t('wizard.ai.orConnected')} /> : null}
+                <BlockButton label={orConnected ? t('wizard.ai.orAgain') : t('wizard.ai.orLogin')} variant={orConnected ? 'line' : undefined} busy={busy} onPress={() => void act(() => openRouterLogin(Platform.OS === 'web'))} />
+                <Text style={type.small}>{t('wizard.ai.orLimits')}</Text>
+                {orState ? <>
+                  <Field label={t('wizard.ai.orCode')} help={t('wizard.ai.orCodeHelp')} value={orCode} onChangeText={setOrCode} autoCapitalize="none" autoCorrect={false} />
+                  <BlockButton label={t('wizard.ai.orCodeTake')} variant="line" busy={busy} disabled={!orCode.trim()} onPress={() => void act(() => takeOpenRouter(orState, orCode.trim()))} />
+                </> : Platform.OS === 'web' ? <Press accessibilityRole="button" onPress={() => void act(() => openRouterLogin(false))}><Text style={[type.small, { textDecorationLine: 'underline' }]}>{t('wizard.ai.orNoRedirect')}</Text></Press> : null}
+              </> : <>
+                {field('OPENAI_API_KEY')}
+                <BlockButton label={t('wizard.ai.test')} variant="line" busy={busy} onPress={() => void act(async () => { const r = await admin.testOpenAi(changes.OPENAI_API_KEY || undefined, changes.OPENAI_API_KEY ? 'https://api.openai.com/v1' : undefined); if (!r.ok) throw new Error(r.message); setMessage(r.message) })} />
+              </>}
               <Notice level="info" text={t('wizard.ai.cost')} />
-              {field('OPENAI_API_KEY')}
-              <BlockButton label={t('wizard.ai.test')} variant="line" busy={busy} onPress={() => void act(async () => { const r = await admin.testOpenAi(changes.OPENAI_API_KEY || undefined); if (!r.ok) throw new Error(r.message); setMessage(r.message) })} />
               {field('ORGANIZER_EXCLUDE_NAMES')}{field('ORGANIZER_REDACT')}
               <Text style={type.small}>{t('wizard.ai.more')}</Text>
             </> : null}

@@ -38,7 +38,7 @@ export const FIXTURE_CARDS: Card[] = [
     key: 'sprach:lena:1', type: 'voice', group: 'reply', urgency: 2, state: 'new',
     title: 'Lena hat eine Sprachnachricht geschickt', source: { chat: 'Lena', chatJid: 'lena@demo', when: 'heute 16:10', at: iso(4) },
     say: 'Lena hat dir 48 Sekunden gesprochen: Umzug Sonntag ab 14 Uhr, und ob du Kartons von der Arbeit mitbringst.',
-    suggestions: [s('a', 'Kartons bringe ich', 'Klar, ich bring Kartons mit! Bis Sonntag 14 Uhr.', true), s('b', 'Ohne Kartons', 'Kartons schaffe ich nicht, aber ich bin pünktlich da.')],
+    suggestions: [s('a', 'Kartons bringe ich', 'Klar, ich bring Kartons mit! Bis Sonntag 14 Uhr.', true), s('b', 'Ohne Kartons', 'Kartons schaffe ich nicht, aber ich bin pünktlich da.'), { id: 'resolved', label: 'Schon geklärt', action: { kind: 'done' } }],
     data: { person: p('Lena', 'LE'), durationSec: 48, summary: 'Umzug Sonntag ab 14 Uhr, Transporter bis 18 Uhr. Fragt, ob du Kartons mitbringst.', stats: [{ label: 'Dauer', value: '0:48' }, { label: 'Thema', value: 'Umzug' }, { label: 'Frage', value: '1' }] },
   },
   {
@@ -46,7 +46,7 @@ export const FIXTURE_CARDS: Card[] = [
     title: 'Grillen bei Lukas', source: { chat: 'Abi 2019', when: 'Sa 18:00' },
     say: 'Lukas grillt Samstag ab 18 Uhr, sechs sind schon dabei. Nur deine Zusage fehlt noch.',
     context: 'Lena, Tim und Sarah haben schon zugesagt.',
-    suggestions: [s('a', 'Zusagen', 'Bin dabei, ich bring Getränke mit!', true), s('b', 'Später', 'Komme später, so gegen 20 Uhr.'), s('c', 'Absagen', 'Schaffe es leider nicht.')],
+    suggestions: [{ id: 'going', label: 'Ich bin dabei', action: { kind: 'attend', going: true }, primary: true }, { id: 'not-going', label: 'Bin nicht dabei', action: { kind: 'attend', going: false } }, s('a', 'Im Chat zusagen', 'Bin dabei, ich bring Getränke mit!')],
     data: { day: '25', weekday: 'Sa', month: 'Okt', time: '18:00', place: 'Garten bei Lukas, Am Mühlbach 4', attendees: [p('Lukas', 'LU'), p('Tim', 'TI'), p('Sarah', 'SA'), p('Lena', 'LE')], yes: 6, stats: [{ label: 'Beginn', value: '18:00' }, { label: 'Dabei', value: '6' }, { label: 'Du', value: 'offen' }] },
   },
   {

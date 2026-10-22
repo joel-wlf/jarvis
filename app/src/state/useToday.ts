@@ -199,7 +199,7 @@ export function useToday(wide: boolean) {
       if (selected === card.key) { setSelected(null); setPinned(false) }
       try {
         const res = await api.act(card.key, action)
-        if (!res.removed) setCards(before)
+        if (!res.removed) setCards(res.card ? before.map((c) => (c.key === card.key ? res.card! : c)) : before)
         toast(res.message)
         flash('happy', 1600)
         setSay(rest.length ? t('today.afterAct', { message: res.message, summary: summary(rest) }) : t('today.allDone'))

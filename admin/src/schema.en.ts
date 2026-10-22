@@ -38,7 +38,7 @@ export const FIELDS_EN: Record<string, Text> = {
   CLOUDFLARE_TUNNEL_TOKEN: { label: 'Cloudflare tunnel token', help: 'Makes Jarvis reachable from outside (Zero Trust → Networks → Tunnels). Set = tunnel runs. Pasting the whole install command works too.', patternHelp: 'Starts with eyJ…' },
   POSTGRES_PASSWORD: { label: 'Database password', help: 'Main database password. Only applies at the very first start; later only through "Rotate", which changes the database too.', patternHelp: 'At least 16 characters, only letters and digits (used in connection URLs)' },
   MCP_RO_PASSWORD: { label: 'Password of the MCP database roles', help: 'For the restricted roles mcp_ro, mcp_act and mcp_mem. Change only through "Rotate".', patternHelp: 'At least 16 characters, only letters and digits' },
-  OPENAI_API_KEY: { label: 'OpenAI API key', help: 'Without a key search and archive stay local; transcription, topic sorting and image descriptions are off.', patternHelp: 'Starts with sk-' },
+  OPENAI_API_KEY: { label: 'API key', help: 'Key from OpenAI or OpenRouter (with OpenRouter you can also sign in from the setup assistant). Without a key search and archive stay local; transcription, topic sorting and image descriptions are off.', patternHelp: 'Starts with sk-' },
   OPENAI_BASE_URL: { label: 'API address', help: 'For OpenAI-compatible providers or a proxy. Applies to topic sorting, image descriptions and the app.' },
   APP_MODEL: { label: 'App model', help: 'For reply suggestions and "Ask Jarvis" in the app. Needs an OpenAI key.', patternHelp: MODEL_HELP },
   ORGANIZER_EXCLUDE_NAMES: { label: 'Never send these chats to the AI', help: 'Chats whose name contains one of these words go neither to the embedding nor to the sorting API. Set this before the first start with a key.', placeholder: 'e.g. Doctor, Bank, Lawyer', patternHelp: LIST_HELP },
@@ -86,6 +86,8 @@ export const FIELDS_EN: Record<string, Text> = {
   JARVIS_SECRETS_DIR: { label: 'Folder of the real .env (vault)', help: 'Only with an encrypted vault: folder that ~/jarvis/.env points to (e.g. /srv/vault/secrets).', patternHelp: 'Absolute path' },
   LOG_LEVEL: { label: 'Log level wa-ingest', help: 'debug for troubleshooting, otherwise info.' },
   BAILEYS_LOG_LEVEL: { label: 'Log level WhatsApp library', help: 'Very chatty from info on.' },
+  AUTO_UPDATE: { label: 'Update automatically', help: 'Loads new versions at night and restarts only the services that changed. If the new state does not run cleanly, the old one comes back.' },
+  AUTO_UPDATE_HOUR: { label: 'Update time', help: 'Hour (time zone Europe/Berlin) when the nightly update starts.', unit: 'o\'clock' },
   JARVIS_VERSION: { label: 'Image version', help: 'Which prebuilt images are pulled: latest, a version like 1.2.0 or a commit (sha-abc1234). Takes effect with the next update.', patternHelp: 'Tag, e.g. latest or 1.2.0' },
   JARVIS_REGISTRY: { label: 'Image registry', help: 'Prefix of the images (<prefix>-<service>). Only change for your own fork or a mirror. docker-compose.yml must match.', patternHelp: 'Lower case, e.g. ghcr.io/owner/jarvis' },
 }

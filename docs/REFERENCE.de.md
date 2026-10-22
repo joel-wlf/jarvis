@@ -39,38 +39,43 @@ WhatsApp ──QR──> wa-ingest ──> postgres (pgvector) <── mcp-serve
 | `whisper` | whisper.cpp (CPU) für die Transkription von Sprachnachrichten. Das Audio wird nicht gespeichert. |
 | `mcp-server` | MCP (Streamable HTTP) mit Read-only-DB-Zugang und Suchtools. |
 | `cloudflared` | Cloudflare Tunnel, macht den MCP-Server von außen erreichbar. |
-| `admin` | Weboberfläche für Einrichtung, Einstellungen, Status, Logs und Wartung (Port 8080, nur Heimnetz). |
+| `admin` | Weboberfläche für Einrichtung, Einstellungen, Status, Logs und Wartung (über `app-web` auf Port 8081, beim Pi-Image Port 80, nur Heimnetz). |
 
 ## Einrichtung auf dem Pi
 
 Voraussetzung: Raspberry Pi OS, Debian oder Ubuntu (arm64 oder amd64, 64-bit), idealerweise Daten auf SSD. Auf dem Mac genügt Docker Desktop.
 
-### Mit der Weboberfläche (empfohlen)
+### Fertiges Raspberry-Pi-Image (am einfachsten)
 
-Ein Befehl zeigt zuerst die Hinweise oben und lässt sie bestätigen, installiert dann Docker (nach Rückfrage), lädt die vorgebauten Images (kein Bauen auf dem Pi, kein Speicherproblem), startet die Oberfläche und zeigt Adresse und Einrichtungscode:
+Jedes Release enthält `jarvis-<version>-arm64.img.xz`: Raspberry Pi OS Lite (64-bit) mit Docker und Jarvis, gebaut von `.github/workflows/pi-image.yml` mit pi-gen (Stage in `image/`). Mit dem Raspberry Pi Imager auf eine SD-Karte schreiben (WLAN in den Imager-Einstellungen, mit Kabel nichts), einstecken, `http://jarvis.local` öffnen. Beim ersten Start lädt `jarvis-boot.service` die Images und zeigt so lange eine Warteseite auf Port 80; `jarvis-mdns.service` meldet `jarvis.local` im Netz an, auch wenn der Imager einen anderen Hostnamen gesetzt hat. Jarvis liegt unter `/opt/jarvis`. Es gibt keinen Konsolen-Login und kein SSH, außer du richtest beides im Imager ein. Die Imager-Liste für `rpi-imager --repo` liegt unter `releases/latest/download/rpi-imager.json`.
+
+### Mit dem Installer
+
+Auf einem vorhandenen 64-bit-Linux zeigt ein Skript zuerst die Hinweise oben und lässt sie bestätigen, installiert dann Docker (auf Debian und Ubuntu nach Rückfrage), lädt die vorgebauten Images (kein Bauen auf dem Pi, kein Speicherproblem), startet die Oberfläche und zeigt die Adresse:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/joel-wlf/jarvis/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/joel-wlf/jarvis/main/install.sh -o install-jarvis.sh
+bash install-jarvis.sh
 ```
 
-Optionen (hinter `sh -s --`): `--dir ORDNER` (Standard `~/jarvis`), `--version 1.2.0` (Standard: neuestes Release), `--yes` (alle Fragen mit Ja, auch den Hinweis oben; ohne Terminal nötig), `--accept-risks` (nur den Hinweis bestätigen), `--uninstall` (stoppt Jarvis; fragt vor dem Löschen der Daten, `--purge` löscht sie ohne Rückfrage). Die Meldungen sind Englisch, bei `LANG=de_…` Deutsch. Das Skript ist wiederholbar: Erneutes Ausführen aktualisiert auf die gewählte Version, eine vorhandene `.env` bleibt erhalten (nur `JARVIS_VERSION` wird gesetzt). Die Images liegen unter `ghcr.io/joel-wlf/jarvis-<dienst>` (arm64 und amd64).
+Optionen: `--dir ORDNER` (Standard `~/jarvis`), `--version REF` (Tag oder Commit, Standard `main`), `--port PORT` (Standard 8081), `--accept-risks` (Hinweis ohne Rückfrage bestätigen). Erneutes Ausführen startet eine vorhandene Installation wieder und überschreibt nichts. Die Images liegen unter `ghcr.io/joel-wlf/jarvis-<dienst>` (arm64 und amd64).
 
-Dann im Browser `http://<adresse-des-pi>:8080` öffnen, den Einrichtungscode eingeben und ein Admin-Passwort festlegen. Der Assistent fragt Name, OpenAI-Schlüssel (optional, mit Live-Test), Datenschutz-Ausschlüsse, Funktionen und Cloudflare-Tunnel ab, erzeugt alle Passwörter und den MCP-Token selbst, startet die Dienste und zeigt danach den **WhatsApp-QR-Code direkt im Browser** (oder einen Kopplungscode per Telefonnummer). Am Ende steht die Connector-URL zum Kopieren bereit.
+Dann im Browser `http://<adresse-des-pi>:8081` öffnen. Wer die Seite zuerst öffnet, legt das Passwort fest. Der Assistent fragt Name, Passwort, WhatsApp-Hinweise, koppelt WhatsApp per **QR-Code direkt im Browser** (oder Kopplungscode per Telefonnummer), verbindet die KI (**Anmeldung bei OpenRouter** ohne Schlüssel-Kopieren, oder ein OpenAI-Schlüssel mit Live-Test) samt Datenschutz-Ausschlüssen und fragt nach Fernzugriff (Heimnetz, Cloudflare-Tunnel oder eigene Adresse). Alle Passwörter und den MCP-Token erzeugt er selbst. Am Ende stehen App-QR-Code und Connector-URL bereit.
 
 Danach ist die Oberfläche die Zentrale für alles Weitere:
 
 | Bereich | Was geht |
 |---|---|
-| Übersicht | Zustand aller Dienste, WhatsApp-Verbindung, Archiv-Kennzahlen, freier Speicher, Warnungen, Connector-URL |
+| Übersicht | Zustand in Klartext („Alles läuft" oder z.B. „WhatsApp wurde abgemeldet" mit passendem Knopf), Dienste, WhatsApp-Verbindung, Archiv-Kennzahlen, freier Speicher, Connector-URL |
 | Einstellungen | Alle Einstellungen aus `.env` in Gruppen, mit Suche, Experten-Modus, Prüfung während der Eingabe, Vorschau der Unterschiede und betroffenen Dienste |
 | WhatsApp | QR-Code/Kopplungscode live, neu verknüpfen (das Archiv bleibt erhalten) |
 | Logs | Logs je Dienst, live, mit geschwärzten Geheimnissen |
-| Wartung | Dienste neu starten, auf neue Images aktualisieren (lädt sie, prüft die Gesundheit und setzt bei Fehlern auf die alten zurück; ohne erreichbare Images wird aus dem Quellcode gebaut), Kostenschätzung der Themen-Sortierung, MCP-Token und Datenbank-Passwörter wechseln, Admin-Passwort ändern, Protokolle früherer Vorgänge |
+| Wartung | Dienste neu starten, auf neue Images aktualisieren (passiert auch jede Nacht automatisch, siehe `AUTO_UPDATE` und `AUTO_UPDATE_HOUR`; nachts wird nie aus dem Quellcode gebaut und nichts neu gestartet, wenn es keine neuen Images gibt) (lädt sie, prüft die Gesundheit und setzt bei Fehlern auf die alten zurück; ohne erreichbare Images wird aus dem Quellcode gebaut), Kostenschätzung der Themen-Sortierung, MCP-Token und Datenbank-Passwörter wechseln, Admin-Passwort ändern, Protokolle früherer Vorgänge |
 | Versionen | Jede frühere `.env` (die letzten 30), Unterschiede ansehen und wiederherstellen |
 
 **So schützt die Oberfläche vor Fehlern:** Jede Änderung wird erst geprüft (Format, Grenzen, Abhängigkeiten wie „Themen-Sortierung braucht einen Schlüssel"), dann von Docker Compose gegengeprüft, bevor irgendetwas geschrieben wird. Die alte `.env` wird gesichert, die neue atomar geschrieben (ein Stromausfall hinterlässt nie eine halbe Datei). Danach startet Compose nur die betroffenen Dienste neu, und die Oberfläche wartet, bis alle stabil laufen und sich an der Datenbank anmelden können. Klappt das nicht, stellt sie den vorherigen Stand automatisch wieder her. Docker-Profile (`tunnel`, `organizer`, `local-whisper`) setzt sie passend zu den Schaltern; Datenbank-Passwörter lassen sich nur über „Wechseln" ändern, das die Datenbank mit umstellt. Es läuft immer nur ein Vorgang gleichzeitig; schließt du den Browser, läuft er weiter.
 
-**Sicherheit der Oberfläche:** Sie steuert Docker über den Docker-Socket und hat damit Root-Rechte auf dem Pi. Deshalb: nur im Heimnetz erreichbar (nie über den Cloudflare-Tunnel veröffentlichen), Erstzugang nur mit dem Einrichtungscode aus dem Log, danach Passwort (scrypt), Sperre nach 10 Fehlversuchen, Geheimnisse gehen nie im Klartext an den Browser (Anzeigen nur mit erneuter Passwort-Eingabe). Nur auf dem Pi selbst: unter Einstellungen → Oberfläche „Erreichbar über" auf `127.0.0.1` setzen und per `ssh -L 8080:localhost:8080 <pi>` zugreifen. Passwort vergessen: `docker compose exec admin node dist/src/cli.js reset-password`. Wer die Oberfläche nicht braucht: `docker compose stop admin`.
+**Sicherheit der Oberfläche:** Sie steuert Docker über den Docker-Socket und hat damit Root-Rechte auf dem Pi. Deshalb: nur im Heimnetz erreichbar (nie über den Cloudflare-Tunnel veröffentlichen), wer sie zuerst öffnet, legt das Passwort fest (scrypt), Sperre nach 10 Fehlversuchen, Geheimnisse gehen nie im Klartext an den Browser (Anzeigen nur mit erneuter Passwort-Eingabe). Nur auf dem Pi selbst: unter Einstellungen → Oberfläche „Web-Adresse" auf `127.0.0.1` setzen und per `ssh -L 8081:localhost:8081 <pi>` zugreifen. Passwort vergessen: `docker compose exec admin node dist/src/cli.js reset-password`. Wer die Oberfläche nicht braucht: `docker compose stop admin`.
 
 Mit verschlüsseltem Tresor (siehe unten) zeigt `.env` auf `/srv/vault/secrets/.env`; dafür muss `JARVIS_SECRETS_DIR=/srv/vault/secrets` in `.env` stehen (das Tresor-Skript trägt es ein, die Oberfläche nennt sonst den genauen Befehl).
 
@@ -81,8 +86,7 @@ Für Entwicklung oder eigene Änderungen. Jeder Dienst hat in `docker-compose.ym
 ```bash
 git clone https://github.com/joel-wlf/jarvis.git ~/jarvis && cd ~/jarvis
 docker compose build          # auf einem Pi 4 dauert das 10 bis 30 Minuten
-docker compose up -d admin
-docker compose logs admin     # zeigt den Einrichtungscode
+docker compose up -d admin app-web   # dann http://<adresse-des-pi>:8081 öffnen
 ```
 
 Mit `JARVIS_REGISTRY` (Präfix, Standard `ghcr.io/joel-wlf/jarvis`) und `JARVIS_VERSION` (Standard `latest`) in `.env` wählst du andere Images, etwa die eines Forks.
