@@ -27,6 +27,11 @@ export interface CardRef {
   topicId?: number
   /** organizer thread the card comes from, for its background */
   threadId?: number
+  /** from the person's profile, for questions */
+  relationship?: string
+  closeness?: number
+  /** who started a poll */
+  fromName?: string
   /** watch_state renotify window (polls) */
   renotifyMs?: number
 }
@@ -35,6 +40,10 @@ export interface Built {
   ref: CardRef
   /** for sorting */
   at: number
+  /** Jarvis' own guess of the urgency, before the owner's priority or a rule changed it */
+  guess: Urgency
+  /** the owner's choice for this card: set per card, or by a rule for its chat or type (1 later, 3 important) */
+  owner?: Urgency
 }
 
 const S = {
@@ -158,7 +167,8 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
   const t = S[l]
   const watch = await loadWatchState()
   const going = attendanceOf(watch)
-  const out: Built[] = []
+  // `guess` is filled in below, once every card is built
+  const out: (Omit<Built, 'guess'> & { guess?: Urgency })[] = []
   const visible = (key: string, renotifyMs?: number): CardState | null => {
     const r = resolveState(key, watch, { renotifyMs })
     return r.state === 'dismissed' || r.state === 'snoozed' ? null : r.state === 'notified' ? 'notified' : 'new'
@@ -192,7 +202,7 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
     if (x.closeness) stats.push({ label: t.closeness, value: `${x.closeness}/5` })
     const resolved: Suggestion = { id: 'resolved', label: t.resolved, action: { kind: 'done' } }
     const common = { urgency, state, chat: x.chat_name, chatJid: x.chat_jid, at: ts, suggestions: [resolved, ...laterSuggestions(l, now)] }
-    const ref = { chatJid: x.chat_jid, messageId: x.id }
+    const ref: CardRef = { chatJid: x.chat_jid, messageId: x.id, ...(x.relationship ? { relationship: x.relationship } : {}), ...(x.closeness ? { closeness: Number(x.closeness) } : {}) }
     if (x.type === 'audio') {
       const sec = Number(x.seconds ?? 0)
       out.push({ at: ts.getTime(), ref, card: { ...base('voice', key, { ...common, title: t.voice, say: t.voiceSay(name, sec) }, l, now), data: { person: p, durationSec: sec, summary: cut(x.body, 160), ...(x.body ? { transcript: x.body } : {}), messageId: x.id, stats } } })
@@ -225,7 +235,7 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
     const suggestions: Suggestion[] = options.slice(0, 4).map((o, i) => ({ id: `vote-${i}`, label: o.label, action: { kind: 'vote', option: o.label, pollId: x.id }, ...(o.recommended ? { primary: true } : {}) }))
     suggestions.push(laterSuggestions(l, now)[2])
     const ageD = (now.getTime() - ts.getTime()) / 86400_000
-    out.push({ at: ts.getTime(), ref: { chatJid: x.chat_jid, messageId: x.id, renotifyMs: POLL_RENOTIFY_MS }, card: { ...base('poll', key, { urgency: ageD < 1 ? 2 : 1, state, title: cut(x.question, 120), chat: x.chat_name, chatJid: x.chat_jid, at: ts, say: t.pollSay(niceName(x.chat_name, l)), suggestions }, l, now), data: { pollId: x.id, voted: String(res?.voted ?? 0), options } } })
+    out.push({ at: ts.getTime(), ref: { chatJid: x.chat_jid, messageId: x.id, renotifyMs: POLL_RENOTIFY_MS, fromName: x.sender_name }, card: { ...base('poll', key, { urgency: ageD < 3 ? 2 : 1, state, title: cut(x.question, 120), chat: x.chat_name, chatJid: x.chat_jid, at: ts, say: t.pollSay(niceName(x.chat_name, l)), suggestions }, l, now), data: { pollId: x.id, voted: String(res?.voted ?? 0), options } } })
   }
 
   // --- events (next 7 days, same stages as the watch service) and conflicts ---
@@ -410,17 +420,21 @@ export async function listCards(l: Lang, now = new Date()): Promise<Built[]> {
   const rules = rulesOf(watch)
   for (let i = out.length - 1; i >= 0; i--) {
     const b = out[i]
+    b.guess = b.card.urgency
     const rule = ruleFor(b.card, b.ref.chatJid, rules)
     if (rule?.dismissed) {
       out.splice(i, 1)
       continue
     }
     const p = priorityOf(b.card.key, watch) ?? (rule?.priority ? (rule.priority as Urgency) : undefined)
-    if (p) b.card.urgency = p
+    if (p) {
+      b.card.urgency = p
+      b.owner = p
+    }
   }
   // Importance first, then the nearest deadline, then the newest.
-  const due = (b: Built) => (b.card.dueAt ? new Date(b.card.dueAt).getTime() : Infinity)
-  return out.sort((a, b) => b.card.urgency - a.card.urgency || due(a) - due(b) || b.at - a.at)
+  const due = (b: Pick<Built, 'card'>) => (b.card.dueAt ? new Date(b.card.dueAt).getTime() : Infinity)
+  return (out as Built[]).sort((a, b) => b.card.urgency - a.card.urgency || due(a) - due(b) || b.at - a.at)
 }
 
 export function countCards(cards: Built[]): Record<CardGroup | 'all', number> {
